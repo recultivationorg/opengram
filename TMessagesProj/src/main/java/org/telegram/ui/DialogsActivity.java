@@ -5806,6 +5806,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     public boolean isPremiumRestoreHintVisible() {
+        if (BuildVars.DISABLE_PREMIUM_PROMO) {
+            return false;
+        }
         if (!MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && folderId == 0 && communityId == 0) {
             return MessagesController.getInstance(currentAccount).pendingSuggestions.contains("PREMIUM_RESTORE") && !getUserConfig().isPremium() && MediaDataController.getInstance(currentAccount).getPremiumHintAnnualDiscount(false) != null;
         }
@@ -5813,6 +5816,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     public boolean isPremiumChristmasHintVisible() {
+        if (BuildVars.DISABLE_PREMIUM_PROMO) {
+            return false;
+        }
         if (!MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && folderId == 0 && communityId == 0) {
             return MessagesController.getInstance(currentAccount).pendingSuggestions.contains("PREMIUM_CHRISTMAS");
         }
@@ -5820,6 +5826,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     public boolean isPremiumHintVisible() {
+        if (BuildVars.DISABLE_PREMIUM_PROMO) {
+            return false;
+        }
         if (!MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && folderId == 0 && communityId == 0) {
             if (MessagesController.getInstance(currentAccount).pendingSuggestions.contains("PREMIUM_UPGRADE") && getUserConfig().isPremium() || MessagesController.getInstance(currentAccount).pendingSuggestions.contains("PREMIUM_ANNUAL") && !getUserConfig().isPremium()) {
                 if (UserConfig.getInstance(currentAccount).isPremium() ? !BuildVars.useInvoiceBilling() && MediaDataController.getInstance(currentAccount).getPremiumHintAnnualDiscount(true) != null : MediaDataController.getInstance(currentAccount).getPremiumHintAnnualDiscount(false) != null) {
@@ -5965,7 +5974,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             username = UserObject.getUserName(MessagesController.getInstance(currentAccount).getUser(dialogId));
         }
         Bulletin bulletin;
-        if (getMessagesController().premiumFeaturesBlocked()) {
+        if (BuildVars.DISABLE_PREMIUM_PROMO || getMessagesController().premiumFeaturesBlocked()) {
             bulletin = BulletinFactory.of(this).createSimpleBulletin(R.raw.star_premium_2, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserBlockedNonPremium, username)));
         } else {
             bulletin = BulletinFactory.of(this)
@@ -13509,6 +13518,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private void openStoriesRecorder() {
         if (!storiesEnabled) {
+            if (BuildVars.DISABLE_PREMIUM_PROMO) {
+                return;
+            }
             if (storyPremiumHint != null) {
                 if (storyPremiumHint.shown()) {
                     return;

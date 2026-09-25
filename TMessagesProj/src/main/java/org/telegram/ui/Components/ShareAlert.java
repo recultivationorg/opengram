@@ -69,6 +69,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.SQLite.SQLiteCursor;
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BotWebViewVibrationEffect;
 import org.telegram.messenger.ChatObject;
@@ -1912,7 +1913,7 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
             username = UserObject.getUserName(MessagesController.getInstance(currentAccount).getUser(dialogId));
         }
         Bulletin bulletin;
-        if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
+        if (BuildVars.DISABLE_PREMIUM_PROMO || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
             bulletin = BulletinFactory.of(bulletinContainer, resourcesProvider).createSimpleBulletin(R.raw.star_premium_2, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserBlockedNonPremium, username)));
         } else {
             bulletin = BulletinFactory.of(bulletinContainer, resourcesProvider).createSimpleBulletin(R.raw.star_premium_2, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserBlockedNonPremium, username)), LocaleController.getString(R.string.UserBlockedNonPremiumButton), () -> {

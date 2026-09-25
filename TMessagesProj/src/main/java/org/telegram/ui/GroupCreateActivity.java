@@ -44,6 +44,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.BotWebViewVibrationEffect;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
@@ -800,7 +801,7 @@ public class GroupCreateActivity extends BaseFragment implements NotificationCen
             username = UserObject.getUserName(MessagesController.getInstance(currentAccount).getUser(dialogId));
         }
         Bulletin bulletin;
-        if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
+        if (BuildVars.DISABLE_PREMIUM_PROMO || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
             bulletin = BulletinFactory.of(this).createSimpleBulletin(R.raw.star_premium_2, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserBlockedNonPremium, username)));
         } else {
             bulletin = BulletinFactory.of(this).createSimpleBulletin(R.raw.star_premium_2, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserBlockedNonPremium, username)), getString(R.string.UserBlockedNonPremiumButton), () -> presentFragment(new PremiumPreviewFragment("noncontacts")));

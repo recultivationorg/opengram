@@ -700,7 +700,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(UItem.asShadow(null));
 
-        if (!getMessagesController().premiumFeaturesBlocked()) {
+        if ((!BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) || getUserConfig().isPremium()) {
             items.add(SettingCell.Factory.of(11, 0xFFB659FF, 0xFF617CFF, R.drawable.settings_premium, getString(R.string.TelegramPremium)));
         }
         if (getMessagesController().starsPurchaseAvailable()) {
@@ -727,7 +727,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
         }
 
-        if (!getMessagesController().premiumFeaturesBlocked()) {
+        if ((!BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) || getUserConfig().isPremium()) {
             items.add(SettingCell.Factory.of(15, 0xFFF45255, 0xFFDF3955, R.drawable.settings_business, getString(R.string.TelegramBusiness)));
         }
         if (!getMessagesController().premiumPurchaseBlocked()) {

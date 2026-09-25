@@ -842,6 +842,10 @@ public abstract class BaseFragment {
                 }
             });
             visibleDialog.show();
+            if (!visibleDialog.isShowing()) {
+                visibleDialog = null;
+                return null;
+            }
             return visibleDialog;
         } catch (Exception e) {
             FileLog.e(e);
@@ -1082,6 +1086,12 @@ public abstract class BaseFragment {
         }
         fragment.setParentDialog(bottomSheet[0]);
         bottomSheet[0].setOpenNoDelay(true);
+        if (actionBarLayout[0].getFragmentStack().isEmpty()) {
+            if (LaunchActivity.instance != null) {
+                LaunchActivity.instance.sheetFragmentsStack.remove(actionBarLayout[0]);
+            }
+            return null;
+        }
         bottomSheet[0].show();
 
         return actionBarLayout;

@@ -154,6 +154,14 @@ public class GiftPremiumBottomSheet extends BottomSheetWithRecyclerListView impl
         });
     }
 
+    @Override
+    public void show() {
+        if (BuildVars.DISABLE_PREMIUM_PROMO) {
+            return;
+        }
+        super.show();
+    }
+
     private void initData() {
         giftTiers.clear();
         rowsCount = 0;

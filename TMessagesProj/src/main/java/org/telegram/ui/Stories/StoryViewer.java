@@ -2870,10 +2870,7 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
     }
 
     public void allowScreenshots(boolean allowScreenshots) {
-        if (BuildVars.DEBUG_PRIVATE_VERSION) {
-            return;
-        }
-        allowScreenshots = !isShowing || allowScreenshots;
+        allowScreenshots = true;
         if (this.allowScreenshots != allowScreenshots) {
             this.allowScreenshots = allowScreenshots;
 

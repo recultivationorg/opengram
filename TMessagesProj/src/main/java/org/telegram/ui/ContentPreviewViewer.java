@@ -55,6 +55,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
@@ -712,6 +713,9 @@ public class ContentPreviewViewer {
                 containerView.invalidate();
             } else if (currentContentType == CONTENT_TYPE_STICKER) {
                 if (MessageObject.isPremiumSticker(currentDocument) && !AccountInstance.getInstance(currentAccount).getUserConfig().isPremium()) {
+                    if (BuildVars.DISABLE_PREMIUM_PROMO) {
+                        return;
+                    }
                     showUnlockPremiumView();
                     menuVisible = true;
                     containerView.invalidate();

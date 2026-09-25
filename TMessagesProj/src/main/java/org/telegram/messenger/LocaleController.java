@@ -1444,6 +1444,12 @@ public class LocaleController {
     }
 
     private String getStringInternal(String key, String fallback, int fallbackRes, int res) {
+        if ("AppName".equals(key)) {
+            return "Opengram";
+        }
+        if ("AppNameBeta".equals(key)) {
+            return "Opengram Beta";
+        }
         String value = BuildVars.USE_CLOUD_STRINGS ? localizationExternal.getByResNameOrResId(ApplicationLoader.applicationContext, key, res) : null;
         if (value == null) {
             if (BuildVars.USE_CLOUD_STRINGS && fallback != null) {

@@ -15,6 +15,7 @@ import android.widget.TextView;
 import androidx.core.graphics.ColorUtils;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
@@ -50,6 +51,15 @@ public class StealthModeAlert extends BottomSheet {
     private boolean stealthModeIsActive;
     private int type;
     private Listener listener;
+
+    @Override
+    public void show() {
+        TLRPC.User user = UserConfig.getInstance(currentAccount).getCurrentUser();
+        if (BuildVars.DISABLE_PREMIUM_PROMO && (user == null || !user.premium)) {
+            return;
+        }
+        super.show();
+    }
 
     public StealthModeAlert(Context context, float topOffset, int type, Theme.ResourcesProvider resourcesProvider) {
         super(context, false, resourcesProvider);

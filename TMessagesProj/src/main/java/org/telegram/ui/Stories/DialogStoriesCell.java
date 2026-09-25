@@ -53,6 +53,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.BotWebViewVibrationEffect;
 import org.telegram.messenger.BuildConfig;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLog;
@@ -2133,6 +2134,9 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
     }
 
     public void showPremiumHint() {
+        if (BuildVars.DISABLE_PREMIUM_PROMO) {
+            return;
+        }
         makePremiumHint();
         if (premiumHint != null) {
             if (premiumHint.shown()) {

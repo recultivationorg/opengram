@@ -2989,7 +2989,7 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
             username = UserObject.getUserName(MessagesController.getInstance(currentAccount).getUser(dialogId));
         }
         Bulletin bulletin;
-        if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
+        if (BuildVars.DISABLE_PREMIUM_PROMO || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
             bulletin = BulletinFactory.of(storyContainer, resourcesProvider)
                     .createSimpleBulletin(R.raw.star_premium_2, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserBlockedRepliesNonPremium, username)));
         } else {

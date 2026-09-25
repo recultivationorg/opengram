@@ -46,6 +46,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.BotWebViewVibrationEffect;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ChannelBoostsController;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
@@ -518,6 +519,8 @@ public class LimitReachedBottomSheet extends BottomSheetWithRecyclerListView imp
                 if (canApplyBoost.empty) {
                     if (UserConfig.getInstance(currentAccount).isPremium() && BoostRepository.isMultiBoostsAvailable()) {
                         BoostDialogs.showMoreBoostsNeeded(dialogId, this);
+                    } else if (BuildVars.DISABLE_PREMIUM_PROMO) {
+                        dismiss();
                     } else {
                         AlertDialog.Builder builder = new AlertDialog.Builder(context, resourcesProvider);
                         builder.setTitle(getString(R.string.PremiumNeeded));
@@ -635,7 +638,7 @@ public class LimitReachedBottomSheet extends BottomSheetWithRecyclerListView imp
                 dismiss();
                 return;
             }
-            if (UserConfig.getInstance(currentAccount).isPremium() || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() || isVeryLargeFile) {
+            if (BuildVars.DISABLE_PREMIUM_PROMO || UserConfig.getInstance(currentAccount).isPremium() || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() || isVeryLargeFile) {
                 dismiss();
                 return;
             }
@@ -653,7 +656,10 @@ public class LimitReachedBottomSheet extends BottomSheetWithRecyclerListView imp
         });
         premiumButtonView.overlayTextView.setOnClickListener(v -> {
             if (premiumButtonSetSubscribe) {
-                if (parentFragment == null) return;
+                if (BuildVars.DISABLE_PREMIUM_PROMO || parentFragment == null) {
+                    dismiss();
+                    return;
+                }
                 BaseFragment.BottomSheetParams params = new BaseFragment.BottomSheetParams();
                 params.transitionFromLeft = true;
                 params.allowNestedScroll = false;
@@ -711,7 +717,7 @@ public class LimitReachedBottomSheet extends BottomSheetWithRecyclerListView imp
             username = UserObject.getForcedFirstName(MessagesController.getInstance(currentAccount).getUser(dialogId));
         }
         Bulletin bulletin;
-        if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
+        if (BuildVars.DISABLE_PREMIUM_PROMO || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
             bulletin = BulletinFactory.of((FrameLayout) containerView, resourcesProvider).createSimpleBulletin(R.raw.star_premium_2, AndroidUtilities.replaceTags(LocaleController.formatString(R.string.UserBlockedNonPremium, username)));
         } else {
             bulletin = BulletinFactory.of((FrameLayout) containerView, resourcesProvider)
@@ -943,7 +949,7 @@ public class LimitReachedBottomSheet extends BottomSheetWithRecyclerListView imp
             spannableStringBuilder.setSpan(new ColoredImageSpan(R.drawable.msg_copy_filled), 0, 1, 0);
             spannableStringBuilder.append(getString(R.string.CopyLink));
             premiumButtonView.buttonTextView.setText(spannableStringBuilder);
-        } else if (UserConfig.getInstance(currentAccount).isPremium() || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() || isVeryLargeFile) {
+        } else if (BuildVars.DISABLE_PREMIUM_PROMO || UserConfig.getInstance(currentAccount).isPremium() || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() || isVeryLargeFile) {
             premiumButtonView.buttonTextView.setText(getString(R.string.OK));
             premiumButtonView.hideIcon();
         } else {
@@ -1908,7 +1914,7 @@ public class LimitReachedBottomSheet extends BottomSheetWithRecyclerListView imp
                 final int blockedInviting = premiumInviteBlockedUsers == null ? 0 : premiumInviteBlockedUsers.size();
                 final int blockedMessaging = premiumMessagingBlockedUsers == null ? 0 : premiumMessagingBlockedUsers.size();
 
-                if ((blockedInviting - blockedMessaging) > 0 && !(blockedInviting == 1 && blockedMessaging == 1) && canSendLink) {
+                if (!BuildVars.DISABLE_PREMIUM_PROMO && (blockedInviting - blockedMessaging) > 0 && !(blockedInviting == 1 && blockedMessaging == 1) && canSendLink) {
                     PremiumButtonView premiumButtonView = new PremiumButtonView(context, false, resourcesProvider);
                     ScaleStateListAnimator.apply(premiumButtonView, .02f, 1.2f);
                     premiumButtonView.setButton(getString(R.string.InvitePremiumBlockedSubscribe), v -> {

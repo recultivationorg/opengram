@@ -1119,6 +1119,9 @@ public class PremiumPreviewFragment extends BaseFragment implements Notification
     }
 
     public static void buyPremium(BaseFragment fragment, SubscriptionTier tier, String source, boolean forcePremium, BillingFlowParams.SubscriptionUpdateParams updateParams) {
+        if (BuildVars.DISABLE_PREMIUM_PROMO) {
+            return;
+        }
         if (BuildVars.IS_BILLING_UNAVAILABLE) {
             if (fragment == null) {
                 new PremiumNotAvailableBottomSheet(fragment).show();
@@ -1441,7 +1444,8 @@ public class PremiumPreviewFragment extends BaseFragment implements Notification
             showAdsInfoRow = rowCount++;
         }
 
-        AndroidUtilities.updateViewVisibilityAnimated(buttonContainer, !getUserConfig().isPremium() || currentSubscriptionTier != null && currentSubscriptionTier.getMonths() < subscriptionTiers.get(selectedTierIndex).getMonths() && !forcePremium, 1f, false);
+        boolean showBuyButton = !BuildVars.DISABLE_PREMIUM_PROMO && (!getUserConfig().isPremium() || currentSubscriptionTier != null && currentSubscriptionTier.getMonths() < subscriptionTiers.get(selectedTierIndex).getMonths() && !forcePremium);
+        AndroidUtilities.updateViewVisibilityAnimated(buttonContainer, showBuyButton, 1f, false);
 
         int buttonHeight = buttonContainer.getVisibility() == View.VISIBLE ? dp(64) : 0;
         layoutManager.setAdditionalHeight(buttonHeight + statusBarHeight - dp(16));
@@ -1455,7 +1459,7 @@ public class PremiumPreviewFragment extends BaseFragment implements Notification
 
     @Override
     public boolean onFragmentCreate() {
-        if (getMessagesController().premiumFeaturesBlocked()) {
+        if (BuildVars.DISABLE_PREMIUM_PROMO && !getUserConfig().isPremium() || getMessagesController().premiumFeaturesBlocked()) {
             return false;
         }
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.billingProductDetailsUpdated);

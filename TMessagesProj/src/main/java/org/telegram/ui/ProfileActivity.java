@@ -2520,7 +2520,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             flagSecure = null;
         }
         if (layout != null && layout.getParentActivity() != null) {
-            flagSecure = new FlagSecureReason(layout.getParentActivity().getWindow(), () -> currentEncryptedChat != null || isPeerNoForwards());
+            flagSecure = new FlagSecureReason(layout.getParentActivity().getWindow(), () -> false);
         }
     }
 
@@ -10650,7 +10650,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 devicesRow = rowCount++;
                 languageRow = rowCount++;
                 devicesSectionRow = rowCount++;
-                if (!getMessagesController().premiumFeaturesBlocked()) {
+                if ((!BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) || getUserConfig().isPremium()) {
                     premiumRow = rowCount++;
                 }
                 if (getMessagesController().starsPurchaseAvailable()) {
@@ -10660,7 +10660,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (ApplicationLoader.isBetaBuild() || ApplicationLoader.isStandaloneBuild() || ApplicationLoader.isHuaweiStoreBuild() || (StarsController.getInstance(currentAccount, true).balanceAvailable() && (StarsController.getInstance(currentAccount, true).hasTransactions() || StarsController.getInstance(currentAccount, true).getBalance().positive()))) {
                     tonRow = rowCount++;
                 }
-                if (!getMessagesController().premiumFeaturesBlocked()) {
+                if ((!BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) || getUserConfig().isPremium()) {
                     businessRow = rowCount++;
                 }
                 if (!getMessagesController().premiumPurchaseBlocked()) {
@@ -14802,6 +14802,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         }
 
         private static boolean isPremiumFeatureAvailable(int currentAccount, int feature) {
+            if (BuildVars.DISABLE_PREMIUM_PROMO)
+                return false;
             if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && !UserConfig.getInstance(currentAccount).isPremium())
                 return false;
             if (feature == -1)

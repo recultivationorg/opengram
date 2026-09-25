@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.content.pm.InstallSourceInfo;
 import android.content.pm.PackageInfo;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -17,11 +16,6 @@ import androidx.annotation.Keep;
 import androidx.annotation.OptIn;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter;
-import com.google.android.gms.tasks.Task;
-import com.google.android.play.core.integrity.IntegrityManager;
-import com.google.android.play.core.integrity.IntegrityManagerFactory;
-import com.google.android.play.core.integrity.IntegrityTokenRequest;
-import com.google.android.play.core.integrity.IntegrityTokenResponse;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,7 +25,6 @@ import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BaseController;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.CaptchaController;
-import org.telegram.messenger.EmuDetector;
 import org.telegram.messenger.FileLoadOperation;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
@@ -49,7 +42,6 @@ import org.telegram.proxy.WebProxyConnectionTester;
 import org.telegram.proxy.WebProxyTransport;
 import org.telegram.proxy.ProxySettings;
 import org.telegram.ui.Components.VideoPlayer;
-import org.telegram.ui.LoginActivity;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -68,7 +60,6 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
-import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -223,21 +214,27 @@ public class ConnectionsManager extends BaseController {
         try {
             systemLangCode = LocaleController.getSystemLocaleStringIso639().toLowerCase();
             langCode = LocaleController.getLocaleStringIso639().toLowerCase();
-            deviceModel = Build.MANUFACTURER + Build.MODEL;
+            deviceModel = BuildVars.REPORTED_DEVICE_MODEL;
+            systemVersion = BuildVars.REPORTED_SYSTEM_VERSION;
             PackageInfo pInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
-            appVersion = pInfo.versionName + " (" + pInfo.versionCode + ")";
-            if (BuildVars.DEBUG_PRIVATE_VERSION) {
-                appVersion += " pbeta";
-            } else if (BuildVars.DEBUG_VERSION) {
-                appVersion += " beta";
+            if (BuildVars.useOfficialWebIdentity()) {
+                appVersion = BuildVars.OFFICIAL_WEB_APP_VERSION;
+            } else if (BuildVars.useForkgramIdentity()) {
+                appVersion = BuildVars.FORKGRAM_APP_VERSION;
+            } else {
+                appVersion = "Opengram " + pInfo.versionName + " (" + pInfo.versionCode + ")";
+                if (BuildVars.DEBUG_PRIVATE_VERSION) {
+                    appVersion += " pbeta";
+                } else if (BuildVars.DEBUG_VERSION) {
+                    appVersion += " beta";
+                }
             }
-            systemVersion = "SDK " + Build.VERSION.SDK_INT;
         } catch (Exception e) {
             systemLangCode = "en";
             langCode = "";
-            deviceModel = "Android unknown";
+            deviceModel = BuildVars.REPORTED_DEVICE_MODEL;
             appVersion = "App version unknown";
-            systemVersion = "SDK " + Build.VERSION.SDK_INT;
+            systemVersion = BuildVars.REPORTED_SYSTEM_VERSION;
         }
         if (systemLangCode.trim().length() == 0) {
             systemLangCode = "en";
@@ -253,9 +250,9 @@ public class ConnectionsManager extends BaseController {
         }
         getUserConfig().loadConfig();
         String pushString = getRegId();
-        String fingerprint = AndroidUtilities.getCertificateSHA256Fingerprint();
+        String fingerprint = BuildVars.useOfficialWebIdentity() ? BuildVars.OFFICIAL_WEB_CERT_SHA256 : BuildVars.useForkgramIdentity() ? BuildVars.FORKGRAM_CERT_SHA256 : AndroidUtilities.getCertificateSHA256Fingerprint();
 
-        int timezoneOffset = (TimeZone.getDefault().getRawOffset() + TimeZone.getDefault().getDSTSavings()) / 1000;
+        int timezoneOffset = BuildVars.REPORTED_TIMEZONE_OFFSET;
         SharedPreferences mainPreferences;
         if (currentAccount == 0) {
             mainPreferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
@@ -267,7 +264,7 @@ public class ConnectionsManager extends BaseController {
         if (getUserConfig().getCurrentUser() != null) {
             userPremium = getUserConfig().getCurrentUser().premium;
         }
-        init(SharedConfig.buildVersion(), TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, langCode, systemLangCode, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), userPremium, enablePushConnection);
+        init(SharedConfig.buildVersion(), TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), userPremium, enablePushConnection);
     }
 
     private String getRegId() {
@@ -645,44 +642,14 @@ public class ConnectionsManager extends BaseController {
                         proxySettings.getUser(), proxySettings.getPassword(), proxySettings.getSecret());
             }
         }
-        String installer = "";
-        try {
-            Context context = ApplicationLoader.applicationContext;
-            if (Build.VERSION.SDK_INT >= 30) {
-                InstallSourceInfo installSourceInfo = context.getPackageManager().getInstallSourceInfo(context.getPackageName());
-                if (installSourceInfo != null) {
-                    installer = installSourceInfo.getInitiatingPackageName();
-                    if (installer == null) {
-                        installer = installSourceInfo.getInstallingPackageName();
-                    }
-                }
-            } else {
-                installer = context.getPackageManager().getInstallerPackageName(context.getPackageName());
-            }
-        } catch (Throwable ignore) {
-
-        }
-        if (installer == null) {
-            installer = "";
-        }
-        String packageId = "";
-        try {
-            packageId = ApplicationLoader.applicationContext.getPackageName();
-        } catch (Throwable ignore) {
-
-        }
-        if (packageId == null) {
-            packageId = "";
-        }
-
-        native_init(currentAccount, version, layer, apiId, deviceModel, systemVersion, appVersion, langCode, systemLangCode, configPath, logPath, regId, cFingerprint, installer, packageId, timezoneOffset, userId, userPremium, enablePushConnection, ApplicationLoader.isNetworkOnline(), ApplicationLoader.getCurrentNetworkType(), SharedConfig.measureDevicePerformanceClass());
+        String packageId = BuildVars.useOfficialWebIdentity() ? BuildVars.OFFICIAL_WEB_PACKAGE_ID : BuildVars.useForkgramIdentity() ? BuildVars.FORKGRAM_PACKAGE_ID : BuildVars.REPORTED_PACKAGE_ID;
+        native_init(currentAccount, version, layer, apiId, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, logPath, regId, cFingerprint, BuildVars.REPORTED_INSTALLER, packageId, BuildVars.REPORTED_TIMEZONE_OFFSET, userId, userPremium, enablePushConnection, ApplicationLoader.isNetworkOnline(), ApplicationLoader.getCurrentNetworkType(), SharedConfig.PERFORMANCE_CLASS_HIGH);
         checkConnection();
     }
 
     public static void setLangCode(String langCode) {
-        langCode = langCode.replace('_', '-').toLowerCase();
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            native_setLangCode(a, langCode);
+            native_setLangCode(a, BuildVars.REPORTED_LANG_CODE);
         }
     }
 
@@ -704,9 +671,8 @@ public class ConnectionsManager extends BaseController {
     }
 
     public static void setSystemLangCode(String langCode) {
-        langCode = langCode.replace('_', '-').toLowerCase();
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            native_setSystemLangCode(a, langCode);
+            native_setSystemLangCode(a, BuildVars.REPORTED_LANG_CODE);
         }
     }
 
@@ -840,15 +806,7 @@ public class ConnectionsManager extends BaseController {
     }
 
     public static int getInitFlags() {
-        int flags = 0;
-        EmuDetector detector = EmuDetector.with(ApplicationLoader.applicationContext);
-        if (detector.detect()) {
-            if (BuildVars.LOGS_ENABLED) {
-                FileLog.d("detected emu");
-            }
-            flags |= 1024;
-        }
-        return flags;
+        return 0;
     }
 
     public static void onBytesSent(int amount, int networkType, final int currentAccount) {
@@ -1506,41 +1464,7 @@ public class ConnectionsManager extends BaseController {
 
     @Keep
     public static void onIntegrityCheckClassic(final int currentAccount, final int requestToken, final String project, final String nonce) {
-        AndroidUtilities.runOnUIThread(() -> {
-            long start = System.currentTimeMillis();
-            FileLog.d("account"+currentAccount+": server requests integrity classic check with project = "+project+" nonce = " + nonce);
-            IntegrityManager integrityManager = IntegrityManagerFactory.create(ApplicationLoader.applicationContext);
-            final long project_id;
-            try {
-                project_id = Long.parseLong(project);
-            } catch (Exception e) {
-                FileLog.d("account"+currentAccount+": integrity check failes to parse project id");
-                native_receivedIntegrityCheckClassic(currentAccount, requestToken, nonce, "PLAYINTEGRITY_FAILED_EXCEPTION_NOPROJECT");
-                return;
-            }
-            Task<IntegrityTokenResponse> integrityTokenResponse = integrityManager.requestIntegrityToken(IntegrityTokenRequest.builder().setNonce(nonce).setCloudProjectNumber(project_id).build());
-            integrityTokenResponse
-                .addOnSuccessListener(r -> {
-                    final String token = r.token();
-
-                    if (token == null) {
-                        FileLog.e("account"+currentAccount+": integrity check gave null token in " + (System.currentTimeMillis() - start) + "ms");
-                        native_receivedIntegrityCheckClassic(currentAccount, requestToken, nonce, "PLAYINTEGRITY_FAILED_EXCEPTION_NULL");
-                        return;
-                    }
-
-                    FileLog.d("account"+currentAccount+": integrity check successfully gave token: " + token + " in " + (System.currentTimeMillis() - start) + "ms");
-                    try {
-                        native_receivedIntegrityCheckClassic(currentAccount, requestToken, nonce, token);
-                    } catch (Exception e) {
-                        FileLog.e("receivedIntegrityCheckClassic failed", e);
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    FileLog.e("account"+currentAccount+": integrity check failed to give a token in " + (System.currentTimeMillis() - start) + "ms", e);
-                    native_receivedIntegrityCheckClassic(currentAccount, requestToken, nonce, "PLAYINTEGRITY_FAILED_EXCEPTION_" + LoginActivity.errorString(e));
-                });
-        });
+        native_receivedIntegrityCheckClassic(currentAccount, requestToken, nonce, "PLAYINTEGRITY_DISABLED");
     }
 
     @Keep

@@ -44,6 +44,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BotWebViewVibrationEffect;
 import org.telegram.messenger.ContactsController;
@@ -642,11 +643,7 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
                 BulletinFactory.of(this).createSimpleBulletin(
                     R.raw.star_premium_2,
                     LocaleController.getString(R.string.OptionPremiumRequiredTitle),
-                    AndroidUtilities.replaceTags(LocaleController.getString(R.string.OptionPremiumRequiredMessage)),
-                    LocaleController.getString(R.string.OptionPremiumRequiredButton),
-                    () -> {
-                        presentFragment(new PremiumPreviewFragment("noncontacts"));
-                    }
+                    AndroidUtilities.replaceTags(LocaleController.getString(R.string.OptionPremiumRequiredMessage))
                 ).show();
                 BotWebViewVibrationEffect.APP_ERROR.vibrate();
                 AndroidUtilities.shakeViewSpring(view, shakeDp = -shakeDp);
@@ -654,11 +651,7 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
                 BulletinFactory.of(this).createSimpleBulletin(
                         R.raw.star_premium_2,
                         LocaleController.getString(R.string.OptionPremiumRequiredTitle),
-                        AndroidUtilities.replaceTags(LocaleController.getString(R.string.OptionPremiumRequiredMessage)),
-                        LocaleController.getString(R.string.OptionPremiumRequiredButton),
-                        () -> {
-                            presentFragment(new PremiumPreviewFragment("settings"));
-                        }
+                        AndroidUtilities.replaceTags(LocaleController.getString(R.string.OptionPremiumRequiredMessage))
                 ).show();
                 BotWebViewVibrationEffect.APP_ERROR.vibrate();
                 AndroidUtilities.shakeViewSpring(view, shakeDp = -shakeDp);
@@ -757,7 +750,9 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
                 updateDoneButton();
                 ((TextCheckCell) view).setChecked(selectedReadValue);
             } else if (position == readPremiumRow) {
-                presentFragment(new PremiumPreviewFragment("lastseen"));
+                if (!BuildVars.DISABLE_PREMIUM_PROMO) {
+                    presentFragment(new PremiumPreviewFragment("lastseen"));
+                }
             } else if (position == showGiftIconRow) {
                 selectedGiftIconValue = !selectedGiftIconValue;
                 updateDoneButton();
@@ -870,9 +865,7 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
         BulletinFactory.of(this).createSimpleBulletin(
             R.raw.star_premium_2,
             getString(R.string.OptionPremiumRequiredTitle),
-            AndroidUtilities.replaceTags(getString(R.string.OptionPremiumRequiredMessage)),
-            getString(R.string.OptionPremiumRequiredButton),
-            () -> presentFragment(new PremiumPreviewFragment("noncontacts"))
+            AndroidUtilities.replaceTags(getString(R.string.OptionPremiumRequiredMessage))
         ).show();
     }
 
@@ -1570,7 +1563,7 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
                 readRow = rowCount++;
                 readDetailRow = rowCount++;
             }
-            if (rulesType == PRIVACY_RULES_TYPE_LASTSEEN && !getMessagesController().premiumFeaturesBlocked()) {
+            if (rulesType == PRIVACY_RULES_TYPE_LASTSEEN && !BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) {
                 readPremiumRow = rowCount++;
                 readPremiumDetailRow = rowCount++;
             }

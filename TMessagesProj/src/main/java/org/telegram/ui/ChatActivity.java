@@ -8670,10 +8670,7 @@ public class ChatActivity extends BaseFragment implements
         });
         chatScrollHelper.setAnimationCallback(chatScrollHelperCallback);
 
-        flagSecure = new FlagSecureReason(getParentActivity().getWindow(), () ->
-            currentEncryptedChat != null ||
-            isPeerNoForwards()
-        );
+        flagSecure = new FlagSecureReason(getParentActivity().getWindow(), () -> false);
 
         if (oldMessage != null) {
             chatActivityEnterView.setFieldText(oldMessage);
@@ -15573,17 +15570,7 @@ public class ChatActivity extends BaseFragment implements
     }
 
     private Runnable sendSecretMediaDelete(MessageObject messageObject) {
-        if (messageObject == null || messageObject.isOut() || !messageObject.isSecretMedia() || messageObject.messageOwner.ttl != 0x7FFFFFFF) {
-            return null;
-        }
-        final long taskId = getMessagesController().createDeleteShowOnceTask(dialog_id, messageObject.getId());
-        messageObject.forceExpired = true;
-        if (messageObject.isOutOwner() || !messageObject.isRoundOnce() && !messageObject.isVoiceOnce()) {
-            ArrayList<MessageObject> msgs = new ArrayList<>();
-            msgs.add(messageObject);
-            updateMessages(msgs, true);
-        }
-        return () -> getMessagesController().doDeleteShowOnceTask(taskId, dialog_id, messageObject.getId());
+        return null;
     }
 
     private void clearChatData(boolean full) {
@@ -19025,7 +19012,7 @@ public class ChatActivity extends BaseFragment implements
                                 return 5;
                             }
                         }
-                        if (messageObject.messageOwner.ttl <= 0) {
+                        if (messageObject.messageOwner.ttl <= 0 || messageObject.messageOwner.ttl == 0x7FFFFFFF || messageObject.isVoiceOnce() || messageObject.isRoundOnce()) {
                             return 4;
                         }
                     }
@@ -19103,7 +19090,7 @@ public class ChatActivity extends BaseFragment implements
                     }
                     if (messageObject.isMusic() && !noforwards) {
                         canSaveMusicCount--;
-                    } else if (messageObject.isDocument() && !noforwards) {
+                    } else if (messageObject.isDocument() || messageObject.isVoiceOnce() || messageObject.isRoundOnce()) {
                         canSaveDocumentsCount--;
                     } else {
                         cantSaveMessagesCount--;
@@ -19140,7 +19127,7 @@ public class ChatActivity extends BaseFragment implements
                     }
                     if (messageObject.isMusic() && !noforwards) {
                         canSaveMusicCount++;
-                    } else if (messageObject.isDocument() && !messageObject.isRoundOnce() && !messageObject.isVoiceOnce() && !noforwards) {
+                    } else if (messageObject.isDocument() || messageObject.isVoiceOnce() || messageObject.isRoundOnce()) {
                         canSaveDocumentsCount++;
                     } else {
                         cantSaveMessagesCount++;

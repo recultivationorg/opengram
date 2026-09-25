@@ -827,6 +827,10 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
     }
 
     private void updatePremiumTiers() {
+        if (BuildVars.DISABLE_PREMIUM_PROMO) {
+            premiumTiers.clear();
+            return;
+        }
         premiumTiers.clear();
         if (premiumTiers.isEmpty() && options != null && !options.isEmpty()) {
             List<QueryProductDetailsParams.Product> products = new ArrayList<>();
@@ -919,7 +923,7 @@ public class GiftSheet extends BottomSheetWithRecyclerListView implements Notifi
 
     public void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         boolean pushedTopView = false;
-        if (!self && dialogId >= 0 && !(userSettings != null && userSettings.disallow_premium_gifts)) {
+        if (!BuildVars.DISABLE_PREMIUM_PROMO && !self && dialogId >= 0 && !(userSettings != null && userSettings.disallow_premium_gifts)) {
             items.add(UItem.asCustom(topView));
             pushedTopView = true;
             items.add(UItem.asCustom(premiumHeaderView));
