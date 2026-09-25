@@ -2668,6 +2668,7 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
     }
 
     public void close(boolean backAnimation) {
+        MessagesController.getInstance(currentAccount).getStoriesController().ghostReadDialogId = 0;
         AndroidUtilities.hideKeyboard(windowView);
         isClosed = true;
         invalidateOutRect = true;

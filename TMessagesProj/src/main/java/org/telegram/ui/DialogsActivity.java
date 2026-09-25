@@ -5286,6 +5286,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                                     }
                                 });
                                 showDialog(stealthModeAlert);
+                            }).makeMultiline(false).add(R.drawable.msg_stories_stealth2, LocaleController.getString(R.string.ViewAsGhost), () -> {
+                                if (view instanceof StoryCell) {
+                                    dialogStoriesCell.openStoryForCellAsGhost((StoryCell) view);
+                                }
                             }).makeMultiline(false).addIf(!fromTopPeer && !isArchive(), R.drawable.msg_archive, LocaleController.getString(R.string.ArchivePeerStories), () -> {
                                 toggleArciveForStory(dialogId);
                             }).makeMultiline(false).addIf(!fromTopPeer && isArchive(), R.drawable.msg_unarchive, LocaleController.getString(R.string.UnarchiveStories), () -> {

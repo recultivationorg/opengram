@@ -10511,7 +10511,22 @@ public class MessagesController extends BaseController implements NotificationCe
         checkReadTasks();
 
         if (getUserConfig().isClientActivated()) {
-            if (!ignoreSetOnline && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
+            if (SharedConfig.ghostMode) {
+                if (statusSettingState != 2 && !offlineSent) {
+                    statusSettingState = 2;
+                    if (statusRequest != 0) {
+                        getConnectionsManager().cancelRequest(statusRequest, true);
+                    }
+                    TL_account.updateStatus offlineReq = new TL_account.updateStatus();
+                    offlineReq.offline = true;
+                    statusRequest = getConnectionsManager().sendRequest(offlineReq, (response, error) -> {
+                        if (error == null) {
+                            offlineSent = true;
+                        }
+                        statusRequest = 0;
+                    });
+                }
+            } else if (!ignoreSetOnline && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
                 if (ApplicationLoader.mainInterfacePausedStageQueueTime != 0 && Math.abs(ApplicationLoader.mainInterfacePausedStageQueueTime - System.currentTimeMillis()) > 1000) {
                     if (statusSettingState != 1 && (lastStatusUpdateTime == 0 || Math.abs(System.currentTimeMillis() - lastStatusUpdateTime) >= 55000 || offlineSent)) {
                         statusSettingState = 1;
@@ -14392,6 +14407,9 @@ public class MessagesController extends BaseController implements NotificationCe
         long dialogId = messageObject.getDialogId();
         getMessagesStorage().markMessagesContentAsRead(dialogId, arrayList, 0, 0);
         getNotificationCenter().postNotificationName(NotificationCenter.messagesReadContent, dialogId, arrayList);
+        if (SharedConfig.ghostMode) {
+            return;
+        }
         if (messageObject.getId() < 0) {
             markMessageAsRead(messageObject.getDialogId(), messageObject.messageOwner.random_id, Integer.MIN_VALUE);
         } else {
@@ -14420,6 +14438,9 @@ public class MessagesController extends BaseController implements NotificationCe
 
     public void markMentionMessageAsRead(int mid, long channelId, long did) {
         getMessagesStorage().markMentionMessageAsRead(-channelId, mid, did);
+        if (SharedConfig.ghostMode) {
+            return;
+        }
         if (channelId != 0) {
             TLRPC.TL_channels_readMessageContents req = new TLRPC.TL_channels_readMessageContents();
             req.channel = getInputChannel(channelId);
@@ -14499,6 +14520,12 @@ public class MessagesController extends BaseController implements NotificationCe
         if (createDeleteTask) {
             getMessagesStorage().createTaskForMid(dialogId, mid, time, time, ttl, false);
         }
+        if (SharedConfig.ghostMode) {
+            if (newTaskId != 0) {
+                getMessagesStorage().removePendingTask(newTaskId);
+            }
+            return;
+        }
         if (inputChannel != null) {
             TLRPC.TL_channels_readMessageContents req = new TLRPC.TL_channels_readMessageContents();
             req.channel = inputChannel;
@@ -14536,7 +14563,9 @@ public class MessagesController extends BaseController implements NotificationCe
         }
         ArrayList<Long> randomIds = new ArrayList<>();
         randomIds.add(randomId);
-        getSecretChatHelper().sendMessagesReadMessage(chat, randomIds, null);
+        if (!SharedConfig.ghostMode) {
+            getSecretChatHelper().sendMessagesReadMessage(chat, randomIds, null);
+        }
         if (ttl > 0) {
             int time = getConnectionsManager().getCurrentTime();
             getMessagesStorage().createTaskForSecretChat(chat.id, time, time, 0, randomIds);
@@ -14544,6 +14573,9 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     private void completeReadTask(ReadTask task) {
+        if (SharedConfig.ghostMode) {
+            return;
+        }
         if (task.replyId != 0 && task.monoForumPeerId == 0) {
             TLRPC.TL_messages_readDiscussion req = new TLRPC.TL_messages_readDiscussion();
             req.msg_id = (int) task.replyId;
@@ -14650,6 +14682,9 @@ public class MessagesController extends BaseController implements NotificationCe
             return;
         }
         getMessagesStorage().resetMentionsCount(dialogId, topicId, 0);
+        if (SharedConfig.ghostMode) {
+            return;
+        }
         TLRPC.TL_messages_readMentions req = new TLRPC.TL_messages_readMentions();
         req.peer = getInputPeer(dialogId);
         if (topicId != 0) {
