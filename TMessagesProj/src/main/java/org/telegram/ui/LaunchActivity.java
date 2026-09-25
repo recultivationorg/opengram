@@ -5988,7 +5988,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         }
         final TLRPC.TL_help_getAppUpdate req = new TLRPC.TL_help_getAppUpdate();
         try {
-            req.source = ApplicationLoader.applicationContext.getPackageManager().getInstallerPackageName(ApplicationLoader.applicationContext.getPackageName());
+            req.source = BuildVars.REPORTED_INSTALLER;
         } catch (Exception ignore) {
 
         }

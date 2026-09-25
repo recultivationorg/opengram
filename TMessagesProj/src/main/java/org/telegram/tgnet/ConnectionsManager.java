@@ -264,10 +264,14 @@ public class ConnectionsManager extends BaseController {
         if (getUserConfig().getCurrentUser() != null) {
             userPremium = getUserConfig().getCurrentUser().premium;
         }
-        init(SharedConfig.buildVersion(), TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), userPremium, enablePushConnection);
+        int reportedVersion = BuildVars.useForkgramIdentity() ? BuildVars.FORKGRAM_VERSION_CODE : SharedConfig.buildVersion();
+        init(reportedVersion, TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), userPremium, enablePushConnection);
     }
 
     private String getRegId() {
+        if (BuildVars.useOfficialWebIdentity() || BuildVars.useForkgramIdentity()) {
+            return "";
+        }
         String pushString = SharedConfig.pushString;
         if (!TextUtils.isEmpty(pushString) && SharedConfig.pushType == PushListenerController.PUSH_TYPE_HUAWEI) {
             pushString = "huawei://" + pushString;

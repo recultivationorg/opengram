@@ -47,6 +47,7 @@ public class BuildVars {
     public static boolean REPORT_FORKGRAM_IDENTITY = true;
     public static final String FORKGRAM_PACKAGE_ID = "org.forkclient.messenger.beta";
     public static final String FORKGRAM_APP_VERSION = "12.10.5.1 (710019)";
+    public static final int FORKGRAM_VERSION_CODE = 710019;
     public static final String FORKGRAM_CERT_SHA256 = "0880F186D777F3CB6D82A66D02BD58850E3A270A26B678175459A95511235AE5";
 
     public static boolean useOfficialWebIdentity() {
