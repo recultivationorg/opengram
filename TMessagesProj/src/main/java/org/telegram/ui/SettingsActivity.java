@@ -698,7 +698,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(UItem.asShadow(null));
 
-        items.add(UItem.asHeader(getString(R.string.ControlPanel)));
         items.add(UItem.asCheck(25, getString(R.string.GhostMode)).setChecked(SharedConfig.ghostMode));
         items.add(UItem.asShadow(null));
 

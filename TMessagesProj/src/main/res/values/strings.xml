@@ -3309,7 +3309,6 @@
     <string name="CreateSticker">Create Sticker</string>
     <string name="StopDownload">Stop downloading</string>
     <string name="SaveToGallery">Save to gallery</string>
-    <string name="ControlPanel">Control Panel</string>
     <string name="GhostMode">Ghost mode</string>
     <string name="ViewAsGhost">View as a ghost</string>
     <string name="GhostModeAlert">Ghost mode cannot cover sending messages, subscribing to channels, posting stories, and other interactions that involve servers.</string>
