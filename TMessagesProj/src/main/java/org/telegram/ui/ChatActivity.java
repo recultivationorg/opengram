@@ -46310,9 +46310,11 @@ public class ChatActivity extends BaseFragment implements
                     icons.add(R.drawable.msg_gallery);
                 }
             }
-            items.add(LocaleController.getString(R.string.ExpireOnce));
-            options.add(OPTION_EXPIRE_ONCE);
-            icons.add(R.drawable.msg_delete);
+            int deleteIndex = options.indexOf(OPTION_DELETE);
+            int insertAt = deleteIndex >= 0 ? deleteIndex : items.size();
+            items.add(insertAt, LocaleController.getString(R.string.ExpireOnce));
+            options.add(insertAt, OPTION_EXPIRE_ONCE);
+            icons.add(insertAt, R.drawable.msg_stories_stealth2);
         }
 
         if (showWelcomeMessageRevertOption(primaryMessage)) {

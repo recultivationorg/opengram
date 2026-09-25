@@ -1831,10 +1831,6 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                             });
                         }
 
-                        if (!MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && !currentStory.isLive && !isChannel) {
-                            createStealthModeItem(popupLayout);
-                        }
-
                         if (isChannel && allowShareLink) {
                             ActionBarMenuItem.addItem(popupLayout, R.drawable.msg_link, getString(R.string.CopyLink), false, resourcesProvider).setOnClickListener(v -> {
                                 AndroidUtilities.addToClipboard(currentStory.createLink());
@@ -2077,9 +2073,6 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                             });
                         }
 
-                        if (!MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && !isChannel) {
-                            createStealthModeItem(popupLayout);
-                        }
                         if (allowShareLink) {
                             ActionBarMenuItem.addItem(popupLayout, R.drawable.msg_link2, getString(R.string.CopyLink), false, resourcesProvider).setOnClickListener(v -> {
                                 AndroidUtilities.addToClipboard(currentStory.createLink());
@@ -2398,44 +2391,6 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
             }
         });
         storyCaptionView.textSelectionHelper.setParentView(this);
-    }
-
-    private void createStealthModeItem(ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout) {
-        if (isBotsPreview() || currentStory.isLive) return;
-        if (UserConfig.getInstance(currentAccount).isPremium()) {
-            ActionBarMenuItem.addItem(popupLayout, R.drawable.msg_stories_stealth2, getString(R.string.StealthModeButton), false, resourcesProvider).setOnClickListener(v -> {
-                if (stealthModeIsActive) {
-                    StealthModeAlert.showStealthModeEnabledBulletin();
-                } else {
-                    StealthModeAlert stealthModeAlert = new StealthModeAlert(getContext(), getY() + storyContainer.getY(), StealthModeAlert.TYPE_FROM_STORIES, resourcesProvider);
-                    delegate.showDialog(stealthModeAlert);
-                }
-                if (popupMenu != null) {
-                    popupMenu.dismiss();
-                }
-            });
-        } else {
-            Drawable lockIcon2 = ContextCompat.getDrawable(getContext(), R.drawable.msg_gallery_locked2);
-            lockIcon2.setColorFilter(new PorterDuffColorFilter(ColorUtils.blendARGB(Color.WHITE, Color.BLACK, 0.5f), PorterDuff.Mode.MULTIPLY));
-            CombinedDrawable combinedDrawable2 = new CombinedDrawable(
-                    ContextCompat.getDrawable(getContext(), R.drawable.msg_stealth_locked),
-                    lockIcon2
-            ) {
-                @Override
-                public void setColorFilter(ColorFilter colorFilter) {
-
-                }
-            };
-            ActionBarMenuSubItem item2 = ActionBarMenuItem.addItem(popupLayout, R.drawable.msg_stories_stealth2, getString(R.string.StealthModeButton), false, resourcesProvider);
-            item2.setOnClickListener(v -> {
-                StealthModeAlert stealthModeAlert = new StealthModeAlert(getContext(), getY() + storyContainer.getY(), StealthModeAlert.TYPE_FROM_STORIES, resourcesProvider);
-                delegate.showDialog(stealthModeAlert);
-                if (popupMenu != null) {
-                    popupMenu.dismiss();
-                }
-            });
-            item2.setIcon(combinedDrawable2);
-        }
     }
 
     private void createQualityItem(ActionBarPopupWindow.ActionBarPopupWindowLayout popupLayout) {
