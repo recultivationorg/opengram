@@ -1247,6 +1247,7 @@ public class ChatActivity extends BaseFragment implements
 
     public final static int OPTION_VIEW_STATISTICS = 115;
     public final static int OPTION_WELCOME_REVERT = 116;
+    public final static int OPTION_EXPIRE_ONCE = 117;
 
     private final static int[] allowedNotificationsDuringChatListAnimations = new int[]{
             NotificationCenter.messagesRead,
@@ -34236,6 +34237,17 @@ public class ChatActivity extends BaseFragment implements
             case OPTION_WELCOME_REVERT:
                 getMessagesController().revertWelcomeEphemeralMessage(selectedObject);
                 break;
+            case OPTION_EXPIRE_ONCE: {
+                if (selectedObject != null) {
+                    selectedObject.forceExpired = true;
+                    long taskId = getMessagesController().createDeleteShowOnceTask(dialog_id, selectedObject.getId());
+                    getMessagesController().doDeleteShowOnceTask(taskId, dialog_id, selectedObject.getId());
+                    ArrayList<MessageObject> expired = new ArrayList<>();
+                    expired.add(selectedObject);
+                    updateMessages(expired, true);
+                }
+                break;
+            }
             case OPTION_SUGGESTION_ADD_OFFER:
             case OPTION_SUGGESTION_EDIT_PRICE: {
                 final MessageObject msg = selectedObjectGroup != null ? selectedObjectGroup.findPrimaryMessageObject() : selectedObject;
@@ -46261,11 +46273,42 @@ public class ChatActivity extends BaseFragment implements
             }
         }
 
+        if (selectedObject != null && isOneTimeMedia(selectedObject) && !selectedObject.forceExpired) {
+            if (!options.contains(OPTION_SAVE_TO_GALLERY) && !options.contains(OPTION_SAVE_TO_GALLERY2) && !options.contains(OPTION_SAVE_TO_DOWNLOADS_OR_MUSIC)) {
+                if (selectedObject.isVoice() || selectedObject.isRoundVideo() || selectedObject.getDocument() != null && !selectedObject.isVideo()) {
+                    items.add(LocaleController.getString(R.string.SaveToDownloads));
+                    options.add(OPTION_SAVE_TO_DOWNLOADS_OR_MUSIC);
+                    icons.add(R.drawable.msg_download);
+                } else {
+                    items.add(LocaleController.getString(R.string.SaveToGallery));
+                    options.add(OPTION_SAVE_TO_GALLERY);
+                    icons.add(R.drawable.msg_gallery);
+                }
+            }
+            items.add(LocaleController.getString(R.string.ExpireOnce));
+            options.add(OPTION_EXPIRE_ONCE);
+            icons.add(R.drawable.msg_delete);
+        }
+
         if (showWelcomeMessageRevertOption(primaryMessage)) {
             items.add(getString(R.string.WelcomeMessageRevert));
             options.add(OPTION_WELCOME_REVERT);
             icons.add(R.drawable.outline_revert_24);
         }
+    }
+
+    private boolean isOneTimeMedia(MessageObject messageObject) {
+        if (messageObject == null || messageObject.messageOwner == null) {
+            return false;
+        }
+        if (messageObject.isVoiceOnce() || messageObject.isRoundOnce()) {
+            return true;
+        }
+        if (messageObject.messageOwner.ttl == 0x7FFFFFFF) {
+            return true;
+        }
+        TLRPC.MessageMedia media = MessageObject.getMedia(messageObject.messageOwner);
+        return media != null && media.ttl_seconds == 0x7FFFFFFF;
     }
 
     private boolean showWelcomeMessageRevertOption(MessageObject messageObject) {

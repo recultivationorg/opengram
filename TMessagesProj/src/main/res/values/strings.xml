@@ -3309,6 +3309,7 @@
     <string name="CreateSticker">Create Sticker</string>
     <string name="StopDownload">Stop downloading</string>
     <string name="SaveToGallery">Save to gallery</string>
+    <string name="ExpireOnce">Expire</string>
     <string name="Of">%1$d of %2$d</string>
     <string name="OfS">%1$s of %2$s</string>
     <string name="TaggedMessages_one">%1$d message</string>
