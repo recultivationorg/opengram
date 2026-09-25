@@ -97,6 +97,7 @@ import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.SettingsSearchCell;
+import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AvatarDrawable;
@@ -697,6 +698,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(UItem.asShadow(null));
 
+        items.add(UItem.asHeader(getString(R.string.ControlPanel)));
+        items.add(UItem.asCheck(25, getString(R.string.GhostMode)).setChecked(SharedConfig.ghostMode));
+        items.add(UItem.asShadow(null));
+
         if ((!BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) || getUserConfig().isPremium()) {
             items.add(SettingCell.Factory.of(11, 0xFFB659FF, 0xFF617CFF, R.drawable.settings_premium, getString(R.string.TelegramPremium)));
         }
@@ -885,6 +890,27 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
             case 24: {
                 presentFragment(new RoundVideoSettingsActivity());
+                break;
+            }
+            case 25: {
+                if (!SharedConfig.ghostMode) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+                    builder.setTitle(getString(R.string.GhostMode));
+                    builder.setMessage(getString(R.string.GhostModeAlert));
+                    builder.setPositiveButton(getString(R.string.OK), (dialogInterface, i) -> {
+                        SharedConfig.ghostMode = true;
+                        SharedConfig.saveConfig();
+                        listView.adapter.update(true);
+                    });
+                    builder.setNegativeButton(getString(R.string.Cancel), (dialogInterface, i) -> listView.adapter.update(true));
+                    showDialog(builder.create());
+                } else {
+                    SharedConfig.ghostMode = false;
+                    SharedConfig.saveConfig();
+                    if (view instanceof TextCheckCell) {
+                        ((TextCheckCell) view).setChecked(false);
+                    }
+                }
                 break;
             }
         }
