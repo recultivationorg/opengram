@@ -3728,7 +3728,7 @@ public class StoriesController {
             if (seenStories.contains(storyId)) return false;
             seenStories.add(storyId);
             saveCache();
-            if (!SharedConfig.ghostMode && dialogId != ghostReadDialogId) {
+            if (!SharedConfig.ghostMode && dialogId != MessagesController.getInstance(currentAccount).getStoriesController().ghostReadDialogId) {
                 TL_stories.TL_stories_incrementStoryViews req = new TL_stories.TL_stories_incrementStoryViews();
                 req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
                 req.id.add(storyId);
