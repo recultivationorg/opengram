@@ -26,6 +26,7 @@
         android:theme="@style/Theme.TMessages.Start"
         android:hardwareAccelerated="true"
         android:largeHeap="true"
+        android:memtagMode="sync"
         android:supportsRtl="false"
         android:requestLegacyExternalStorage="true"
         tools:replace="android:supportsRtl">
