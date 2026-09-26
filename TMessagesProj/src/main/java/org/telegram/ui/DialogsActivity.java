@@ -3291,7 +3291,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (initialDialogsType == DIALOGS_TYPE_DEFAULT) {
             speedItem = menu.addItem(-47, R.drawable.avd_speed);
             AndroidUtilities.removeFromParent(speedItem);
-            speedItem.setOnClickListener(v -> showDialog(new PremiumFeatureBottomSheet(DialogsActivity.this, PremiumPreviewFragment.PREMIUM_FEATURE_DOWNLOAD_SPEED, true)));
+            speedItem.setOnClickListener(v -> presentFragment(new DownloadSpeedActivity()));
 
             fragmentSearchField.addAdditionalIcon(speedItem);
             fragmentSearchField.updateColors();

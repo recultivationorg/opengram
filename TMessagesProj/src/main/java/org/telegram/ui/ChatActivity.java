@@ -34248,7 +34248,7 @@ public class ChatActivity extends BaseFragment implements
                 break;
             }
             case OPTION_SPEED_PROMO: {
-                showDialog(new PremiumFeatureBottomSheet(ChatActivity.this, PremiumPreviewFragment.PREMIUM_FEATURE_DOWNLOAD_SPEED, true));
+                presentFragment(new DownloadSpeedActivity());
                 break;
             }
             case OPTION_OPEN_PROFILE: {
@@ -44480,7 +44480,11 @@ public class ChatActivity extends BaseFragment implements
             R.raw.speed_limit,
             LocaleController.getString(isUpload ? R.string.UploadSpeedLimited : R.string.DownloadSpeedLimited),
             AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(isUpload ? R.string.UploadSpeedLimitedMessage : R.string.DownloadSpeedLimitedMessage), () -> {
-                presentFragment(new PremiumPreviewFragment(isUpload ? "upload_speed" : "download_speed"));
+                if (isUpload) {
+                    presentFragment(new PremiumPreviewFragment("upload_speed"));
+                } else {
+                    presentFragment(new DownloadSpeedActivity());
+                }
             }), boldN)
         ).setDuration(8000).show(true);
     }

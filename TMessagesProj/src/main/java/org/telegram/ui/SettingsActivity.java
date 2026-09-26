@@ -700,6 +700,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(UItem.asCheck(25, getString(R.string.GhostMode)).setChecked(SharedConfig.ghostMode));
         items.add(SettingCell.Factory.of(26, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_secret, getString(R.string.OpengramPreload)));
+        items.add(SettingCell.Factory.of(27, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.msg_download, getString(R.string.DownloadSpeedScaling)));
         items.add(UItem.asShadow(null));
 
         if ((!BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) || getUserConfig().isPremium()) {
@@ -915,6 +916,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
             case 26: {
                 presentFragment(new OpengramPreloadActivity());
+                break;
+            }
+            case 27: {
+                presentFragment(new DownloadSpeedActivity());
                 break;
             }
         }

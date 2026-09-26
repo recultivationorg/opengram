@@ -295,6 +295,14 @@ public class FileLoadOperation {
             maxDownloadRequests = 4;
             maxDownloadRequestsBig = 4;
         }
+        if (SharedConfig.downloadSpeedScale > 0) {
+            maxDownloadRequests = SharedConfig.downloadRequestCount();
+            maxDownloadRequestsBig = maxDownloadRequests;
+            if (SharedConfig.downloadSpeedScale >= 2) {
+                downloadChunkSizeBig = 1024 * 512;
+            }
+        }
+        maxDownloadRequestsAnimation = Math.max(maxDownloadRequestsAnimation, maxDownloadRequests / 2);
         maxCdnParts = (int) (FileLoader.DEFAULT_MAX_FILE_SIZE / downloadChunkSizeBig);
     }
 

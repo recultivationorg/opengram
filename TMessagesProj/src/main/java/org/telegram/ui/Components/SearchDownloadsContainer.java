@@ -41,6 +41,7 @@ import org.telegram.ui.Cells.SharedAudioCell;
 import org.telegram.ui.Cells.SharedDocumentCell;
 import org.telegram.ui.FilteredSearchView;
 import org.telegram.ui.PhotoViewer;
+import org.telegram.ui.DownloadSpeedActivity;
 import org.telegram.ui.PremiumPreviewFragment;
 
 import java.util.ArrayList;
@@ -805,7 +806,11 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
                 R.raw.speed_limit,
                 LocaleController.getString(isUpload ? R.string.UploadSpeedLimited : R.string.DownloadSpeedLimited),
                 AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(isUpload ? R.string.UploadSpeedLimitedMessage : R.string.DownloadSpeedLimitedMessage), () -> {
-                    parentFragment.presentFragment(new PremiumPreviewFragment(isUpload ? "upload_speed" : "download_speed"));
+                    if (isUpload) {
+                        parentFragment.presentFragment(new PremiumPreviewFragment("upload_speed"));
+                    } else {
+                        parentFragment.presentFragment(new DownloadSpeedActivity());
+                    }
                 }), boldN)
         ).setDuration(8000).show(false);
     }

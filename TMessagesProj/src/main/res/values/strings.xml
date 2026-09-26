@@ -3318,6 +3318,12 @@
     <string name="OpengramPreloadNotFound">Not Found</string>
     <string name="OpengramPreloadEnable">Enable preload for this user</string>
     <string name="OpengramPreloadInfo">Opengram preload is a list of user IDs whose owner requested that others must contact them only over a secure channel.</string>
+    <string name="DownloadSpeedScaling">Download speed scaling</string>
+    <string name="DownloadSpeedStandard">Standard</string>
+    <string name="DownloadSpeedFaster">Faster</string>
+    <string name="DownloadSpeedHigh">High</string>
+    <string name="DownloadSpeedMaximum">Maximum</string>
+    <string name="DownloadSpeedScalingInfo">Raises how many files and file pieces download at once. Higher steps use more of a fast connection for accounts without Premium.</string>
     <string name="ViewAsGhost">View as a ghost</string>
     <string name="GhostModeAlert">Ghost mode cannot cover sending messages, subscribing to channels, posting stories, and other interactions that involve servers.</string>
     <string name="ExpireOnce">Expire</string>
@@ -8076,7 +8082,7 @@
     <string name="BotAllowBiometryTitle">Allow biometry</string>
     <string name="BotAllowBiometryMessage">Do you want to allow **%s** to use biometry?</string>
     <string name="DownloadSpeedLimited">Download speed limited</string>
-    <string name="DownloadSpeedLimitedMessage">Subscribe to **Telegram Premium** and increase download speeds %d times.</string>
+    <string name="DownloadSpeedLimitedMessage">Increase parallel downloads in **Download speed scaling**.</string>
     <string name="UploadSpeedLimited">Upload speed limited</string>
     <string name="UploadSpeedLimitedMessage">Subscribe to **Telegram Premium** and increase upload speeds %d times.</string>
     <string name="PrivacyBiometryBotsButton">Bots with biometry access</string>

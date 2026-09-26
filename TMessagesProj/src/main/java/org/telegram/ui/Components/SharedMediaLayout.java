@@ -150,6 +150,7 @@ import org.telegram.ui.Gifts.ProfileGiftsContainer;
 import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.LocationActivity;
 import org.telegram.ui.PhotoViewer;
+import org.telegram.ui.DownloadSpeedActivity;
 import org.telegram.ui.PremiumPreviewFragment;
 import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.ProfileActivity2;
@@ -11867,7 +11868,11 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
             R.raw.speed_limit,
             LocaleController.getString(isUpload ? R.string.UploadSpeedLimited : R.string.DownloadSpeedLimited),
             AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(isUpload ? R.string.UploadSpeedLimitedMessage : R.string.DownloadSpeedLimitedMessage), () -> {
-                profileActivity.presentFragment(new PremiumPreviewFragment(isUpload ? "upload_speed" : "download_speed"));
+                if (isUpload) {
+                    profileActivity.presentFragment(new PremiumPreviewFragment("upload_speed"));
+                } else {
+                    profileActivity.presentFragment(new DownloadSpeedActivity());
+                }
             }), boldN)
         ).setDuration(8000).show(true);
     }

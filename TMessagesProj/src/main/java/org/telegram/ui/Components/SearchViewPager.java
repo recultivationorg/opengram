@@ -68,6 +68,7 @@ import org.telegram.ui.Components.blur3.capture.IBlur3Capture;
 import org.telegram.ui.Components.blur3.utils.Blur3Utils;
 import org.telegram.ui.DialogsActivity;
 import org.telegram.ui.FilteredSearchView;
+import org.telegram.ui.DownloadSpeedActivity;
 import org.telegram.ui.PremiumPreviewFragment;
 import org.telegram.ui.ReportBottomSheet;
 import org.telegram.ui.SearchAdsInfoBottomSheet;
@@ -966,7 +967,7 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
                 return;
             }
 
-            parent.showDialog(new PremiumFeatureBottomSheet(parent, PremiumPreviewFragment.PREMIUM_FEATURE_DOWNLOAD_SPEED, true));
+            parent.presentFragment(new DownloadSpeedActivity());
         } else if (id == gotoItemId) {
             if (selectedFiles.size() != 1) {
                 return;
