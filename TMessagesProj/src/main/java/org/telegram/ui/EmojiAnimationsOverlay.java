@@ -907,6 +907,11 @@ public class EmojiAnimationsOverlay implements NotificationCenter.NotificationCe
         }
         interaction.interaction.data = jsonObject.toString();
 
+        if (SharedConfig.ghostMode) {
+            clearSendingInfo();
+            return;
+        }
+
         TLRPC.TL_messages_setTyping req = new TLRPC.TL_messages_setTyping();
         if (threadMsgId != 0) {
             req.top_msg_id = (int) threadMsgId;

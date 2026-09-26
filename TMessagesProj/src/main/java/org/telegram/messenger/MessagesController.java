@@ -10512,20 +10512,12 @@ public class MessagesController extends BaseController implements NotificationCe
 
         if (getUserConfig().isClientActivated()) {
             if (SharedConfig.ghostMode) {
-                if (statusSettingState != 2 && !offlineSent) {
-                    statusSettingState = 2;
-                    if (statusRequest != 0) {
-                        getConnectionsManager().cancelRequest(statusRequest, true);
-                    }
-                    TL_account.updateStatus offlineReq = new TL_account.updateStatus();
-                    offlineReq.offline = true;
-                    statusRequest = getConnectionsManager().sendRequest(offlineReq, (response, error) -> {
-                        if (error == null) {
-                            offlineSent = true;
-                        }
-                        statusRequest = 0;
-                    });
+                if (statusRequest != 0) {
+                    getConnectionsManager().cancelRequest(statusRequest, true);
+                    statusRequest = 0;
                 }
+                statusSettingState = 2;
+                offlineSent = true;
             } else if (!ignoreSetOnline && getConnectionsManager().getPauseTime() == 0 && ApplicationLoader.isScreenOn && !ApplicationLoader.mainInterfacePausedStageQueue) {
                 if (ApplicationLoader.mainInterfacePausedStageQueueTime != 0 && Math.abs(ApplicationLoader.mainInterfacePausedStageQueueTime - System.currentTimeMillis()) > 1000) {
                     if (statusSettingState != 1 && (lastStatusUpdateTime == 0 || Math.abs(System.currentTimeMillis() - lastStatusUpdateTime) >= 55000 || offlineSent)) {
@@ -11385,6 +11377,9 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean sendTyping(long dialogId, long threadMsgId, int action, String emojicon, int classGuid) {
+        if (SharedConfig.ghostMode) {
+            return false;
+        }
         if (action < 0 || action >= sendingTypings.length || dialogId == 0) {
             return false;
         }
@@ -21584,6 +21579,10 @@ public class MessagesController extends BaseController implements NotificationCe
             topicsController.markAllReactionsAsRead(-dialogId, topicId);
         }
         getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, 0);
+        if (SharedConfig.ghostMode) {
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.updateInterfaces, UPDATE_MASK_REACTIONS_READ);
+            return;
+        }
         TLRPC.TL_messages_readReactions req = new TLRPC.TL_messages_readReactions();
         req.peer = getInputPeer(dialogId);
 
@@ -21615,6 +21614,10 @@ public class MessagesController extends BaseController implements NotificationCe
             topicsController.markAllPollVotesAsRead(-dialogId, topicId);
         }
         getMessagesStorage().updateUnreadPollVotesCount(dialogId, topicId, 0);
+        if (SharedConfig.ghostMode) {
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.updateInterfaces, UPDATE_MASK_REACTIONS_READ);
+            return;
+        }
         TLRPC.TL_messages_readPollVotes req = new TLRPC.TL_messages_readPollVotes();
         req.peer = getInputPeer(dialogId);
 

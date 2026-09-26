@@ -2936,8 +2936,8 @@ public class VoIPService extends Service implements SensorEventListener, AudioMa
 				float maxAmplitude = 0;
 				boolean hasOther = false;
 				for (int a = 0; a < uids.length; a++) {
-					if (uids[a] == 0) {
-						if (chat != null && lastTypingTimeSend < SystemClock.uptimeMillis() - 5000 && levels[a] > 0.1f && voice[a]) {
+						if (uids[a] == 0) {
+						if (!SharedConfig.ghostMode && chat != null && lastTypingTimeSend < SystemClock.uptimeMillis() - 5000 && levels[a] > 0.1f && voice[a]) {
 							lastTypingTimeSend = SystemClock.uptimeMillis();
 							TLRPC.TL_messages_setTyping req = new TLRPC.TL_messages_setTyping();
 							req.action = new TLRPC.TL_speakingInGroupCallAction();
