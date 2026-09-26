@@ -238,6 +238,7 @@ public class SharedConfig {
     public static boolean saveIncomingPhotos;
     public static boolean allowScreenCapture;
     public static boolean ghostMode;
+    public static boolean forceEndToEndEncryption;
     public static int lastPauseTime;
     public static boolean isWaitingForPasscodeEnter;
     public static boolean useFingerprintLock = true;
@@ -452,6 +453,7 @@ public class SharedConfig {
                 editor.putBoolean("useFingerprint", useFingerprintLock);
                 editor.putBoolean("allowScreenCapture", allowScreenCapture);
                 editor.putBoolean("ghostMode", ghostMode);
+                editor.putBoolean("forceEndToEndEncryption", forceEndToEndEncryption);
                 editor.putString("pushString2", pushString);
                 editor.putInt("pushType", pushType);
                 editor.putBoolean("pushStatSent", pushStatSent);
@@ -531,6 +533,7 @@ public class SharedConfig {
             useFingerprintLock = preferences.getBoolean("useFingerprint", true);
             allowScreenCapture = preferences.getBoolean("allowScreenCapture", false);
             ghostMode = preferences.getBoolean("ghostMode", false);
+            forceEndToEndEncryption = preferences.getBoolean("forceEndToEndEncryption", false);
             lastLocalId = preferences.getInt("lastLocalId", -210000);
             pushString = preferences.getString("pushString2", "");
             pushType = preferences.getInt("pushType", PushListenerController.PUSH_TYPE_FIREBASE);

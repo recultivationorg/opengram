@@ -3310,6 +3310,14 @@
     <string name="StopDownload">Stop downloading</string>
     <string name="SaveToGallery">Save to gallery</string>
     <string name="GhostMode">Ghost mode</string>
+    <string name="OpengramPreload">Opengram Preload</string>
+    <string name="ForceEndToEndEncryption">Force End-to-end encryption</string>
+    <string name="ForceEndToEndEncryptionInfo">This option protects from interception by Telegram by making secret chats the default.</string>
+    <string name="OpengramPreloadStatus">Opengram preload</string>
+    <string name="OpengramPreloadEnabled">Enabled</string>
+    <string name="OpengramPreloadNotFound">Not Found</string>
+    <string name="OpengramPreloadEnable">Enable preload for this user</string>
+    <string name="OpengramPreloadInfo">Opengram preload is a list of user IDs whose owner requested that others must contact them only over a secure channel.</string>
     <string name="ViewAsGhost">View as a ghost</string>
     <string name="GhostModeAlert">Ghost mode cannot cover sending messages, subscribing to channels, posting stories, and other interactions that involve servers.</string>
     <string name="ExpireOnce">Expire</string>
