@@ -97,7 +97,6 @@ import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.SettingsSearchCell;
-import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AvatarDrawable;
@@ -117,6 +116,7 @@ import org.telegram.ui.Components.Paint.PersistColorPalette;
 import org.telegram.ui.Components.Premium.boosts.UserSelectorBottomSheet;
 import org.telegram.ui.Components.RadialProgressView;
 import org.telegram.ui.Components.RecyclerListView;
+import org.telegram.ui.Components.Switch;
 import org.telegram.ui.Components.ScaleStateListAnimator;
 import org.telegram.ui.Components.ShareAlert;
 import org.telegram.ui.Components.SizeNotifierFrameLayout;
@@ -698,9 +698,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(UItem.asShadow(null));
 
-        items.add(UItem.asCheck(25, getString(R.string.GhostMode)).setChecked(SharedConfig.ghostMode));
-        items.add(SettingCell.Factory.of(26, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_secret, getString(R.string.OpengramPreload)));
-        items.add(SettingCell.Factory.of(27, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.msg_download, getString(R.string.DownloadSpeedScaling)));
+        items.add(SettingCell.Factory.ofCheck(25, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.msg_stories_stealth2, getString(R.string.GhostMode), SharedConfig.ghostMode).setIconScale(0.7f));
+        items.add(SettingCell.Factory.of(26, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_secret, getString(R.string.OpengramPreload)).setIconScale(0.7f));
+        items.add(SettingCell.Factory.of(27, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.msg_download, getString(R.string.DownloadSpeedScaling)).setIconScale(0.83f));
         items.add(UItem.asShadow(null));
 
         if ((!BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) || getUserConfig().isPremium()) {
@@ -908,9 +908,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 } else {
                     SharedConfig.ghostMode = false;
                     SharedConfig.saveConfig();
-                    if (view instanceof TextCheckCell) {
-                        ((TextCheckCell) view).setChecked(false);
-                    }
+                    listView.adapter.update(true);
                 }
                 break;
             }
@@ -1179,6 +1177,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         private final TextView titleView;
         private final TextView subtitleView;
         private final TextView valueView;
+        private final Switch switchView;
         private final boolean mini;
 
         public SettingCell(Context context, Theme.ResourcesProvider resourcesProvider) {
@@ -1204,6 +1203,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             titleView = new TextView(context);
             titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            titleView.setSingleLine(true);
+            titleView.setEllipsize(TextUtils.TruncateAt.END);
             textLayout.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 0));
 
             subtitleView = new TextView(context);
@@ -1212,7 +1213,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             valueView = new TextView(context);
             valueView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+
+            switchView = new Switch(context, resourcesProvider);
+            switchView.setVisibility(GONE);
+            switchView.setClickable(false);
+            switchView.setFocusable(false);
+
             if (LocaleController.isRTL) {
+                addView(switchView, LayoutHelper.createLinear(37, 20, Gravity.CENTER_VERTICAL, 16, 0, 0, 0));
                 addView(valueView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 20, 0, 0, 0));
                 addView(textLayout, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1, Gravity.CENTER_VERTICAL | Gravity.FILL_HORIZONTAL, 20, 0, mini ? 12 : 18, 0));
                 addView(iconLayout, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, mini ? 9 : 18, 0));
@@ -1220,6 +1228,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 addView(iconLayout, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.LEFT, mini ? 9 : 18, 0, 0, 0));
                 addView(textLayout, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1, Gravity.CENTER_VERTICAL | Gravity.FILL_HORIZONTAL,  mini ? 12 : 18, 0, 20, 0));
                 addView(valueView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 0, 0, 20, 0));
+                addView(switchView, LayoutHelper.createLinear(37, 20, Gravity.CENTER_VERTICAL, 0, 0, 16, 0));
             }
             updateColors();
         }
@@ -1229,6 +1238,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
             subtitleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourcesProvider));
             valueView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, resourcesProvider));
+            switchView.setColors(Theme.key_switchTrack, Theme.key_switchTrackChecked, Theme.key_windowBackgroundWhite, Theme.key_windowBackgroundWhite);
             iconBackground.setDrawBorder(resourcesProvider != null ? resourcesProvider.isDark() : Theme.isCurrentThemeDark());
         }
 
@@ -1238,7 +1248,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             int iconColorTop, int iconColorBottom, int icon,
             CharSequence title,
             CharSequence subtitle,
-            CharSequence value
+            CharSequence value,
+            float iconScale
         ) {
             iconLayout.setVisibility(icon != 0 ? View.VISIBLE : View.GONE);
             titleView.setTranslationX(icon == 0 ? dp(2) : 0);
@@ -1246,10 +1257,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             iconBackground.setColor(iconColorTop, iconColorBottom);
             iconView.setImageResource(icon);
+            float scale = iconScale > 0f ? iconScale : 1f;
+            iconView.setScaleX(scale);
+            iconView.setScaleY(scale);
             titleView.setText(title);
             subtitleView.setVisibility((twoLines = !TextUtils.isEmpty(subtitle)) ? View.VISIBLE : View.GONE);
             subtitleView.setText(subtitle);
             setValue(value);
+        }
+
+        public void setChecked(boolean visible, boolean checked) {
+            switchView.setVisibility(visible ? VISIBLE : GONE);
+            if (visible) {
+                switchView.setChecked(checked, false);
+            }
         }
 
         public void setValue(CharSequence value) {
@@ -1327,12 +1348,15 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             public void bindView(View view, UItem item, boolean divider, UniversalAdapter adapter, UniversalRecyclerView listView) {
                 int iconColorTop    = (int) item.longValue;
                 int iconColorBottom = (int) (item.longValue >>> 32);
-                ((SettingCell) view).set(
+                SettingCell cell = (SettingCell) view;
+                cell.set(
                     iconColorTop, iconColorBottom, item.iconResId,
                     item.text,
                     item.subtext,
-                    item.textValue
+                    item.textValue,
+                    item.floatValue
                 );
+                cell.setChecked((item.flags & 1) != 0, item.checked);
             }
 
             public static UItem of(int id, int iconColorTop, int iconColorBottom, int icon, CharSequence title) {
@@ -1349,6 +1373,13 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 item.subtext = subtitle;
                 item.textValue = value;
                 item.longValue = ((long) iconColorBottom << 32) | (iconColorTop & 0xFFFFFFFFL);
+                return item;
+            }
+
+            public static UItem ofCheck(int id, int iconColorTop, int iconColorBottom, int icon, CharSequence title, boolean checked) {
+                final UItem item = of(id, iconColorTop, iconColorBottom, icon, title);
+                item.checked = checked;
+                item.flags = 1;
                 return item;
             }
 

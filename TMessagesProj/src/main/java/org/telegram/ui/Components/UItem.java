@@ -646,6 +646,11 @@ public class UItem extends AdapterWithDiffUtils.Item {
         return this;
     }
 
+    public UItem setIconScale(float scale) {
+        this.floatValue = scale;
+        return this;
+    }
+
     public UItem setChecked(boolean checked) {
         this.checked = checked;
         if (viewType == UniversalAdapter.VIEW_TYPE_FILTER_CHAT) {

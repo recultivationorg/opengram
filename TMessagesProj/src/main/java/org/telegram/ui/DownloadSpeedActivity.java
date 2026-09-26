@@ -3,26 +3,25 @@ package org.telegram.ui;
 import static org.telegram.messenger.LocaleController.getString;
 
 import android.content.Context;
+import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.FrameLayout;
-
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Components.LayoutHelper;
-import org.telegram.ui.Components.RecyclerListView;
-import org.telegram.ui.Components.SlideChooseView;
+import org.telegram.ui.Components.UItem;
+import org.telegram.ui.Components.UniversalAdapter;
+import org.telegram.ui.Components.UniversalRecyclerView;
+
+import java.util.ArrayList;
 
 public class DownloadSpeedActivity extends BaseFragment {
 
-    private RecyclerListView listView;
+    private UniversalRecyclerView listView;
 
     @Override
     public View createView(Context context) {
@@ -38,70 +37,28 @@ public class DownloadSpeedActivity extends BaseFragment {
             }
         });
 
-        listView = new RecyclerListView(context);
-        listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
-        listView.setVerticalScrollBarEnabled(false);
-        listView.setAdapter(new ListAdapter(context));
-        fragmentView = new FrameLayout(context);
-        fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
-        ((FrameLayout) fragmentView).addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-        return fragmentView;
+        FrameLayout contentView = new FrameLayout(context);
+        listView = new UniversalRecyclerView(this, this::fillItems, this::onClick, null);
+        listView.setSections();
+        listView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
+        contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+        actionBar.setAdaptiveBackground(listView);
+        return fragmentView = contentView;
     }
 
-    private class ListAdapter extends RecyclerListView.SelectionAdapter {
-        private final Context context;
+    private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
+        items.add(UItem.asSlideView(new String[] {
+            getString(R.string.DownloadSpeedStandard),
+            getString(R.string.DownloadSpeedFaster),
+            getString(R.string.DownloadSpeedHigh),
+            getString(R.string.DownloadSpeedMaximum)
+        }, SharedConfig.downloadSpeedScale, index -> {
+            SharedConfig.downloadSpeedScale = index;
+            SharedConfig.saveConfig();
+        }));
+        items.add(UItem.asShadow(getString(R.string.DownloadSpeedScalingInfo)));
+    }
 
-        private ListAdapter(Context context) {
-            this.context = context;
-        }
-
-        @Override
-        public int getItemCount() {
-            return 2;
-        }
-
-        @Override
-        public boolean isEnabled(RecyclerView.ViewHolder holder) {
-            return false;
-        }
-
-        @Override
-        public int getItemViewType(int position) {
-            return position == 0 ? 0 : 1;
-        }
-
-        @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view;
-            if (viewType == 0) {
-                SlideChooseView chooseView = new SlideChooseView(context);
-                chooseView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-                view = chooseView;
-            } else {
-                view = new TextInfoPrivacyCell(context);
-                view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
-            }
-            return new RecyclerListView.Holder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            if (position == 0) {
-                SlideChooseView chooseView = (SlideChooseView) holder.itemView;
-                chooseView.setCallback(index -> {
-                    SharedConfig.downloadSpeedScale = index;
-                    SharedConfig.saveConfig();
-                });
-                chooseView.setOptions(
-                    SharedConfig.downloadSpeedScale,
-                    getString(R.string.DownloadSpeedStandard),
-                    getString(R.string.DownloadSpeedFaster),
-                    getString(R.string.DownloadSpeedHigh),
-                    getString(R.string.DownloadSpeedMaximum)
-                );
-            } else {
-                ((TextInfoPrivacyCell) holder.itemView).setText(getString(R.string.DownloadSpeedScalingInfo));
-            }
-        }
+    private void onClick(UItem item, View view, int position, float x, float y) {
     }
 }
