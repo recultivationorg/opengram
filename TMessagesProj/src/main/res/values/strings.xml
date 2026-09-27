@@ -3312,7 +3312,12 @@
     <string name="GhostMode">Ghost mode</string>
     <string name="OpengramPreload">Opengram Preload</string>
     <string name="ForceEndToEndEncryption">Force End-to-end encryption</string>
-    <string name="ForceEndToEndEncryptionInfo">This option protects from interception by Telegram by making secret chats the default.</string>
+    <string name="ForceEndToEndEncryptionInfo">This option protects from interception by Telegram by opening new person chats as secret chats.</string>
+    <string name="ForceEndToEndForAllChats">Use for all chats</string>
+    <string name="ForceEndToEndForAllChatsInfo">Auto-starts a secret chat when opening an old chat created prior to enabling the main option</string>
+    <string name="ForceEndToEndStrongBoxTitle">Potential information leak</string>
+    <string name="ForceEndToEndStrongBoxWarning">This device has no Android StrongBox. The list of chats saved for this option is a potential information leak.</string>
+    <string name="StartSecretChat">Start secret chat</string>
     <string name="OpengramPreloadStatus">Opengram preload</string>
     <string name="OpengramPreloadEnabled">Enabled</string>
     <string name="OpengramPreloadNotFound">Not Found</string>

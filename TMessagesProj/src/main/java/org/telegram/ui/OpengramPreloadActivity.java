@@ -7,12 +7,14 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
 
+import org.telegram.messenger.OpengramChatSnapshot;
 import org.telegram.messenger.OpengramPreload;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
@@ -55,12 +57,15 @@ public class OpengramPreloadActivity extends BaseFragment {
         listView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         actionBar.setAdaptiveBackground(listView);
+        OpengramPreload.ensureSnapshot();
         return fragmentView = contentView;
     }
 
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         items.add(UItem.asCheck(1, getString(R.string.ForceEndToEndEncryption)).setChecked(SharedConfig.forceEndToEndEncryption));
         items.add(UItem.asShadow(getString(R.string.ForceEndToEndEncryptionInfo)));
+        items.add(UItem.asCheck(4, getString(R.string.ForceEndToEndForAllChats)).setChecked(SharedConfig.forceEndToEndForAllChats).setEnabled(SharedConfig.forceEndToEndEncryption));
+        items.add(UItem.asShadow(getString(R.string.ForceEndToEndForAllChatsInfo)));
         boolean enabled = OpengramPreload.contains(UserConfig.getInstance(currentAccount).getClientUserId());
         items.add(UItem.asButton(
             2,
@@ -72,13 +77,44 @@ public class OpengramPreloadActivity extends BaseFragment {
         items.add(UItem.asShadow(null));
     }
 
+    private void enableForceEndToEnd() {
+        SharedConfig.forceEndToEndEncryption = true;
+        OpengramPreload.captureExistingChats();
+        listView.adapter.update(true);
+    }
+
     private void onClick(UItem item, View view, int position, float x, float y) {
         if (item.id == 1) {
-            SharedConfig.forceEndToEndEncryption = !SharedConfig.forceEndToEndEncryption;
+            if (SharedConfig.forceEndToEndEncryption) {
+                SharedConfig.forceEndToEndEncryption = false;
+                SharedConfig.forceEndToEndChatsSnapshotted = false;
+                OpengramChatSnapshot.clear();
+                SharedConfig.saveConfig();
+                listView.adapter.update(true);
+                return;
+            }
+            if (getParentActivity() == null) {
+                return;
+            }
+            if (OpengramChatSnapshot.usesStrongBox()) {
+                enableForceEndToEnd();
+            } else {
+                AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+                builder.setTitle(getString(R.string.ForceEndToEndStrongBoxTitle));
+                builder.setMessage(getString(R.string.ForceEndToEndStrongBoxWarning));
+                builder.setPositiveButton(getString(R.string.OK), (dialogInterface, i) -> enableForceEndToEnd());
+                builder.setNegativeButton(getString(R.string.Cancel), (dialogInterface, i) -> listView.adapter.update(true));
+                showDialog(builder.create());
+            }
+        } else if (item.id == 4) {
+            if (!SharedConfig.forceEndToEndEncryption) {
+                return;
+            }
+            SharedConfig.forceEndToEndForAllChats = !SharedConfig.forceEndToEndForAllChats;
             SharedConfig.saveConfig();
             listView.adapter.update(true);
         } else if (item.id == 3) {
-            Browser.openUrl(getParentActivity(), "https://t.me/opengrampreloadbot");
+            Browser.openUrl(getParentActivity(), "https://t.me/ogpreloadbot");
         }
     }
 }

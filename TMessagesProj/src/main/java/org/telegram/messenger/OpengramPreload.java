@@ -1,12 +1,13 @@
 package org.telegram.messenger;
 
 import android.app.Activity;
+import android.util.LongSparseArray;
 
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.LaunchActivity;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 
 public final class OpengramPreload {
 
@@ -26,17 +27,74 @@ public final class OpengramPreload {
         return false;
     }
 
-    public static boolean requiresSecretChat(long userId) {
-        return userId > 0 && (SharedConfig.forceEndToEndEncryption || contains(userId));
+    public static void ensureSnapshot() {
+        if (!SharedConfig.forceEndToEndEncryption || SharedConfig.forceEndToEndChatsSnapshotted) {
+            return;
+        }
+        for (int account = 0; account < UserConfig.MAX_ACCOUNT_COUNT; account++) {
+            if (!UserConfig.getInstance(account).isClientActivated()) {
+                continue;
+            }
+            if (!MessagesController.getInstance(account).dialogsLoaded) {
+                return;
+            }
+        }
+        captureExistingChats();
+    }
+
+    public static void captureExistingChats() {
+        HashSet<String> ids = new HashSet<>();
+        boolean ready = true;
+        for (int account = 0; account < UserConfig.MAX_ACCOUNT_COUNT; account++) {
+            if (!UserConfig.getInstance(account).isClientActivated()) {
+                continue;
+            }
+            MessagesController controller = MessagesController.getInstance(account);
+            if (!controller.dialogsLoaded) {
+                ready = false;
+            }
+            LongSparseArray<TLRPC.Dialog> dialogs = controller.dialogs_dict;
+            for (int i = 0; i < dialogs.size(); i++) {
+                long dialogId = dialogs.keyAt(i);
+                if (DialogObject.isUserDialog(dialogId)) {
+                    ids.add(account + ":" + dialogId);
+                }
+            }
+        }
+        if (ready) {
+            SharedConfig.forceEndToEndChatsSnapshotted = OpengramChatSnapshot.store(ids);
+        } else {
+            SharedConfig.forceEndToEndChatsSnapshotted = false;
+        }
+        SharedConfig.saveConfig();
+    }
+
+    public static boolean chatPredatesForce(int account, long userId) {
+        ensureSnapshot();
+        if (!SharedConfig.forceEndToEndChatsSnapshotted) {
+            return true;
+        }
+        return OpengramChatSnapshot.contains(account, userId);
+    }
+
+    public static boolean forceApplies(int account, long userId) {
+        if (!SharedConfig.forceEndToEndEncryption || userId <= 0 || !canSecretChat(account, userId)) {
+            return false;
+        }
+        if (SharedConfig.forceEndToEndForAllChats) {
+            return true;
+        }
+        return !chatPredatesForce(account, userId);
     }
 
     public static boolean interceptCloudChat(ChatActivity fragment, long userId) {
-        if (!requiresSecretChat(userId)) {
+        final int account = fragment.getCurrentAccount();
+        if (!canSecretChat(account, userId)) {
             return false;
         }
-        final int account = fragment.getCurrentAccount();
-        TLRPC.User user = MessagesController.getInstance(account).getUser(userId);
-        if (user == null || user.bot || user.self || UserObject.isReplyUser(user) || UserObject.isService(userId)) {
+        boolean forced = forceApplies(account, userId);
+        boolean listed = contains(userId);
+        if (!forced && !listed) {
             return false;
         }
         TLRPC.EncryptedChat existing = findSecretChat(account, userId);
@@ -46,15 +104,50 @@ public final class OpengramPreload {
             present(new ChatActivity(args));
             return true;
         }
+        if (listed && !forced) {
+            TLRPC.User user = MessagesController.getInstance(account).getUser(userId);
+            Activity activity = fragment.getParentActivity();
+            if (activity == null) {
+                activity = LaunchActivity.instance;
+            }
+            beginSecretChat(activity, account, user);
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean shouldPromptSecretChat(int account, long userId) {
+        if (!forceApplies(account, userId)) {
+            return false;
+        }
+        return findSecretChat(account, userId) == null;
+    }
+
+    public static void startSecretChat(ChatActivity fragment, TLRPC.User user) {
+        if (fragment == null || user == null) {
+            return;
+        }
         Activity activity = fragment.getParentActivity();
         if (activity == null) {
             activity = LaunchActivity.instance;
         }
-        if (activity == null) {
+        beginSecretChat(activity, fragment.getCurrentAccount(), user);
+    }
+
+    private static boolean canSecretChat(int account, long userId) {
+        if (userId <= 0 || UserObject.isReplyUser(userId) || UserObject.isService(userId)) {
             return false;
         }
+        TLRPC.User user = MessagesController.getInstance(account).getUser(userId);
+        return user != null && !user.bot && !user.self && !UserObject.isDeleted(user);
+    }
+
+    private static void beginSecretChat(Activity activity, int account, TLRPC.User user) {
+        if (activity == null || user == null) {
+            return;
+        }
         final NotificationCenter center = NotificationCenter.getInstance(account);
-        final long expectedUserId = userId;
+        final long expectedUserId = user.id;
         NotificationCenter.NotificationCenterDelegate delegate = new NotificationCenter.NotificationCenterDelegate() {
             @Override
             public void didReceivedNotification(int id, int accountNum, Object... args) {
@@ -73,18 +166,17 @@ public final class OpengramPreload {
         };
         center.addObserver(delegate, NotificationCenter.encryptedChatCreated);
         SecretChatHelper.getInstance(account).startSecretChat(activity, user);
-        return true;
     }
 
     private static TLRPC.EncryptedChat findSecretChat(int account, long userId) {
         MessagesController controller = MessagesController.getInstance(account);
-        ArrayList<TLRPC.Dialog> dialogs = controller.getAllDialogs();
+        LongSparseArray<TLRPC.Dialog> dialogs = controller.dialogs_dict;
         for (int i = 0; i < dialogs.size(); i++) {
-            TLRPC.Dialog dialog = dialogs.get(i);
-            if (!DialogObject.isEncryptedDialog(dialog.id)) {
+            long dialogId = dialogs.keyAt(i);
+            if (!DialogObject.isEncryptedDialog(dialogId)) {
                 continue;
             }
-            TLRPC.EncryptedChat chat = controller.getEncryptedChat(DialogObject.getEncryptedChatId(dialog.id));
+            TLRPC.EncryptedChat chat = controller.getEncryptedChat(DialogObject.getEncryptedChatId(dialogId));
             if (chat != null && chat.user_id == userId && !(chat instanceof TLRPC.TL_encryptedChatDiscarded)) {
                 return chat;
             }

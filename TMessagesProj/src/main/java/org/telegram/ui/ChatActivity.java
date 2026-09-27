@@ -984,6 +984,7 @@ public class ChatActivity extends BaseFragment implements
 
     public final LongSparseArray<TL_bots.BotInfo> botInfo = new LongSparseArray<>();
     private String botUser;
+    private boolean promptSecretChat;
     private long inlineReturn;
     private String voiceChatHash;
     private boolean openVideoChat;
@@ -2673,9 +2674,6 @@ public class ChatActivity extends BaseFragment implements
         dialogFolderId = arguments.getInt("dialog_folder_id", 0);
         dialogFilterId = arguments.getInt("dialog_filter_id", 0);
         chatMode = arguments.getInt("chatMode", 0);
-        if (encId == 0 && userId != 0 && chatMode == 0 && OpengramPreload.interceptCloudChat(this, userId)) {
-            return false;
-        }
         quickReplyShortcut = arguments.getString("quick_reply", null);
         welcomeMessagesChatId = arguments.getLong("welcome_messages_chat_id", 0);
         voiceChatHash = arguments.getString("voicechat", null);
@@ -2783,6 +2781,10 @@ public class ChatActivity extends BaseFragment implements
                 }
             }
             dialog_id = userId;
+            if (encId == 0 && chatMode == 0 && OpengramPreload.interceptCloudChat(this, userId)) {
+                return false;
+            }
+            promptSecretChat = OpengramPreload.shouldPromptSecretChat(currentAccount, userId);
             botUser = arguments.getString("botUser");
             if (inlineQuery != null) {
                 getMessagesController().sendBotStart(currentUser, inlineQuery);
@@ -8454,13 +8456,23 @@ public class ChatActivity extends BaseFragment implements
         bottomOverlayStartButton.setGravity(Gravity.CENTER);
         bottomOverlayStartButton.setTypeface(AndroidUtilities.bold());
         bottomOverlayStartButton.setVisibility(View.INVISIBLE);
-        bottomOverlayStartButton.setOnClickListener(v -> bottomOverlayChatText.callOnClick());
+        bottomOverlayStartButton.setOnClickListener(v -> {
+            if (promptSecretChat) {
+                OpengramPreload.startSecretChat(ChatActivity.this, currentUser);
+                return;
+            }
+            bottomOverlayChatText.callOnClick();
+        });
         bottomOverlayStartButton.setPadding(dp(31), 0, dp(31), 0);
         ScaleStateListAnimator.apply(bottomOverlayStartButton, 0.02f, 1.2f);
         bottomChannelButtonsLayout.getContainer().addView(bottomOverlayStartButton, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 38, Gravity.CENTER, 3, 3, 3, 3));
         bottomChannelButtonsLayout.makeViewWrapContent(bottomOverlayStartButton);
 
-        if (currentUser != null && currentUser.bot && currentUser.id != UserObject.VERIFY && !UserObject.isDeleted(currentUser) && !UserObject.isReplyUser(currentUser) && !isInScheduleMode() && chatMode != MODE_PINNED && chatMode != MODE_SAVED && !isReport()) {
+        if (promptSecretChat) {
+            bottomOverlayStartButton.setText(LocaleController.getString(R.string.StartSecretChat));
+            bottomOverlayStartButton.setVisibility(View.VISIBLE);
+            bottomChannelButtonsLayout.setVisibility(View.VISIBLE);
+        } else if (currentUser != null && currentUser.bot && currentUser.id != UserObject.VERIFY && !UserObject.isDeleted(currentUser) && !UserObject.isReplyUser(currentUser) && !isInScheduleMode() && chatMode != MODE_PINNED && chatMode != MODE_SAVED && !isReport()) {
             bottomOverlayStartButton.setVisibility(View.VISIBLE);
             bottomChannelButtonsLayout.setVisibility(View.VISIBLE);
         }
@@ -27861,6 +27873,16 @@ public class ChatActivity extends BaseFragment implements
                     bottomOverlayChatText.setText(LocaleController.getString(R.string.ChannelUnmuteNoCaps), true);
                 }
                 showBottomOverlayProgress(false, true);
+            } else if (promptSecretChat && currentUser != null && !UserObject.isDeleted(currentUser)) {
+                if (bottomOverlayStartButton != null) {
+                    bottomOverlayStartButton.setText(LocaleController.getString(R.string.StartSecretChat));
+                    bottomOverlayStartButton.setVisibility(View.VISIBLE);
+                }
+                bottomOverlayChatText.setVisibility(View.GONE);
+                chatActivityEnterView.hidePopup(false);
+                if (getParentActivity() != null) {
+                    AndroidUtilities.hideKeyboard(getParentActivity().getCurrentFocus());
+                }
             } else if (botUser != null && currentUser.bot && !UserObject.isDeleted(currentUser)) {
                 if (bottomOverlayStartButton != null) {
                     bottomOverlayStartButton.setVisibility(View.VISIBLE);
@@ -28021,7 +28043,7 @@ public class ChatActivity extends BaseFragment implements
                     headerItem.setVisibility(View.VISIBLE);
                 }
             } else {
-                if (botUser != null && currentUser != null && currentUser.bot || currentUser != null && currentUser.id == UserObject.VERIFY || chatMode == MODE_SAVED && getSavedDialogId() != getUserConfig().getClientUserId()) {
+                if (promptSecretChat || botUser != null && currentUser != null && currentUser.bot || currentUser != null && currentUser.id == UserObject.VERIFY || chatMode == MODE_SAVED && getSavedDialogId() != getUserConfig().getClientUserId()) {
                     bottomChannelButtonsLayout.setVisibility(View.VISIBLE);
                     chatActivityEnterView.setVisibility(View.INVISIBLE);
                 } else {

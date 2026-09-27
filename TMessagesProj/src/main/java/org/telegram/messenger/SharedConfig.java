@@ -239,6 +239,8 @@ public class SharedConfig {
     public static boolean allowScreenCapture;
     public static boolean ghostMode;
     public static boolean forceEndToEndEncryption;
+    public static boolean forceEndToEndForAllChats;
+    public static boolean forceEndToEndChatsSnapshotted;
     public static int downloadSpeedScale;
 
     public static int downloadRequestCount() {
@@ -473,6 +475,8 @@ public class SharedConfig {
                 editor.putBoolean("allowScreenCapture", allowScreenCapture);
                 editor.putBoolean("ghostMode", ghostMode);
                 editor.putBoolean("forceEndToEndEncryption", forceEndToEndEncryption);
+                editor.putBoolean("forceEndToEndForAllChats", forceEndToEndForAllChats);
+                editor.putBoolean("forceEndToEndChatsSnapshotted", forceEndToEndChatsSnapshotted);
                 editor.putInt("downloadSpeedScale", downloadSpeedScale);
                 editor.putString("pushString2", pushString);
                 editor.putInt("pushType", pushType);
@@ -554,6 +558,8 @@ public class SharedConfig {
             allowScreenCapture = preferences.getBoolean("allowScreenCapture", false);
             ghostMode = preferences.getBoolean("ghostMode", false);
             forceEndToEndEncryption = preferences.getBoolean("forceEndToEndEncryption", false);
+            forceEndToEndForAllChats = preferences.getBoolean("forceEndToEndForAllChats", false);
+            forceEndToEndChatsSnapshotted = preferences.getBoolean("forceEndToEndChatsSnapshotted", false);
             downloadSpeedScale = preferences.getInt("downloadSpeedScale", 0);
             lastLocalId = preferences.getInt("lastLocalId", -210000);
             pushString = preferences.getString("pushString2", "");
