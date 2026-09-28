@@ -95,6 +95,7 @@ import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SavedMessagesController;
+import org.telegram.messenger.OpengramOutboundGuard;
 import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
@@ -7863,6 +7864,9 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                         TLRPC.Document document;
                         if (visibleReaction.emojicon != null) {
                             document = MediaDataController.getInstance(currentAccount).getEmojiAnimatedSticker(visibleReaction.emojicon);
+                            if (OpengramOutboundGuard.reject(currentAccount, dialogId)) {
+                                return;
+                            }
                             SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(visibleReaction.emojicon, dialogId);
                             params.replyToStoryItem = currentStory.storyItem;
                             params.payStars = payStars;
@@ -7875,6 +7879,9 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                                     reactionsContainerLayout.getReactionsWindow().dismissWithAlpha();
                                 }
                                 closeKeyboardOrEmoji();
+                                return;
+                            }
+                            if (OpengramOutboundGuard.reject(currentAccount, dialogId)) {
                                 return;
                             }
                             SendMessagesHelper.SendMessageParams params = SendMessagesHelper.SendMessageParams.of(emoticon, dialogId);

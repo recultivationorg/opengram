@@ -11864,17 +11864,23 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
         boldN.setSpan(new TypefaceSpan(AndroidUtilities.bold()), 0, boldN.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         if (profileActivity.hasStoryViewer()) return;
-        BulletinFactory.of(profileActivity).createSimpleBulletin(
-            R.raw.speed_limit,
-            LocaleController.getString(isUpload ? R.string.UploadSpeedLimited : R.string.DownloadSpeedLimited),
-            AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(isUpload ? R.string.UploadSpeedLimitedMessage : R.string.DownloadSpeedLimitedMessage), () -> {
-                if (isUpload) {
+        if (isUpload) {
+            BulletinFactory.of(profileActivity).createSimpleBulletin(
+                R.raw.speed_limit,
+                LocaleController.getString(R.string.UploadSpeedLimited),
+                AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(R.string.UploadSpeedLimitedMessage), () -> {
                     profileActivity.presentFragment(new PremiumPreviewFragment("upload_speed"));
-                } else {
-                    profileActivity.presentFragment(new DownloadSpeedActivity());
-                }
-            }), boldN)
-        ).setDuration(8000).show(true);
+                }), boldN)
+            ).setDuration(8000).show(true);
+        } else {
+            BulletinFactory.of(profileActivity).createSimpleBulletin(
+                R.raw.speed_limit,
+                LocaleController.getString(R.string.DownloadSpeedLimited),
+                LocaleController.getString(R.string.DownloadSpeedLimitedMessage),
+                LocaleController.getString(R.string.DownloadSpeedCappedGo),
+                () -> profileActivity.presentFragment(new DownloadSpeedActivity())
+            ).setDuration(8000).show(true);
+        }
     }
 
     public boolean canEditStories() {

@@ -84,6 +84,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.OpengramOutboundGuard;
 import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
@@ -2488,6 +2489,9 @@ public class ShareAlert extends BottomSheet implements NotificationCenter.Notifi
                 List<Long> removeKeys = new ArrayList<>();
                 for (int a = 0; a < selectedDialogs.size(); a++) {
                     long key = selectedDialogs.keyAt(a);
+                    if (OpengramOutboundGuard.reject(currentAccount, key)) {
+                        continue;
+                    }
                     boolean isMonoForum = MessagesController.getInstance(currentAccount).isMonoForum(key);
                     final Long price = prices == null ? (Long) 0L : prices.get(key);
                     if (price != null && price > 0) hadPaid = true;

@@ -44498,17 +44498,23 @@ public class ChatActivity extends BaseFragment implements
         boldN.setSpan(new TypefaceSpan(AndroidUtilities.bold()), 0, boldN.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         if (hasStoryViewer()) return;
-        BulletinFactory.of(this).createSimpleBulletin(
-            R.raw.speed_limit,
-            LocaleController.getString(isUpload ? R.string.UploadSpeedLimited : R.string.DownloadSpeedLimited),
-            AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(isUpload ? R.string.UploadSpeedLimitedMessage : R.string.DownloadSpeedLimitedMessage), () -> {
-                if (isUpload) {
+        if (isUpload) {
+            BulletinFactory.of(this).createSimpleBulletin(
+                R.raw.speed_limit,
+                LocaleController.getString(R.string.UploadSpeedLimited),
+                AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(R.string.UploadSpeedLimitedMessage), () -> {
                     presentFragment(new PremiumPreviewFragment("upload_speed"));
-                } else {
-                    presentFragment(new DownloadSpeedActivity());
-                }
-            }), boldN)
-        ).setDuration(8000).show(true);
+                }), boldN)
+            ).setDuration(8000).show(true);
+        } else {
+            BulletinFactory.of(this).createSimpleBulletin(
+                R.raw.speed_limit,
+                LocaleController.getString(R.string.DownloadSpeedLimited),
+                LocaleController.getString(R.string.DownloadSpeedLimitedMessage),
+                LocaleController.getString(R.string.DownloadSpeedCappedGo),
+                () -> presentFragment(new DownloadSpeedActivity())
+            ).setDuration(8000).show(true);
+        }
     }
 
     public void didLongPressLink(ChatMessageCell cell, MessageObject messageObject, CharacterStyle span, String str) {

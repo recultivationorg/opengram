@@ -241,6 +241,10 @@ public class SharedConfig {
     public static boolean forceEndToEndEncryption;
     public static boolean forceEndToEndForAllChats;
     public static boolean forceEndToEndChatsSnapshotted;
+    public static int forceEndToEndPhase;
+    public static int forceEndToEndStorageMode;
+    public static long forceEndToEndCutoff;
+    public static int forceEndToEndSchema;
     public static int downloadSpeedScale;
 
     public static int downloadRequestCount() {
@@ -477,6 +481,10 @@ public class SharedConfig {
                 editor.putBoolean("forceEndToEndEncryption", forceEndToEndEncryption);
                 editor.putBoolean("forceEndToEndForAllChats", forceEndToEndForAllChats);
                 editor.putBoolean("forceEndToEndChatsSnapshotted", forceEndToEndChatsSnapshotted);
+                editor.putInt("forceEndToEndPhase", forceEndToEndPhase);
+                editor.putInt("forceEndToEndStorageMode", forceEndToEndStorageMode);
+                editor.putLong("forceEndToEndCutoff", forceEndToEndCutoff);
+                editor.putInt("forceEndToEndSchema", forceEndToEndSchema);
                 editor.putInt("downloadSpeedScale", downloadSpeedScale);
                 editor.putString("pushString2", pushString);
                 editor.putInt("pushType", pushType);
@@ -560,6 +568,10 @@ public class SharedConfig {
             forceEndToEndEncryption = preferences.getBoolean("forceEndToEndEncryption", false);
             forceEndToEndForAllChats = preferences.getBoolean("forceEndToEndForAllChats", false);
             forceEndToEndChatsSnapshotted = preferences.getBoolean("forceEndToEndChatsSnapshotted", false);
+            forceEndToEndPhase = preferences.getInt("forceEndToEndPhase", 0);
+            forceEndToEndStorageMode = preferences.getInt("forceEndToEndStorageMode", 0);
+            forceEndToEndCutoff = preferences.getLong("forceEndToEndCutoff", 0);
+            forceEndToEndSchema = preferences.getInt("forceEndToEndSchema", 0);
             downloadSpeedScale = preferences.getInt("downloadSpeedScale", 0);
             lastLocalId = preferences.getInt("lastLocalId", -210000);
             pushString = preferences.getString("pushString2", "");
@@ -720,6 +732,7 @@ public class SharedConfig {
 
             preferences = ApplicationLoader.applicationContext.getSharedPreferences("Notifications", Activity.MODE_PRIVATE);
             showNotificationsForAllAccounts = preferences.getBoolean("AllAccounts", true);
+            OpengramSecureChannel.onConfigLoaded();
 
             configLoaded = true;
         }

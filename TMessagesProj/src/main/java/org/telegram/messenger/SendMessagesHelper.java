@@ -1856,6 +1856,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (user == null || messageId == 0 || user.id == getUserConfig().getClientUserId()) {
             return;
         }
+        if (OpengramOutboundGuard.reject(currentAccount, user.id)) {
+            return;
+        }
 
         TLRPC.TL_messages_sendScreenshotNotification req = new TLRPC.TL_messages_sendScreenshotNotification();
         req.peer = new TLRPC.TL_inputPeerUser();
@@ -2078,6 +2081,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         MessageSuggestionParams suggestionParams
     ) {
         if (messages == null || messages.isEmpty()) {
+            return 0;
+        }
+        if (OpengramOutboundGuard.reject(currentAccount, peer)) {
             return 0;
         }
         int sendResult = 0;
@@ -2877,6 +2883,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (messageObject == null) {
             return;
         }
+        if (OpengramOutboundGuard.reject(currentAccount, messageObject.getDialogId())) {
+            return;
+        }
         if (params == null) {
             params = new HashMap<>();
         }
@@ -3648,6 +3657,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (messageObject == null || button == null) {
             return;
         }
+        if (OpengramOutboundGuard.reject(currentAccount, messageObject.getDialogId())) {
+            return;
+        }
         final String key = messageObject.getDialogId() + "_" + messageObject.getId() + "_" + Utilities.bytesToHex(button.getData()) + "_" + (TLKeyboardHelper.isType(button, TL_keyboard.TL_inlineButtonTypeGame.class) ? "1" : "0");
         waitingForLocation.put(key, messageObject);
         locationProvider.start();
@@ -3662,6 +3674,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     }
 
     public void sendNotificationCallback(long dialogId, int msgId, byte[] data) {
+        if (OpengramOutboundGuard.reject(currentAccount, dialogId)) {
+            return;
+        }
         AndroidUtilities.runOnUIThread(() -> {
             final String key = dialogId + "_" + msgId + "_" + Utilities.bytesToHex(data) + "_" + 0;
             waitingForCallback.put(key, true);
@@ -3728,6 +3743,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
 
     public int sendVote(final MessageObject messageObject, final ArrayList<TLRPC.PollAnswer> answers, final Runnable finishRunnable) {
         if (messageObject == null) {
+            return 0;
+        }
+        if (OpengramOutboundGuard.reject(currentAccount, messageObject.getDialogId())) {
+            if (finishRunnable != null) {
+                finishRunnable.run();
+            }
             return 0;
         }
         final String key = "poll_" + messageObject.getPollId();
@@ -3820,6 +3841,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (messageObject == null || parentFragment == null) {
             return;
         }
+        if (OpengramOutboundGuard.reject(currentAccount, messageObject.getDialogId())) {
+            if (callback != null) {
+                callback.run();
+            }
+            return;
+        }
         TLRPC.TL_messages_sendReaction req = new TLRPC.TL_messages_sendReaction();
         if (messageObject.messageOwner.isThreadMessage && messageObject.messageOwner.fwd_from != null) {
             req.peer = getMessagesController().getInputPeer(messageObject.getFromChatId());
@@ -3887,6 +3914,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
 
     public void sendCallback(final boolean cache, final MessageObject messageObject, final TL_keyboard.KeyboardButtonProto button, TLRPC.InputCheckPasswordSRP srp, TwoStepVerificationActivity passwordFragment, final ChatActivity parentFragment) {
         if (messageObject == null || button == null || parentFragment == null) {
+            return;
+        }
+        if (OpengramOutboundGuard.reject(currentAccount, messageObject.getDialogId())) {
             return;
         }
         final boolean cacheFinal;
@@ -4206,6 +4236,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (peer == null || game == null) {
             return;
         }
+        long opengramDialogId = DialogObject.getPeerDialogId(peer);
+        if (OpengramOutboundGuard.reject(currentAccount, opengramDialogId)) {
+            return;
+        }
         TLRPC.TL_messages_sendMedia request = new TLRPC.TL_messages_sendMedia();
         request.peer = peer;
         if (request.peer instanceof TLRPC.TL_inputPeerChannel) {
@@ -4315,6 +4349,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             return;
         }
         if (peer == 0) {
+            return;
+        }
+        if (OpengramOutboundGuard.reject(currentAccount, peer)) {
             return;
         }
         if (richMessage != null && DialogObject.isEncryptedDialog(peer)) {
@@ -9934,6 +9971,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (paths == null && originalPaths == null && uris == null || paths != null && originalPaths != null && paths.size() != originalPaths.size()) {
             return;
         }
+        if (accountInstance != null && OpengramOutboundGuard.reject(accountInstance.getCurrentAccount(), dialogId)) {
+            return;
+        }
         Utilities.globalQueue.postRunnable(() -> {
             int error = 0;
             long[] groupId = new long[1];
@@ -10047,6 +10087,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     @UiThread
     public static void prepareSendingBotContextResult(BaseFragment fragment, AccountInstance accountInstance, TLRPC.BotInlineResult result, HashMap<String, String> params, long dialogId, MessageObject replyToMsg, MessageObject replyToTopMsg, TL_stories.StoryItem storyItem, ChatActivity.ReplyQuote quote, boolean notify, int scheduleDate, int scheduleRepeatPeriod, SendMessageChatArguments sendMessageChatArguments, long stars, long monoForumPeerId) {
         if (result == null) {
+            return;
+        }
+        if (accountInstance != null && OpengramOutboundGuard.reject(accountInstance.getCurrentAccount(), dialogId)) {
             return;
         }
         if (result.send_message instanceof TLRPC.TL_botInlineMessageMediaAuto) {
@@ -10502,6 +10545,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
 
     @UiThread
     public static void prepareSendingText(AccountInstance accountInstance, CharSequence text, long dialogId, long topicId, boolean notify, int scheduleDate, int scheduleRepeatPeriod, long effectId) {
+        if (accountInstance != null && OpengramOutboundGuard.reject(accountInstance.getCurrentAccount(), dialogId)) {
+            return;
+        }
         accountInstance.getMessagesStorage().getStorageQueue().postRunnable(() -> Utilities.stageQueue.postRunnable(() -> AndroidUtilities.runOnUIThread(() -> {
             CharSequence textFinal = getTrimmedString(text);
             final int limit = accountInstance.getMessagesController().getMaxMessageLength();
@@ -10658,6 +10704,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     @UiThread
     public static void prepareSendingMedia(AccountInstance accountInstance, ArrayList<SendingMediaInfo> media, long dialogId, MessageObject replyToMsg, MessageObject replyToTopMsg, TL_stories.StoryItem storyItem, ChatActivity.ReplyQuote quote, boolean forceDocument, boolean groupMedia, MessageObject editingMessageObject, TLRPC.TL_inputPollAnswer pollToAddOptionMessageObject, boolean notify, int scheduleDate, int scheduleRepeatPeriod, int mode, boolean updateStikcersOrder, InputContentInfoCompat inputContent, SendMessageChatArguments sendMessageChatArguments, long effectId, boolean invertMedia, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams, PollSendParams pollSendParams, boolean forcedPollDoNotSendFinal) {
         if (media.isEmpty()) {
+            return;
+        }
+        if (accountInstance != null && OpengramOutboundGuard.reject(accountInstance.getCurrentAccount(), dialogId)) {
             return;
         }
         for (int a = 0, N = media.size(); a < N; a++) {

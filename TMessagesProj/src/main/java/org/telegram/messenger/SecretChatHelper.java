@@ -12,6 +12,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.text.TextUtils;
+import android.util.LongSparseArray;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
 
@@ -79,6 +80,7 @@ public class SecretChatHelper extends BaseController {
     public ArrayList<TLRPC.Update> delayedEncryptedChatUpdates = new ArrayList<>();
     private ArrayList<Long> pendingEncMessagesToDelete = new ArrayList<>();
     private boolean startingSecretChat = false;
+    private final LongSparseArray<Runnable> secretChatStartFailed = new LongSparseArray<>();
 
     private static volatile SecretChatHelper[] Instance = new SecretChatHelper[UserConfig.MAX_ACCOUNT_COUNT];
 
@@ -1939,12 +1941,25 @@ public class SecretChatHelper extends BaseController {
     }
 
     public void startSecretChat(Context context, TLRPC.User user) {
+        startSecretChat(context, user, null);
+    }
+
+    public void startSecretChat(Context context, TLRPC.User user, Runnable onFailed) {
         if (user == null || context == null) {
+            if (onFailed != null) {
+                onFailed.run();
+            }
             return;
         }
         if (getMessagesController().isFrozen()) {
             AccountFrozenAlert.show(currentAccount);
+            if (onFailed != null) {
+                onFailed.run();
+            }
             return;
+        }
+        if (onFailed != null) {
+            secretChatStartFailed.put(user.id, onFailed);
         }
         startingSecretChat = true;
         AlertDialog progressDialog = new AlertDialog(context, AlertDialog.ALERT_TYPE_SPINNER);
@@ -1957,6 +1972,7 @@ public class SecretChatHelper extends BaseController {
                 if (response instanceof TLRPC.TL_messages_dhConfig) {
                     if (!Utilities.isGoodPrime(res.p, res.g)) {
                         AndroidUtilities.runOnUIThread(() -> {
+                            finishSecretChatStart(user.id, true);
                             try {
                                 if (!((Activity) context).isFinishing()) {
                                     progressDialog.dismiss();
@@ -1994,6 +2010,7 @@ public class SecretChatHelper extends BaseController {
                     if (error1 == null) {
                         AndroidUtilities.runOnUIThread(() -> {
                             startingSecretChat = false;
+                            finishSecretChatStart(user.id, false);
                             if (!((Activity) context).isFinishing()) {
                                 try {
                                     progressDialog.dismiss();
@@ -2028,6 +2045,7 @@ public class SecretChatHelper extends BaseController {
                     } else {
                         delayedEncryptedChatUpdates.clear();
                         AndroidUtilities.runOnUIThread(() -> {
+                            finishSecretChatStart(user.id, true);
                             if (!((Activity) context).isFinishing()) {
                                 startingSecretChat = false;
                                 try {
@@ -2048,6 +2066,7 @@ public class SecretChatHelper extends BaseController {
                 delayedEncryptedChatUpdates.clear();
                 AndroidUtilities.runOnUIThread(() -> {
                     startingSecretChat = false;
+                    finishSecretChatStart(user.id, true);
                     if (!((Activity) context).isFinishing()) {
                         try {
                             progressDialog.dismiss();
@@ -2058,11 +2077,22 @@ public class SecretChatHelper extends BaseController {
                 });
             }
         }, ConnectionsManager.RequestFlagFailOnServerErrors);
-        progressDialog.setOnCancelListener(dialog -> getConnectionsManager().cancelRequest(reqId, true));
+        progressDialog.setOnCancelListener(dialog -> {
+            finishSecretChatStart(user.id, true);
+            getConnectionsManager().cancelRequest(reqId, true);
+        });
         try {
             progressDialog.show();
         } catch (Exception e) {
             //don't promt
+        }
+    }
+
+    private void finishSecretChatStart(long userId, boolean failed) {
+        Runnable callback = secretChatStartFailed.get(userId);
+        secretChatStartFailed.remove(userId);
+        if (failed && callback != null) {
+            callback.run();
         }
     }
 }

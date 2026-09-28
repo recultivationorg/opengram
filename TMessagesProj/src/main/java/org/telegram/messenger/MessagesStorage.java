@@ -16,6 +16,7 @@ import static org.telegram.messenger.MessagesController.LOAD_FROM_UNREAD;
 
 import android.appwidget.AppWidgetManager;
 import android.content.SharedPreferences;
+import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.SpannableStringBuilder;
@@ -11081,6 +11082,82 @@ public class MessagesStorage extends BaseController {
             }
             cursor.dispose();
         }
+    }
+
+    public void loadPositiveDialogIds(Utilities.Callback<ArrayList<Long>> callback) {
+        storageQueue.postRunnable(() -> {
+            ArrayList<Long> ids = new ArrayList<>();
+            SQLiteCursor cursor = null;
+            boolean failed = false;
+            try {
+                cursor = database.queryFinalized("SELECT did FROM dialogs WHERE did > 0");
+                while (cursor.next()) {
+                    long did = cursor.longValue(0);
+                    if (did > 0) {
+                        ids.add(did);
+                    }
+                }
+            } catch (Exception e) {
+                FileLog.e(e);
+                failed = true;
+            } finally {
+                if (cursor != null) {
+                    cursor.dispose();
+                }
+            }
+            ArrayList<Long> resultIds = failed ? null : ids;
+            AndroidUtilities.runOnUIThread(() -> callback.run(resultIds));
+        });
+    }
+
+    public TLRPC.EncryptedChat loadEncryptedChatForUserSync(long userId) {
+        if (userId == 0) {
+            return null;
+        }
+        Handler handler = storageQueue.getHandler();
+        if (handler != null && Thread.currentThread() == handler.getLooper().getThread()) {
+            return queryEncryptedChatForUser(userId);
+        }
+        TLRPC.EncryptedChat[] box = new TLRPC.EncryptedChat[1];
+        CountDownLatch latch = new CountDownLatch(1);
+        storageQueue.postRunnable(() -> {
+            box[0] = queryEncryptedChatForUser(userId);
+            latch.countDown();
+        });
+        try {
+            latch.await();
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+        return box[0];
+    }
+
+    private TLRPC.EncryptedChat queryEncryptedChatForUser(long userId) {
+        SQLiteCursor cursor = null;
+        try {
+            cursor = database.queryFinalized("SELECT uid, data, user FROM enc_chats WHERE user = " + userId);
+            while (cursor.next()) {
+                NativeByteBuffer data = cursor.byteBufferValue(1);
+                if (data == null) {
+                    continue;
+                }
+                TLRPC.EncryptedChat chat = TLRPC.EncryptedChat.TLdeserialize(data, data.readInt32(false), false);
+                data.reuse();
+                if (chat == null || chat instanceof TLRPC.TL_encryptedChatDiscarded) {
+                    continue;
+                }
+                chat.id = cursor.intValue(0);
+                chat.user_id = cursor.longValue(2);
+                return chat;
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        } finally {
+            if (cursor != null) {
+                cursor.dispose();
+            }
+        }
+        return null;
     }
 
     public void getEncryptedChatsInternal(String chatsToLoad, ArrayList<TLRPC.EncryptedChat> result, ArrayList<Long> usersToLoad) throws Exception {

@@ -90,6 +90,9 @@ public class WearReplyReceiver extends BroadcastReceiver {
             replyToTopMsgId = new MessageObject(accountInstance.getCurrentAccount(), topicStartMessage, false, false);
         }
 
+        if (OpengramOutboundGuard.reject(accountInstance.getCurrentAccount(), dialog_id)) {
+            return;
+        }
         accountInstance.getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of(text.toString(), dialog_id, replyToMsgId, replyToTopMsgId, null, true, null, null, null, true, 0, 0, null, false));
 
         if (voiceMsgIds != null && voiceMsgIds.length > 0) {

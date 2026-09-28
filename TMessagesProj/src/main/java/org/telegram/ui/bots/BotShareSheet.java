@@ -24,6 +24,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.OpengramOutboundGuard;
 import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
@@ -327,6 +328,9 @@ public class BotShareSheet extends BottomSheetWithRecyclerListView {
                         }
                     }
 
+                    if (OpengramOutboundGuard.reject(currentAccount, dialogId)) {
+                        continue;
+                    }
                     HashMap<String, String> params = new HashMap<>();
                     params.put("query_id", "" + message.query_id);
                     params.put("id", "" + message.result.id);

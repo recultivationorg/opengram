@@ -6764,6 +6764,15 @@ public class MessagesController extends BaseController implements NotificationCe
         return encryptedChats.get(id);
     }
 
+    public TLRPC.EncryptedChat findEncryptedChatByUser(long userId) {
+        for (TLRPC.EncryptedChat chat : encryptedChats.values()) {
+            if (chat != null && chat.user_id == userId && !(chat instanceof TLRPC.TL_encryptedChatDiscarded)) {
+                return chat;
+            }
+        }
+        return null;
+    }
+
     public TLRPC.EncryptedChat getEncryptedChatDB(int chatId, boolean created) {
         TLRPC.EncryptedChat chat = encryptedChats.get(chatId);
         if (chat == null || created && (chat instanceof TLRPC.TL_encryptedChatWaiting || chat instanceof TLRPC.TL_encryptedChatRequested)) {
@@ -16164,6 +16173,8 @@ public class MessagesController extends BaseController implements NotificationCe
         } else {
             getConnectionsManager().cleanup(type == 2);
         }
+        long removedClientUserId = getUserConfig().getClientUserId();
+        OpengramSecureChannel.onAccountRemoved(removedClientUserId);
         getUserConfig().clearConfig();
         SharedPrefsHelper.cleanupAccount(currentAccount);
 

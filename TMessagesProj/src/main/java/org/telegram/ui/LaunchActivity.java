@@ -129,6 +129,7 @@ import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.OpenAttachedMenuBotReceiver;
 import org.telegram.messenger.PushListenerController;
 import org.telegram.messenger.R;
+import org.telegram.messenger.OpengramOutboundGuard;
 import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.SharedPrefsHelper;
@@ -6313,6 +6314,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                     AccountInstance accountInstance = AccountInstance.getInstance(UserConfig.selectedAccount);
                     for (int i = 0; i < dids.size(); i++) {
                         long did = dids.get(i).dialogId;
+                        if (OpengramOutboundGuard.reject(account, did)) {
+                            continue;
+                        }
                         long topicId = dids.get(i).topicId;
                         MessageObject replyToMsg = null;
                         if (topicId != 0) {
@@ -6365,6 +6369,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                 CharSequence captionToSend = null;
                 for (int i = 0; i < dids.size(); i++) {
                     final long did = dids.get(i).dialogId;
+                    if (OpengramOutboundGuard.reject(account, did)) {
+                        continue;
+                    }
                     final long topicId = dids.get(i).topicId;
 
                     AccountInstance accountInstance = AccountInstance.getInstance(UserConfig.selectedAccount);
@@ -6496,6 +6503,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     private static void sendShareText(AccountInstance accountInstance, DialogsActivity dialogsFragment, CharSequence text, long dialogId, MessageObject replyToMsg, long topicId, boolean notify, int scheduleDate, int scheduleRepeatPeriod) {
+        if (accountInstance != null && OpengramOutboundGuard.reject(accountInstance.getCurrentAccount(), dialogId)) {
+            return;
+        }
         final boolean previewEnabled = dialogsFragment == null || dialogsFragment.isWebPagePreviewEnabled();
         final TLRPC.WebPage webPage = previewEnabled && dialogsFragment != null ? dialogsFragment.getSharedWebPage() : null;
         if (TextUtils.isEmpty(text)) return;
