@@ -42,12 +42,12 @@ public class BuildVars {
     public static final String OFFICIAL_WEB_APP_VERSION = "12.10.3 (7089)";
     public static final String OFFICIAL_WEB_CERT_SHA256 = "49C1522548EBACD46CE322B6FD47F6092BB745D0F88082145CAF35E14DCC38E1";
 
-    // Forkgram GitHub build 12.10.5.1, versionCode 710019, certificate CN=23rd.
+    // Forkgram GitHub build 12.10.6.0, versionCode 710609, certificate CN=23rd.
     // Reported to Telegram only. The installed application id stays REPORTED_PACKAGE_ID.
     public static boolean REPORT_FORKGRAM_IDENTITY = true;
     public static final String FORKGRAM_PACKAGE_ID = "org.forkclient.messenger.beta";
-    public static final String FORKGRAM_APP_VERSION = "12.10.5.1 (710019)";
-    public static final int FORKGRAM_VERSION_CODE = 710019;
+    public static final String FORKGRAM_APP_VERSION = "12.10.6.0 (710609)";
+    public static final int FORKGRAM_VERSION_CODE = 710609;
     public static final String FORKGRAM_CERT_SHA256 = "0880F186D777F3CB6D82A66D02BD58850E3A270A26B678175459A95511235AE5";
 
     public static boolean useOfficialWebIdentity() {
