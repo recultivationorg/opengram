@@ -60,6 +60,8 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -262,8 +264,20 @@ public class ConnectionsManager extends BaseController {
         if (getUserConfig().getCurrentUser() != null) {
             userPremium = getUserConfig().getCurrentUser().premium;
         }
-        int reportedVersion = BuildVars.useForkgramIdentity() ? BuildVars.FORKGRAM_VERSION_CODE : SharedConfig.buildVersion();
-        init(reportedVersion, TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), userPremium, enablePushConnection);
+        int initRevision = initConnectionRevision(deviceModel, systemVersion, appVersion, fingerprint, pushString);
+        init(initRevision, TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), userPremium, enablePushConnection);
+    }
+
+    // tgnet resends initConnection only when this value differs from the one stored in tgnet.dat.
+    // It is never sent to Telegram.
+    private static int initConnectionRevision(String deviceModel, String systemVersion, String appVersion, String fingerprint, String regId) {
+        int revision = Objects.hash(SharedConfig.buildVersion(), TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, fingerprint, regId,
+                reportedPackageId(), BuildVars.REPORTED_INSTALLER, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_TIMEZONE_OFFSET, SharedConfig.PERFORMANCE_CLASS_HIGH);
+        return revision == 0 ? 1 : revision;
+    }
+
+    private static String reportedPackageId() {
+        return BuildVars.useOfficialWebIdentity() ? BuildVars.OFFICIAL_WEB_PACKAGE_ID : BuildVars.useForkgramIdentity() ? BuildVars.FORKGRAM_PACKAGE_ID : BuildVars.REPORTED_PACKAGE_ID;
     }
 
     private String getRegId() {
@@ -440,7 +454,7 @@ public class ConnectionsManager extends BaseController {
                         final long delta = Math.max(0, (System.currentTimeMillis() - finalStartRequestTime) - ping_time);
                         DefaultBandwidthMeter.getSingletonInstance(ApplicationLoader.applicationContext).onTransfer(size, delta);
                     }
-                    if (BuildVars.DEBUG_PRIVATE_VERSION && !getUserConfig().isClientActivated() && error != null && error.code == 400 && Objects.equals(error.text, "CONNECTION_NOT_INITED")) {
+                    if (!getUserConfig().isClientActivated() && error != null && error.code == 400 && Objects.equals(error.text, "CONNECTION_NOT_INITED") && connectionNotInitedRetries.add(object)) {
                         if (BuildVars.LOGS_ENABLED) {
                             FileLog.d("Cleanup keys for " + currentAccount + " because of CONNECTION_NOT_INITED");
                         }
@@ -480,6 +494,7 @@ public class ConnectionsManager extends BaseController {
         }
     }
 
+    private final Set<TLObject> connectionNotInitedRetries = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
     private final ConcurrentHashMap<Integer, RequestCallbacks> requestCallbacks = new ConcurrentHashMap<>();
     private static class RequestCallbacks {
         public RequestDelegateInternal onComplete;
@@ -644,8 +659,7 @@ public class ConnectionsManager extends BaseController {
                         proxySettings.getUser(), proxySettings.getPassword(), proxySettings.getSecret());
             }
         }
-        String packageId = BuildVars.useOfficialWebIdentity() ? BuildVars.OFFICIAL_WEB_PACKAGE_ID : BuildVars.useForkgramIdentity() ? BuildVars.FORKGRAM_PACKAGE_ID : BuildVars.REPORTED_PACKAGE_ID;
-        native_init(currentAccount, version, layer, apiId, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, logPath, regId, cFingerprint, BuildVars.REPORTED_INSTALLER, packageId, BuildVars.REPORTED_TIMEZONE_OFFSET, userId, userPremium, enablePushConnection, ApplicationLoader.isNetworkOnline(), ApplicationLoader.getCurrentNetworkType(), SharedConfig.PERFORMANCE_CLASS_HIGH);
+        native_init(currentAccount, version, layer, apiId, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, logPath, regId, cFingerprint, BuildVars.REPORTED_INSTALLER, reportedPackageId(), BuildVars.REPORTED_TIMEZONE_OFFSET, userId, userPremium, enablePushConnection, ApplicationLoader.isNetworkOnline(), ApplicationLoader.getCurrentNetworkType(), SharedConfig.PERFORMANCE_CLASS_HIGH);
         checkConnection();
     }
 

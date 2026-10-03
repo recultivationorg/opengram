@@ -1337,7 +1337,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         if (!doneButtonVisible[currentDoneType]) {
             return;
         }
-        if (radialProgressView.getTag() != null) {
+        if (radialProgressView.getTag() != null || progressRequestId != 0) {
             if (getParentActivity() == null) {
                 return;
             }
@@ -2937,47 +2937,46 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                         fillNextCodeParams(params, (TLRPC.auth_SentCode) response);
                     }
                 } else {
-                    if (error.text != null) {
-                        if (error.text.contains("SESSION_PASSWORD_NEEDED")) {
-                            TL_account.getPassword req2 = new TL_account.getPassword();
-                            ConnectionsManager.getInstance(currentAccount).sendRequest(req2, (response1, error1) -> AndroidUtilities.runOnUIThread(() -> {
-                                nextPressed = false;
-                                showDoneButton(false, true);
-                                if (error1 == null) {
-                                    TL_account.Password password = (TL_account.Password) response1;
-                                    if (!TwoStepVerificationActivity.canHandleCurrentPassword(password, true)) {
-                                        AlertsCreator.showUpdateAppAlert(getParentActivity(), getString("UpdateAppAlert", R.string.UpdateAppAlert), true);
-                                        return;
-                                    }
-                                    Bundle bundle = new Bundle();
-                                    SerializedData data = new SerializedData(password.getObjectSize());
-                                    password.serializeToStream(data);
-                                    bundle.putString("password", Utilities.bytesToHex(data.toByteArray()));
-                                    bundle.putString("phoneFormated", phone);
-                                    setPage(VIEW_PASSWORD, true, bundle, false);
-                                } else {
-                                    needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), error1.text);
+                    final String errorText = error.text != null ? error.text : "";
+                    if (errorText.contains("SESSION_PASSWORD_NEEDED")) {
+                        TL_account.getPassword req2 = new TL_account.getPassword();
+                        ConnectionsManager.getInstance(currentAccount).sendRequest(req2, (response1, error1) -> AndroidUtilities.runOnUIThread(() -> {
+                            nextPressed = false;
+                            showDoneButton(false, true);
+                            if (error1 == null) {
+                                TL_account.Password password = (TL_account.Password) response1;
+                                if (!TwoStepVerificationActivity.canHandleCurrentPassword(password, true)) {
+                                    AlertsCreator.showUpdateAppAlert(getParentActivity(), getString("UpdateAppAlert", R.string.UpdateAppAlert), true);
+                                    return;
                                 }
-                            }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin);
-                        } else if (error.text.contains("PHONE_NUMBER_INVALID")) {
-                            needShowInvalidAlert(LoginActivity.this, phone, phoneInputData, false);
-                        } else if (error.text.contains("PHONE_PASSWORD_FLOOD")) {
-                            needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("FloodWait", R.string.FloodWait));
-                        } else if (error.text.contains("PHONE_NUMBER_FLOOD")) {
-                            needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("PhoneNumberFlood", R.string.PhoneNumberFlood));
-                        } else if (error.text.contains("PHONE_NUMBER_BANNED")) {
-                                needShowInvalidAlert(LoginActivity.this, phone, phoneInputData, true);
-                        } else if (error.text.contains("PHONE_CODE_EMPTY") || error.text.contains("PHONE_CODE_INVALID")) {
-                            needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString(R.string.InvalidCode));
-                        } else if (error.text.contains("PHONE_CODE_EXPIRED")) {
-                            onBackPressed(true);
-                            setPage(VIEW_PHONE_INPUT, true, null, true);
-                            needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("CodeExpired", R.string.CodeExpired));
-                        } else if (error.text.startsWith("FLOOD_WAIT")) {
-                            needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("FloodWait", R.string.FloodWait));
-                        } else if (error.code != -1000) {
-                            AlertsCreator.processError(currentAccount, error, LoginActivity.this, req, phoneInputData.phoneNumber);
-                        }
+                                Bundle bundle = new Bundle();
+                                SerializedData data = new SerializedData(password.getObjectSize());
+                                password.serializeToStream(data);
+                                bundle.putString("password", Utilities.bytesToHex(data.toByteArray()));
+                                bundle.putString("phoneFormated", phone);
+                                setPage(VIEW_PASSWORD, true, bundle, false);
+                            } else {
+                                needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), error1.text);
+                            }
+                        }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin);
+                    } else if (errorText.contains("PHONE_NUMBER_INVALID")) {
+                        needShowInvalidAlert(LoginActivity.this, phone, phoneInputData, false);
+                    } else if (errorText.contains("PHONE_PASSWORD_FLOOD")) {
+                        needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("FloodWait", R.string.FloodWait));
+                    } else if (errorText.contains("PHONE_NUMBER_FLOOD")) {
+                        needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("PhoneNumberFlood", R.string.PhoneNumberFlood));
+                    } else if (errorText.contains("PHONE_NUMBER_BANNED")) {
+                        needShowInvalidAlert(LoginActivity.this, phone, phoneInputData, true);
+                    } else if (errorText.contains("PHONE_CODE_EMPTY") || errorText.contains("PHONE_CODE_INVALID")) {
+                        needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString(R.string.InvalidCode));
+                    } else if (errorText.contains("PHONE_CODE_EXPIRED")) {
+                        onBackPressed(true);
+                        setPage(VIEW_PHONE_INPUT, true, null, true);
+                        needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("CodeExpired", R.string.CodeExpired));
+                    } else if (errorText.startsWith("FLOOD_WAIT")) {
+                        needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("FloodWait", R.string.FloodWait));
+                    } else if (error.code != -2000 && AlertsCreator.processError(currentAccount, error, LoginActivity.this, req, phoneInputData.phoneNumber) == null) {
+                        needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), TextUtils.isEmpty(errorText) ? getString(R.string.ErrorOccurred) : getString(R.string.ErrorOccurred) + "\n" + errorText);
                     }
                 }
                 if (!isRequestingFirebaseSms) {
