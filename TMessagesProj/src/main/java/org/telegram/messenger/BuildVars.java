@@ -35,16 +35,16 @@ public class BuildVars {
     public static final String REPORTED_INSTALLER = "com.google.android.packageinstaller";
     public static final String REPORTED_PACKAGE_ID = "org.recultivation.opengram";
 
-    // Official website APK (telegram.org/android), build 12.10.3, version code 7089.
+    // Official website APK (telegram.org/android), build 12.10.6, version code 71129.
     // Set MASK_AS_OFFICIAL_CLIENT to true to send that package, version, and certificate again.
-    public static boolean MASK_AS_OFFICIAL_CLIENT = false;
+    public static boolean MASK_AS_OFFICIAL_CLIENT = true;
     public static final String OFFICIAL_WEB_PACKAGE_ID = "org.telegram.messenger.web";
-    public static final String OFFICIAL_WEB_APP_VERSION = "12.10.3 (7089)";
+    public static final String OFFICIAL_WEB_APP_VERSION = "12.10.6 (71129)";
     public static final String OFFICIAL_WEB_CERT_SHA256 = "49C1522548EBACD46CE322B6FD47F6092BB745D0F88082145CAF35E14DCC38E1";
 
     // Forkgram GitHub build 12.10.6.0, versionCode 710609, certificate CN=23rd.
     // Reported to Telegram only. The installed application id stays REPORTED_PACKAGE_ID.
-    public static boolean REPORT_FORKGRAM_IDENTITY = true;
+    public static boolean REPORT_FORKGRAM_IDENTITY = false;
     public static final String FORKGRAM_PACKAGE_ID = "org.forkclient.messenger.beta";
     public static final String FORKGRAM_APP_VERSION = "12.10.6.0 (710609)";
     public static final String FORKGRAM_CERT_SHA256 = "0880F186D777F3CB6D82A66D02BD58850E3A270A26B678175459A95511235AE5";
