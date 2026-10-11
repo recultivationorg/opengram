@@ -429,7 +429,6 @@ public final class OpengramGhostReads {
             return;
         }
         Set<String> lines = new LinkedHashSet<>();
-        int generation;
         synchronized (lock) {
             generation = currentEpoch(clientUserId);
             capture(clientUserId, lines);
