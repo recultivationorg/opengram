@@ -80,6 +80,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.OpengramGhostReads;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.SharedPrefsHelper;
 import org.telegram.utils.settings.SharedSettings;
@@ -698,7 +699,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(UItem.asShadow(null));
 
-        items.add(SettingCell.Factory.ofCheck(25, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.msg_stories_stealth2, getString(R.string.GhostMode), SharedConfig.ghostMode).setIconScale(0.7f));
+        items.add(SettingCell.Factory.ofCheck(25, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.msg_stories_stealth2, getString(R.string.GhostMode), getUserConfig().ghostMode).setIconScale(0.7f));
         items.add(SettingCell.Factory.of(26, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_secret, getString(R.string.ForceEndToEndEncryption)).setIconScale(0.7f));
         items.add(SettingCell.Factory.of(27, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.msg_download, getString(R.string.DownloadSpeedScaling)).setIconScale(0.83f));
         items.add(UItem.asShadow(null));
@@ -894,20 +895,22 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             }
             case 25: {
-                if (!SharedConfig.ghostMode) {
+                if (!getUserConfig().ghostMode) {
                     AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
                     builder.setTitle(getString(R.string.GhostMode));
                     builder.setMessage(getString(R.string.GhostModeAlert));
                     builder.setPositiveButton(getString(R.string.OK), (dialogInterface, i) -> {
-                        SharedConfig.ghostMode = true;
-                        SharedConfig.saveConfig();
+                        getUserConfig().ghostMode = true;
+                        getUserConfig().saveConfig(false);
+                        OpengramGhostReads.onEnabled(currentAccount);
                         listView.adapter.update(true);
                     });
                     builder.setNegativeButton(getString(R.string.Cancel), (dialogInterface, i) -> listView.adapter.update(true));
                     showDialog(builder.create());
                 } else {
-                    SharedConfig.ghostMode = false;
-                    SharedConfig.saveConfig();
+                    getUserConfig().ghostMode = false;
+                    getUserConfig().saveConfig(false);
+                    OpengramGhostReads.clear(currentAccount);
                     listView.adapter.update(true);
                 }
                 break;

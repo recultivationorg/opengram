@@ -221,6 +221,7 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
         if (stateStories != null) {
             max_read_id = Math.max(max_read_id, stateStories.max_read_id);
         }
+        max_read_id = Math.max(max_read_id, MessagesController.getInstance(currentAccount).getStoriesController().getMaxStoriesReadId(dialogId));
         List<TL_stories.StoryItem> stories = userStories == null || userStories.stories == null ? new ArrayList() : userStories.stories;
         ArrayList<TL_stories.StoryItem> storiesToShow = new ArrayList<>();
         int count = 0;
@@ -367,7 +368,7 @@ public class ProfileStoriesView extends View implements NotificationCenter.Notif
                 circle.index = i;
                 circle.scale = 1f;
                 circle.scaleAnimated.set(0f, true);
-                circle.read = me || userStories != null && storyItem.id <= userStories.max_read_id;
+                circle.read = me || storyItem.id <= storiesController.getMaxStoriesReadId(dialogId);
                 if (!animated) {
                     circle.apply();
                 }

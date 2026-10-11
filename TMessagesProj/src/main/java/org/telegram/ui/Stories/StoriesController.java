@@ -33,6 +33,7 @@ import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.OpengramGhostReads;
 import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SendMessagesHelper;
@@ -149,7 +150,10 @@ public class StoriesController {
         storiesReadLoaded = mainSettings.getBoolean("read_loaded", false);
         unsupportedStoriesChecked = new HashSet<>(mainSettings.getStringSet("unsupported_stories_checked", new HashSet<>()));
         stealthMode = readStealthMode(mainSettings.getString("stories_stealth_mode", null));
-        storiesStorage.getMaxReadIds(longSparseIntArray -> dialogIdToMaxReadId = longSparseIntArray);
+        storiesStorage.getMaxReadIds(longSparseIntArray -> {
+            dialogIdToMaxReadId = longSparseIntArray;
+            mergeGhostStoryReads();
+        });
 
         sortStoriesRunnable = () -> {
             sortDialogStories(dialogListStories);
@@ -555,8 +559,10 @@ public class StoriesController {
 
     public void preloadUserStories(TL_stories.PeerStories userStories) {
         int preloadPosition = 0;
+        long dialogId = DialogObject.getPeerDialogId(userStories.peer);
+        int maxReadId = Math.max(userStories.max_read_id, dialogIdToMaxReadId.get(dialogId, 0));
         for (int i = 0; i < userStories.stories.size(); i++) {
-            if (userStories.stories.get(i).id > userStories.max_read_id) {
+            if (userStories.stories.get(i).id > maxReadId) {
                 preloadPosition = i;
                 break;
             }
@@ -564,7 +570,6 @@ public class StoriesController {
         if (userStories.stories.isEmpty()) {
             return;
         }
-        long dialogId = DialogObject.getPeerDialogId(userStories.peer);
         preloadStory(dialogId, userStories.stories.get(preloadPosition));
         if (preloadPosition > 0) {
             preloadStory(dialogId, userStories.stories.get(preloadPosition - 1));
@@ -745,7 +750,22 @@ public class StoriesController {
         updateStoriesInLists(dialogId, stories.stories);
     }
 
+    public void retainLocalStoryRead(long dialogId, TL_stories.PeerStories stories) {
+        if (!UserConfig.isGhostMode(currentAccount) || stories == null) {
+            return;
+        }
+        int local = dialogIdToMaxReadId.get(dialogId, 0);
+        TL_stories.PeerStories current = allStoriesMap.get(dialogId);
+        if (current != null && current != stories) {
+            local = Math.max(local, current.max_read_id);
+        }
+        if (local > stories.max_read_id) {
+            stories.max_read_id = local;
+        }
+    }
+
     private void putToAllStories(long dialogId, TL_stories.PeerStories stories) {
+        retainLocalStoryRead(dialogId, stories);
         TL_stories.PeerStories old = allStoriesMap.get(dialogId);
         if (
             old != null && old.stories != null && !old.stories.isEmpty() &&
@@ -1058,6 +1078,7 @@ public class StoriesController {
             TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(user_id);
             TL_stories.PeerStories stories = stories_userStories.stories;
             long dialogId = DialogObject.getPeerDialogId(stories.peer);
+            retainLocalStoryRead(dialogId, stories);
             allStoriesMap.put(dialogId, stories);
             if (user != null && (isContactOrService(user) || user.self)) {
                 applyToList(stories);
@@ -1271,6 +1292,25 @@ public class StoriesController {
         updateStoriesForFullPeer(dialogId, Collections.singletonList(storyItem), !edited);
     }
 
+    public void mergeGhostStoryReads() {
+        if (!UserConfig.isGhostMode(currentAccount)) {
+            return;
+        }
+        long clientUserId = UserConfig.getInstance(currentAccount).getClientUserId();
+        boolean[] changed = new boolean[] {false};
+        OpengramGhostReads.overlayStories(currentAccount, clientUserId, (dialogId, maxReadId) -> {
+            int current = dialogIdToMaxReadId.get(dialogId, 0);
+            int next = OpengramGhostReads.storyReadId(current, maxReadId);
+            if (next != current) {
+                dialogIdToMaxReadId.put(dialogId, next);
+                changed[0] = true;
+            }
+        });
+        if (changed[0]) {
+            NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.storiesUpdated);
+        }
+    }
+
     public boolean markStoryAsRead(long dialogId, TL_stories.StoryItem storyItem) {
         TL_stories.PeerStories userStories = getStories(dialogId);
         if (userStories == null) {
@@ -1294,11 +1334,14 @@ public class StoriesController {
         NotificationsController.getInstance(currentAccount).processReadStories(dialogId, newReadId);
         userStories.max_read_id = newReadId;
         dialogIdToMaxReadId.put(dialogId, newReadId);
+        if (UserConfig.isGhostMode(currentAccount)) {
+            OpengramGhostReads.rememberStory(currentAccount, UserConfig.getInstance(currentAccount).getClientUserId(), dialogId, newReadId);
+        }
         if (newReadId > currentReadId) {
             if (!profile) {
                 storiesStorage.updateMaxReadId(dialogId, newReadId);
             }
-            if (!SharedConfig.ghostMode && dialogId != ghostReadDialogId) {
+            if (!UserConfig.isGhostMode(currentAccount) && dialogId != ghostReadDialogId) {
                 TL_stories.TL_stories_readStories req = new TL_stories.TL_stories_readStories();
                 req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
                 req.max_id = storyItem.id;
@@ -1352,13 +1395,14 @@ public class StoriesController {
                 return true;
             }
         }
+        int maxReadId = Math.max(userStories.max_read_id, dialogIdToMaxReadId.get(dialogId, 0));
         for (int i = 0; i < userStories.stories.size(); i++) {
             TL_stories.StoryItem storyItem = userStories.stories.get(i);
             if (storyItem == null) continue;
 //            if (userStories.stories.get(i).justUploaded) {
 //                return true;
 //            }
-            if (storyItem.id > userStories.max_read_id) {
+            if (storyItem.id > maxReadId) {
                 return true;
             }
         }
@@ -1378,13 +1422,14 @@ public class StoriesController {
                 return 1;
             }
         }
+        int maxReadId = Math.max(userStories.max_read_id, dialogIdToMaxReadId.get(dialogId, 0));
         for (int i = 0; i < userStories.stories.size(); i++) {
             TL_stories.StoryItem storyItem = userStories.stories.get(i);
             if (storyItem == null) continue;
             if (storyItem.media instanceof TLRPC.TL_messageMediaVideoStream) {
                 return 2;
             }
-            if (storyItem.id > userStories.max_read_id) {
+            if (storyItem.id > maxReadId) {
                 return 1;
             }
         }
@@ -1686,8 +1731,12 @@ public class StoriesController {
 
     public int getUnreadStoriesCount(long dialogId) {
         TL_stories.PeerStories userStories = allStoriesMap.get(dialogId);
+        if (userStories == null) {
+            return 0;
+        }
+        int maxReadId = Math.max(userStories.max_read_id, dialogIdToMaxReadId.get(dialogId, 0));
         for (int i = 0; i < userStories.stories.size(); i++) {
-            if (userStories.max_read_id < userStories.stories.get(i).id) {
+            if (maxReadId < userStories.stories.get(i).id) {
                 return  userStories.stories.size() - i;
             }
         }
@@ -3728,7 +3777,7 @@ public class StoriesController {
             if (seenStories.contains(storyId)) return false;
             seenStories.add(storyId);
             saveCache();
-            if (!SharedConfig.ghostMode && dialogId != MessagesController.getInstance(currentAccount).getStoriesController().ghostReadDialogId) {
+            if (!UserConfig.isGhostMode(currentAccount) && dialogId != MessagesController.getInstance(currentAccount).getStoriesController().ghostReadDialogId) {
                 TL_stories.TL_stories_incrementStoryViews req = new TL_stories.TL_stories_incrementStoryViews();
                 req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
                 req.id.add(storyId);

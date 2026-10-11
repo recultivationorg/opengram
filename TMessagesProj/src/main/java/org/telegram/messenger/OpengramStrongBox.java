@@ -10,17 +10,14 @@ import android.security.keystore.KeyProperties;
 import androidx.annotation.RequiresApi;
 
 import java.security.KeyStore;
+import java.util.ArrayList;
+import java.util.Enumeration;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
-/**
- * StrongBox AES-GCM sealer. A failed key operation throws. It never reports
- * "unsupported" for a keystore error, so callers cannot treat a transient
- * failure as permission to write plaintext.
- */
 public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
 
     public enum Probe {
@@ -30,15 +27,35 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
     }
 
     private static final String ANDROID_KEYSTORE = "AndroidKeyStore";
-    private static final String ALIAS = "opengram_force_e2e_chats";
+    private static final String E2E_ALIAS = "opengram_force_e2e_chats";
+    private static final String GHOST_ALIAS_PREFIX = "opengram_ghost_";
     private static final int GCM_TAG_BITS = 128;
+    private static final Object keystoreLock = new Object();
 
-    public static final OpengramStrongBox SEALER = new OpengramStrongBox();
+    public static final OpengramStrongBox SEALER = new OpengramStrongBox(E2E_ALIAS);
 
-    private OpengramStrongBox() {
+    private final String alias;
+
+    private OpengramStrongBox(String alias) {
+        this.alias = alias;
+    }
+
+    public static OpengramStrongBox forGhost(long clientUserId) {
+        if (clientUserId <= 0) {
+            throw new IllegalArgumentException("client user id required");
+        }
+        return new OpengramStrongBox(GHOST_ALIAS_PREFIX + clientUserId);
     }
 
     public static Probe probe() {
+        return SEALER.probeKey();
+    }
+
+    String alias() {
+        return alias;
+    }
+
+    public Probe probeKey() {
         if (Build.VERSION.SDK_INT < 31 || !hasFeature()) {
             return Probe.UNSUPPORTED;
         }
@@ -48,6 +65,68 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
         } catch (Exception e) {
             FileLog.e(e);
             return Probe.ERROR;
+        }
+    }
+
+    public Probe inspect() {
+        if (Build.VERSION.SDK_INT < 31 || !hasFeature()) {
+            return Probe.UNSUPPORTED;
+        }
+        try {
+            SecretKey key = loadExisting();
+            if (key == null) {
+                return Probe.AVAILABLE;
+            }
+            return isStrongBox(key) ? Probe.AVAILABLE : Probe.ERROR;
+        } catch (Exception e) {
+            FileLog.e(e);
+            return Probe.ERROR;
+        }
+    }
+
+    public void deleteKey() {
+        if (Build.VERSION.SDK_INT < 31 || !alias.startsWith(GHOST_ALIAS_PREFIX)) {
+            return;
+        }
+        synchronized (keystoreLock) {
+            deleteAlias(alias);
+        }
+    }
+
+    public static void deleteAllGhostKeys() {
+        if (Build.VERSION.SDK_INT < 31) {
+            return;
+        }
+        synchronized (keystoreLock) {
+            try {
+                KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+                keyStore.load(null);
+                ArrayList<String> aliases = new ArrayList<>();
+                Enumeration<String> existing = keyStore.aliases();
+                while (existing.hasMoreElements()) {
+                    String alias = existing.nextElement();
+                    if (alias != null && alias.startsWith(GHOST_ALIAS_PREFIX)) {
+                        aliases.add(alias);
+                    }
+                }
+                for (int i = 0; i < aliases.size(); i++) {
+                    keyStore.deleteEntry(aliases.get(i));
+                }
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+    }
+
+    private static void deleteAlias(String alias) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+            keyStore.load(null);
+            if (keyStore.containsAlias(alias)) {
+                keyStore.deleteEntry(alias);
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
         }
     }
 
@@ -87,8 +166,12 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
         }
         byte[] iv = new byte[ivLength];
         System.arraycopy(sealed, 1, iv, 0, ivLength);
+        SecretKey key = loadExisting();
+        if (key == null) {
+            throw new IllegalStateException("missing strongbox key");
+        }
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.DECRYPT_MODE, loadOrCreate(), new GCMParameterSpec(GCM_TAG_BITS, iv));
+        cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_BITS, iv));
         if (aad != null) {
             cipher.updateAAD(aad);
         }
@@ -96,24 +179,38 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
     }
 
     @RequiresApi(31)
-    private static SecretKey loadOrCreate() throws Exception {
-        KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
-        keyStore.load(null);
-        if (keyStore.containsAlias(ALIAS)) {
-            SecretKey existing = (SecretKey) keyStore.getKey(ALIAS, null);
-            if (isStrongBox(existing)) {
-                return existing;
+    private SecretKey loadExisting() throws Exception {
+        synchronized (keystoreLock) {
+            KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+            keyStore.load(null);
+            if (!keyStore.containsAlias(alias)) {
+                return null;
             }
-            keyStore.deleteEntry(ALIAS);
+            return (SecretKey) keyStore.getKey(alias, null);
         }
-        KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE);
-        generator.init(new KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
-            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-            .setKeySize(256)
-            .setIsStrongBoxBacked(true)
-            .build());
-        return generator.generateKey();
+    }
+
+    @RequiresApi(31)
+    private SecretKey loadOrCreate() throws Exception {
+        synchronized (keystoreLock) {
+            KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+            keyStore.load(null);
+            if (keyStore.containsAlias(alias)) {
+                SecretKey existing = (SecretKey) keyStore.getKey(alias, null);
+                if (isStrongBox(existing)) {
+                    return existing;
+                }
+                keyStore.deleteEntry(alias);
+            }
+            KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE);
+            generator.init(new KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .setIsStrongBoxBacked(true)
+                .build());
+            return generator.generateKey();
+        }
     }
 
     @RequiresApi(31)

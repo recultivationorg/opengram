@@ -53,6 +53,7 @@ public class UserConfig extends BaseController {
     public long migrateOffsetChannelId = -1;
     public long migrateOffsetAccess = -1;
     public boolean filtersLoaded;
+    public boolean ghostMode;
 
     public int sharingMyLocationUntil;
     public int lastMyLocationShareTime;
@@ -170,6 +171,7 @@ public class UserConfig extends BaseController {
                     editor.putInt("sharingMyLocationUntil", sharingMyLocationUntil);
                     editor.putInt("lastMyLocationShareTime", lastMyLocationShareTime);
                     editor.putBoolean("filtersLoaded", filtersLoaded);
+                    editor.putBoolean("ghostMode", ghostMode);
                     editor.putString("premiumGiftsStickerPack", premiumGiftsStickerPack);
                     editor.putLong("lastUpdatedPremiumGiftsStickerPack", lastUpdatedPremiumGiftsStickerPack);
 
@@ -232,6 +234,13 @@ public class UserConfig extends BaseController {
 
     public static boolean isValidAccount(int num) {
          return num >= 0 && num < UserConfig.MAX_ACCOUNT_COUNT && getInstance(num).isClientActivated();
+    }
+
+    public static boolean isGhostMode(int account) {
+        if (account < 0 || account >= MAX_ACCOUNT_COUNT) {
+            return false;
+        }
+        return getInstance(account).ghostMode;
     }
 
     public boolean isClientActivated() {
@@ -322,6 +331,14 @@ public class UserConfig extends BaseController {
             sharingMyLocationUntil = preferences.getInt("sharingMyLocationUntil", 0);
             lastMyLocationShareTime = preferences.getInt("lastMyLocationShareTime", 0);
             filtersLoaded = preferences.getBoolean("filtersLoaded", false);
+            if (preferences.contains("ghostMode")) {
+                ghostMode = preferences.getBoolean("ghostMode", false);
+            } else if (SharedConfig.ghostModeMigrated) {
+                ghostMode = false;
+            } else {
+                ghostMode = SharedConfig.ghostMode;
+                preferences.edit().putBoolean("ghostMode", ghostMode).apply();
+            }
             premiumGiftsStickerPack = preferences.getString("premiumGiftsStickerPack", null);
             lastUpdatedPremiumGiftsStickerPack = preferences.getLong("lastUpdatedPremiumGiftsStickerPack", 0);
 

@@ -5287,7 +5287,7 @@ public class MessagesStorage extends BaseController {
                                     pastReactions = message.reactions;
                                     topicId = MessageObject.getSavedDialogId(selfId, message);
                                 }
-                                MessageObject.updateReactions(message, reactions);
+                                MessageObject.updateReactions(currentAccount, message, reactions);
                                 SQLitePreparedStatement state;
                                 if (i == 0) {
                                     state = database.executeFast("UPDATE messages_v2 SET data = ? WHERE mid = ? AND uid = ?");
@@ -11937,7 +11937,46 @@ public class MessagesStorage extends BaseController {
 
     }
 
+    private void retainGhostReactionReads(ArrayList<TLRPC.Message> messages) {
+        if (!UserConfig.isGhostMode(currentAccount) || messages == null) {
+            return;
+        }
+        SQLiteCursor cursor = null;
+        try {
+            for (int i = 0; i < messages.size(); i++) {
+                TLRPC.Message message = messages.get(i);
+                if (!MessageObject.hasUnreadReactions(message)) {
+                    continue;
+                }
+                long dialogId = MessageObject.getDialogId(message);
+                int messageId = message.id != 0 ? message.id : message.local_id;
+                cursor = database.queryFinalized(String.format(Locale.US, "SELECT data FROM messages_v2 WHERE uid = %d AND mid = %d", dialogId, messageId));
+                if (cursor.next()) {
+                    NativeByteBuffer data = cursor.byteBufferValue(0);
+                    if (data != null) {
+                        TLRPC.Message existing = TLRPC.Message.TLdeserialize(data, data.readInt32(false), false);
+                        data.reuse();
+                        if (existing != null && existing.reactions != null) {
+                            MessageObject.updateReactions(currentAccount, existing, message.reactions);
+                        }
+                    }
+                }
+                cursor.dispose();
+                cursor = null;
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        } finally {
+            if (cursor != null) {
+                cursor.dispose();
+            }
+        }
+    }
+
     private void putMessagesInternal(ArrayList<TLRPC.Message> messages, boolean withTransaction, boolean doNotUpdateDialogDate, int downloadMask, boolean ifNoLastMessage, int mode, long threadMessageId) {
+        if (mode == ChatActivity.MODE_DEFAULT) {
+            retainGhostReactionReads(messages);
+        }
         if (messages != null) {
             ArrayList<TL_ephemeral.EphemeralMessage> ephemeralMessages = null;
             for (TLRPC.Message message : messages) {
@@ -17419,6 +17458,31 @@ public class MessagesStorage extends BaseController {
                 }
             }
 
+            LongSparseIntArray storedReactionCounts = null;
+            if (UserConfig.isGhostMode(currentAccount) && dialogs.dialogs != null && !dialogs.dialogs.isEmpty()) {
+                storedReactionCounts = new LongSparseIntArray();
+                StringBuilder dialogIds = new StringBuilder();
+                for (int i = 0; i < dialogs.dialogs.size(); i++) {
+                    if (i > 0) {
+                        dialogIds.append(',');
+                    }
+                    dialogIds.append(dialogs.dialogs.get(i).id);
+                }
+                SQLiteCursor reactionsCursor = null;
+                try {
+                    reactionsCursor = database.queryFinalized("SELECT did, unread_reactions FROM dialogs WHERE did IN (" + dialogIds + ")");
+                    while (reactionsCursor.next()) {
+                        storedReactionCounts.put(reactionsCursor.longValue(0), reactionsCursor.intValue(1));
+                    }
+                } catch (Exception e) {
+                    FileLog.e(e);
+                } finally {
+                    if (reactionsCursor != null) {
+                        reactionsCursor.dispose();
+                    }
+                }
+            }
+
             if (!dialogs.dialogs.isEmpty()) {
                 state_messages = database.executeFast("REPLACE INTO messages_v2 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)");
                 state_dialogs = database.executeFast("REPLACE INTO dialogs VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -17605,7 +17669,12 @@ public class MessagesStorage extends BaseController {
                         data = null;
                         state_dialogs.bindNull(14);
                     }
-                    state_dialogs.bindInteger(15, dialog.unread_reactions_count);
+                    int unreadReactions = dialog.unread_reactions_count;
+                    if (storedReactionCounts != null && storedReactionCounts.indexOfKey(dialog.id) >= 0) {
+                        unreadReactions = OpengramGhostReads.reactionCountFromServer(storedReactionCounts.get(dialog.id), unreadReactions);
+                        dialog.unread_reactions_count = unreadReactions;
+                    }
+                    state_dialogs.bindInteger(15, unreadReactions);
                     if (message != null && (message.flags & 131072) != 0) {
                         state_dialogs.bindLong(16, message.grouped_id);
                     } else {

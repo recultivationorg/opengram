@@ -23139,14 +23139,14 @@ public class ChatActivity extends BaseFragment implements
                 if (filteredMessagesDict != null) {
                     MessageObject messageObject = filteredMessagesDict.get(msgId);
                     if (messageObject != null) {
-                        MessageObject.updateReactions(messageObject.messageOwner, (TLRPC.TL_messageReactions) args[2]);
+                        MessageObject.updateReactions(currentAccount, messageObject.messageOwner, (TLRPC.TL_messageReactions) args[2]);
                         messageObject.forceUpdate = true;
                         messageObject.reactionsChanged = true;
                     }
                 }
                 MessageObject messageObject = messagesDict[did == dialog_id ? 0 : 1].get(msgId);
                 if (messageObject != null) {
-                    MessageObject.updateReactions(messageObject.messageOwner, (TLRPC.TL_messageReactions) args[2]);
+                    MessageObject.updateReactions(currentAccount, messageObject.messageOwner, (TLRPC.TL_messageReactions) args[2]);
                     messageObject.forceUpdate = true;
                     messageObject.reactionsChanged = true;
                     updateMessageAnimated(messageObject, true);

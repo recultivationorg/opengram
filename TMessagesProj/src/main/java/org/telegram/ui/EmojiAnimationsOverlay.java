@@ -907,7 +907,7 @@ public class EmojiAnimationsOverlay implements NotificationCenter.NotificationCe
         }
         interaction.interaction.data = jsonObject.toString();
 
-        if (SharedConfig.ghostMode) {
+        if (UserConfig.isGhostMode(currentAccount)) {
             clearSendingInfo();
             return;
         }

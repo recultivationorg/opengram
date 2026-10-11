@@ -36,6 +36,7 @@ import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.OpengramGhostReads;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
@@ -328,6 +329,9 @@ public class ReactionsLayoutInBubble {
                 }
             }
             hasUnreadReactions = MessageObject.hasUnreadReactions(messageObject.messageOwner);
+            if (hasUnreadReactions && UserConfig.isGhostMode(messageObject.currentAccount) && OpengramGhostReads.isReactionRead(messageObject.currentAccount, messageObject.getDialogId(), messageObject.getId())) {
+                hasUnreadReactions = false;
+            }
         }
         for (int i = 0; i < oldButtons.size(); i++) {
             oldButtons.get(i).detach();

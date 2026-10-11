@@ -817,6 +817,10 @@ public class MessagesController extends BaseController implements NotificationCe
                 e.printStackTrace();
             }
             if (needRequest) {
+                if (isReactions && UserConfig.isGhostMode(currentAccount)) {
+                    AndroidUtilities.runOnUIThread(() -> callback.accept(0));
+                    return;
+                }
                 final TLMethod<TLRPC.messages_Messages> request;
                 if (isReactions) {
                     TLRPC.TL_messages_getUnreadReactions req = new TLRPC.TL_messages_getUnreadReactions();
@@ -1552,6 +1556,7 @@ public class MessagesController extends BaseController implements NotificationCe
         super(num);
         ImageLoader.getInstance();
         getMessagesStorage();
+        OpengramGhostReads.load(currentAccount);
         getLocationController();
         AndroidUtilities.runOnUIThread(() -> {
             MessagesController messagesController = getMessagesController();
@@ -7673,6 +7678,7 @@ public class MessagesController extends BaseController implements NotificationCe
         int reqId = getConnectionsManager().sendRequest(request, (response, error) -> {
             if (error == null) {
                 TLRPC.TL_messages_chatFull res = (TLRPC.TL_messages_chatFull) response;
+                getStoriesController().retainLocalStoryRead(dialogId, res.full_chat.stories);
                 getMessagesStorage().putUsersAndChats(res.users, res.chats, true, true);
                 getMessagesStorage().updateChatInfo(res.full_chat, false);
                 getStoriesController().updateStoriesFromFullPeer(dialogId, res.full_chat.stories);
@@ -7800,6 +7806,7 @@ public class MessagesController extends BaseController implements NotificationCe
                 putUsers(res.users, false);
                 putChats(res.chats, false);
                 res.full_user.user = getUser(res.full_user.id);
+                getStoriesController().retainLocalStoryRead(dialogId, userFull.stories);
                 getMessagesStorage().updateUserInfo(userFull, false);
                 getStoriesController().updateStoriesFromFullPeer(dialogId, userFull.stories);
                 ChatThemeController.getInstance(currentAccount).saveChatWallpaper(res.full_user.id, res.full_user.wallpaper);
@@ -10520,7 +10527,7 @@ public class MessagesController extends BaseController implements NotificationCe
         checkReadTasks();
 
         if (getUserConfig().isClientActivated()) {
-            if (SharedConfig.ghostMode) {
+            if (UserConfig.isGhostMode(currentAccount)) {
                 if (statusRequest != 0) {
                     getConnectionsManager().cancelRequest(statusRequest, true);
                     statusRequest = 0;
@@ -11386,7 +11393,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean sendTyping(long dialogId, long threadMsgId, int action, String emojicon, int classGuid) {
-        if (SharedConfig.ghostMode) {
+        if (UserConfig.isGhostMode(currentAccount)) {
             return false;
         }
         if (action < 0 || action >= sendingTypings.length || dialogId == 0) {
@@ -13640,6 +13647,9 @@ public class MessagesController extends BaseController implements NotificationCe
                             getTranslateController().checkDialogMessageSure(key);
                         }
                     } else {
+                        if (UserConfig.isGhostMode(currentAccount) && loadType != DIALOGS_LOAD_TYPE_CACHE) {
+                            value.unread_reactions_count = OpengramGhostReads.reactionCountFromServer(currentDialog.unread_reactions_count, value.unread_reactions_count);
+                        }
                         if (loadType != DIALOGS_LOAD_TYPE_CACHE) {
                             currentDialog.notify_settings = value.notify_settings;
                         }
@@ -14199,6 +14209,9 @@ public class MessagesController extends BaseController implements NotificationCe
                         if (BuildVars.LOGS_ENABLED) {
                             FileLog.d("processDialogsUpdate dialog not null");
                         }
+                        if (UserConfig.isGhostMode(currentAccount) && !fromCache) {
+                            value.unread_reactions_count = OpengramGhostReads.reactionCountFromServer(currentDialog.unread_reactions_count, value.unread_reactions_count);
+                        }
                         currentDialog.unread_count = value.unread_count;
                         if (currentDialog.unread_mentions_count != value.unread_mentions_count) {
                             currentDialog.unread_mentions_count = value.unread_mentions_count;
@@ -14411,7 +14424,7 @@ public class MessagesController extends BaseController implements NotificationCe
         long dialogId = messageObject.getDialogId();
         getMessagesStorage().markMessagesContentAsRead(dialogId, arrayList, 0, 0);
         getNotificationCenter().postNotificationName(NotificationCenter.messagesReadContent, dialogId, arrayList);
-        if (SharedConfig.ghostMode) {
+        if (UserConfig.isGhostMode(currentAccount)) {
             return;
         }
         if (messageObject.getId() < 0) {
@@ -14442,7 +14455,7 @@ public class MessagesController extends BaseController implements NotificationCe
 
     public void markMentionMessageAsRead(int mid, long channelId, long did) {
         getMessagesStorage().markMentionMessageAsRead(-channelId, mid, did);
-        if (SharedConfig.ghostMode) {
+        if (UserConfig.isGhostMode(currentAccount)) {
             return;
         }
         if (channelId != 0) {
@@ -14524,7 +14537,7 @@ public class MessagesController extends BaseController implements NotificationCe
         if (createDeleteTask) {
             getMessagesStorage().createTaskForMid(dialogId, mid, time, time, ttl, false);
         }
-        if (SharedConfig.ghostMode) {
+        if (UserConfig.isGhostMode(currentAccount)) {
             if (newTaskId != 0) {
                 getMessagesStorage().removePendingTask(newTaskId);
             }
@@ -14567,7 +14580,7 @@ public class MessagesController extends BaseController implements NotificationCe
         }
         ArrayList<Long> randomIds = new ArrayList<>();
         randomIds.add(randomId);
-        if (!SharedConfig.ghostMode) {
+        if (!UserConfig.isGhostMode(currentAccount)) {
             getSecretChatHelper().sendMessagesReadMessage(chat, randomIds, null);
         }
         if (ttl > 0) {
@@ -14577,7 +14590,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     private void completeReadTask(ReadTask task) {
-        if (SharedConfig.ghostMode) {
+        if (UserConfig.isGhostMode(currentAccount)) {
             return;
         }
         if (task.replyId != 0 && task.monoForumPeerId == 0) {
@@ -14686,7 +14699,7 @@ public class MessagesController extends BaseController implements NotificationCe
             return;
         }
         getMessagesStorage().resetMentionsCount(dialogId, topicId, 0);
-        if (SharedConfig.ghostMode) {
+        if (UserConfig.isGhostMode(currentAccount)) {
             return;
         }
         TLRPC.TL_messages_readMentions req = new TLRPC.TL_messages_readMentions();
@@ -21283,6 +21296,38 @@ public class MessagesController extends BaseController implements NotificationCe
         return true;
     }
 
+    private boolean storedMessageHasUnreadReactions(long dialogId, int messageId) {
+        TLRPC.Message message = readStoredMessage(dialogId, messageId, "messages_v2");
+        if (message == null) {
+            message = readStoredMessage(dialogId, messageId, "messages_topics");
+        }
+        return MessageObject.hasUnreadReactions(message);
+    }
+
+    private TLRPC.Message readStoredMessage(long dialogId, int messageId, String table) {
+        SQLiteCursor cursor = null;
+        try {
+            cursor = getMessagesStorage().getDatabase().queryFinalized(String.format(Locale.US, "SELECT data FROM %s WHERE mid = %d AND uid = %d", table, messageId, dialogId));
+            if (!cursor.next()) {
+                return null;
+            }
+            NativeByteBuffer data = cursor.byteBufferValue(0);
+            if (data == null) {
+                return null;
+            }
+            TLRPC.Message message = TLRPC.Message.TLdeserialize(data, data.readInt32(false), false);
+            data.reuse();
+            return message;
+        } catch (Exception e) {
+            FileLog.e(e);
+            return null;
+        } finally {
+            if (cursor != null) {
+                cursor.dispose();
+            }
+        }
+    }
+
     public void checkUnreadReactions(long dialogId, long topicId, SparseBooleanArray unreadReactions) {
         checkUnreadReactionsInternal(dialogId, topicId, unreadReactions, true);
     }
@@ -21329,14 +21374,32 @@ public class MessagesController extends BaseController implements NotificationCe
             int newUnreadCount = 0;
             for (int i = 0; i < unreadReactions.size(); i++) {
                 int messageId = unreadReactions.keyAt(i);
-                boolean hasUnreadReaction = unreadReactions.valueAt(i);
-                if (reactionsMentionsMessageIds.indexOfKey(messageId) >= 0) {
-                    if (reactionsMentionsMessageIds.get(messageId) != hasUnreadReaction) {
+                boolean serverUnread = unreadReactions.valueAt(i);
+                boolean localKnown = reactionsMentionsMessageIds.indexOfKey(messageId) >= 0;
+                boolean localUnread = localKnown && reactionsMentionsMessageIds.get(messageId);
+                boolean hasUnreadReaction = serverUnread;
+                if (isReactions && UserConfig.isGhostMode(currentAccount) && localKnown && !localUnread && serverUnread) {
+                    hasUnreadReaction = storedMessageHasUnreadReactions(dialogId, messageId);
+                }
+                if (localKnown) {
+                    if (localUnread != hasUnreadReaction) {
                         newUnreadCount += hasUnreadReaction ? 1 : -1;
+                        changed = true;
+                    }
+                } else if (isReactions && UserConfig.isGhostMode(currentAccount)) {
+                    if (hasUnreadReaction) {
+                        newUnreadCount += 1;
                         changed = true;
                     }
                 } else {
                     needReload = true;
+                }
+                if (isReactions && UserConfig.isGhostMode(currentAccount)) {
+                    if (hasUnreadReaction) {
+                        OpengramGhostReads.unmarkReaction(currentAccount, dialogId, messageId);
+                    } else if (!serverUnread || localKnown && !localUnread) {
+                        OpengramGhostReads.markReaction(currentAccount, dialogId, messageId);
+                    }
                 }
                 if (hasUnreadReaction) {
                     newUnreadMessages.add(messageId);
@@ -21389,12 +21452,15 @@ public class MessagesController extends BaseController implements NotificationCe
                         AndroidUtilities.runOnUIThread(() -> {
                             TLRPC.Dialog dialog = dialogs_dict.get(dialogId);
                             if (dialog == null) {
-                                getMessagesStorage().updateDialogUnreadReactions(dialogId, 0, count, false);
+                                if (!UserConfig.isGhostMode(currentAccount)) {
+                                    getMessagesStorage().updateDialogUnreadReactions(dialogId, 0, count, false);
+                                }
                                 return;
                             }
-                            dialog.unread_reactions_count = count;
-                            getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, count);
-                            getNotificationCenter().postNotificationName(NotificationCenter.dialogsUnreadReactionsCounterChanged, dialogId, topicId, count, newUnreadMessages);
+                            int nextCount = UserConfig.isGhostMode(currentAccount) ? OpengramGhostReads.reactionCountFromServer(dialog.unread_reactions_count, count) : count;
+                            dialog.unread_reactions_count = nextCount;
+                            getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, nextCount);
+                            getNotificationCenter().postNotificationName(NotificationCenter.dialogsUnreadReactionsCounterChanged, dialogId, topicId, nextCount, newUnreadMessages);
                         });
                     }
                 });
@@ -21407,9 +21473,10 @@ public class MessagesController extends BaseController implements NotificationCe
                         TLRPC.TL_messages_savedDialogs topics = (TLRPC.TL_messages_savedDialogs) response;
                         int count = topics.dialogs.size() == 0 ? 0 : topics.dialogs.get(0).unread_reactions_count;
                         AndroidUtilities.runOnUIThread(() -> {
-                            getMessagesController().getTopicsController().updateReactionsUnread(dialogId, topicId, count, false);
-                            getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, count);
-                            getNotificationCenter().postNotificationName(NotificationCenter.dialogsUnreadReactionsCounterChanged, dialogId, topicId, count, newUnreadMessages);
+                            int applied = getMessagesController().getTopicsController().updateReactionsUnread(dialogId, topicId, count, false);
+                            int nextCount = applied >= 0 ? applied : count;
+                            getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, nextCount);
+                            getNotificationCenter().postNotificationName(NotificationCenter.dialogsUnreadReactionsCounterChanged, dialogId, topicId, nextCount, newUnreadMessages);
                         });
                     }
                 });
@@ -21422,9 +21489,10 @@ public class MessagesController extends BaseController implements NotificationCe
                         TLRPC.TL_messages_forumTopics topics = (TLRPC.TL_messages_forumTopics) response;
                         int count = topics.topics.size() == 0 ? 0 : topics.topics.get(0).unread_reactions_count;
                         AndroidUtilities.runOnUIThread(() -> {
-                            getMessagesController().getTopicsController().updateReactionsUnread(dialogId, topicId, count, false);
-                            getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, count);
-                            getNotificationCenter().postNotificationName(NotificationCenter.dialogsUnreadReactionsCounterChanged, dialogId, topicId, count, newUnreadMessages);
+                            int applied = getMessagesController().getTopicsController().updateReactionsUnread(dialogId, topicId, count, false);
+                            int nextCount = applied >= 0 ? applied : count;
+                            getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, nextCount);
+                            getNotificationCenter().postNotificationName(NotificationCenter.dialogsUnreadReactionsCounterChanged, dialogId, topicId, nextCount, newUnreadMessages);
                         });
                     }
                 });
@@ -21590,7 +21658,7 @@ public class MessagesController extends BaseController implements NotificationCe
             topicsController.markAllReactionsAsRead(-dialogId, topicId);
         }
         getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, 0);
-        if (SharedConfig.ghostMode) {
+        if (UserConfig.isGhostMode(currentAccount)) {
             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.updateInterfaces, UPDATE_MASK_REACTIONS_READ);
             return;
         }
@@ -21625,7 +21693,7 @@ public class MessagesController extends BaseController implements NotificationCe
             topicsController.markAllPollVotesAsRead(-dialogId, topicId);
         }
         getMessagesStorage().updateUnreadPollVotesCount(dialogId, topicId, 0);
-        if (SharedConfig.ghostMode) {
+        if (UserConfig.isGhostMode(currentAccount)) {
             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.updateInterfaces, UPDATE_MASK_REACTIONS_READ);
             return;
         }

@@ -15,6 +15,8 @@ import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
+import org.telegram.messenger.OpengramGhostReads;
+import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.Timer;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
@@ -205,7 +207,23 @@ public class StoriesStorage {
                     data.reuse();
                 }
                 state.dispose();
-                database.executeFast(String.format(Locale.US, "REPLACE INTO stories_counter VALUES(%d, %d, %d)", dialogId, 0, userStories.max_read_id)).stepThis().dispose();
+                int maxReadId = userStories.max_read_id;
+                if (UserConfig.isGhostMode(currentAccount)) {
+                    SQLiteCursor readCursor = null;
+                    try {
+                        readCursor = database.queryFinalized("SELECT max_read FROM stories_counter WHERE dialog_id = " + dialogId);
+                        if (readCursor.next()) {
+                            maxReadId = OpengramGhostReads.storyReadId(readCursor.intValue(0), maxReadId);
+                        }
+                    } catch (Exception ignore) {
+                    } finally {
+                        if (readCursor != null) {
+                            readCursor.dispose();
+                        }
+                    }
+                    userStories.max_read_id = maxReadId;
+                }
+                database.executeFast(String.format(Locale.US, "REPLACE INTO stories_counter VALUES(%d, %d, %d)", dialogId, 0, maxReadId)).stepThis().dispose();
             }
         } catch (Exception e) {
             FileLog.e(e);

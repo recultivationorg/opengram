@@ -737,6 +737,10 @@ public class MessageObject {
                 changed = true;
             }
         }
+        if (UserConfig.isGhostMode(currentAccount)) {
+            OpengramGhostReads.markReaction(currentAccount, getDialogId(), getId());
+            changed = true;
+        }
         if (changed) {
             MessagesStorage.getInstance(currentAccount).markMessageReactionsAsRead(messageOwner.dialog_id, getTopicId(currentAccount, messageOwner), messageOwner.id);
         }
@@ -3953,7 +3957,7 @@ public class MessageObject {
         }
     }
 
-    public static void updateReactions(TLRPC.Message message, TLRPC.TL_messageReactions reactions) {
+    public static void updateReactions(int account, TLRPC.Message message, TLRPC.TL_messageReactions reactions) {
         if (message == null || reactions == null) {
             return;
         }
@@ -3976,8 +3980,41 @@ public class MessageObject {
                 }
             }
         }
+        if (UserConfig.isGhostMode(account) && message.reactions != null && message.reactions.recent_reactions != null && reactions.recent_reactions != null) {
+            for (int i = 0; i < reactions.recent_reactions.size(); i++) {
+                TLRPC.MessagePeerReaction incoming = reactions.recent_reactions.get(i);
+                if (incoming == null || !incoming.unread) {
+                    continue;
+                }
+                long incomingPeer = incoming.peer_id == null ? 0 : getPeerId(incoming.peer_id);
+                for (int j = 0; j < message.reactions.recent_reactions.size(); j++) {
+                    TLRPC.MessagePeerReaction previous = message.reactions.recent_reactions.get(j);
+                    if (previous == null || previous.unread) {
+                        continue;
+                    }
+                    long previousPeer = previous.peer_id == null ? 0 : getPeerId(previous.peer_id);
+                    if (incomingPeer == previousPeer && sameReaction(incoming.reaction, previous.reaction)) {
+                        incoming.unread = false;
+                        break;
+                    }
+                }
+            }
+        }
         message.reactions = reactions;
         message.flags |= 1048576;
+    }
+
+    private static boolean sameReaction(TLRPC.Reaction left, TLRPC.Reaction right) {
+        if (left == right) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        if (left instanceof TLRPC.TL_reactionPaid && right instanceof TLRPC.TL_reactionPaid) {
+            return true;
+        }
+        return left.equals(right);
     }
 
     public boolean hasReactions() {

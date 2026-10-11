@@ -929,6 +929,9 @@ public class TopicsController extends BaseController {
                     topic.unread_reactions_count = 0;
                 }
             } else {
+                if (UserConfig.isGhostMode(currentAccount)) {
+                    count = OpengramGhostReads.reactionCountFromServer(topic.unread_reactions_count, count);
+                }
                 topic.unread_reactions_count = count;
             }
             totalCount = topic.unread_reactions_count;

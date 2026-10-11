@@ -4401,9 +4401,10 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
         } else {
             selectedPosition = storyViewer.savedPositions.get(dialogId, -1);
             if (selectedPosition == -1) {
-                if (!storyViewer.isSingleStory && userStories != null && userStories.max_read_id > 0) {
+                int maxReadId = storiesController.getMaxStoriesReadId(dialogId);
+                if (!storyViewer.isSingleStory && maxReadId > 0) {
                     for (int i = 0; i < storyItems.size(); i++) {
-                        if (storyItems.get(i).id > userStories.max_read_id) {
+                        if (storyItems.get(i).id > maxReadId) {
                             selectedPosition = i;
                             break;
                         }

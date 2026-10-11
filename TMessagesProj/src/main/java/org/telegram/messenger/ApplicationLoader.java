@@ -260,6 +260,10 @@ public class ApplicationLoader extends Application {
                 SendMessagesHelper.getInstance(a).checkUnsentMessages();
             }
         }
+        if (!SharedConfig.ghostModeMigrated) {
+            SharedConfig.ghostModeMigrated = true;
+            SharedConfig.saveConfig();
+        }
 
         ApplicationLoader app = (ApplicationLoader) ApplicationLoader.applicationContext;
         app.initPushServices();

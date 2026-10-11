@@ -238,6 +238,7 @@ public class SharedConfig {
     public static boolean saveIncomingPhotos;
     public static boolean allowScreenCapture;
     public static boolean ghostMode;
+    public static boolean ghostModeMigrated;
     public static boolean forceEndToEndEncryption;
     public static boolean forceEndToEndForAllChats;
     public static boolean forceEndToEndChatsSnapshotted;
@@ -477,7 +478,7 @@ public class SharedConfig {
                 editor.putInt("lastPauseTime", lastPauseTime);
                 editor.putBoolean("useFingerprint", useFingerprintLock);
                 editor.putBoolean("allowScreenCapture", allowScreenCapture);
-                editor.putBoolean("ghostMode", ghostMode);
+                editor.putBoolean("ghostModeMigrated", ghostModeMigrated);
                 editor.putBoolean("forceEndToEndEncryption", forceEndToEndEncryption);
                 editor.putBoolean("forceEndToEndForAllChats", forceEndToEndForAllChats);
                 editor.putBoolean("forceEndToEndChatsSnapshotted", forceEndToEndChatsSnapshotted);
@@ -565,6 +566,7 @@ public class SharedConfig {
             useFingerprintLock = preferences.getBoolean("useFingerprint", true);
             allowScreenCapture = preferences.getBoolean("allowScreenCapture", false);
             ghostMode = preferences.getBoolean("ghostMode", false);
+            ghostModeMigrated = preferences.getBoolean("ghostModeMigrated", false);
             forceEndToEndEncryption = preferences.getBoolean("forceEndToEndEncryption", false);
             forceEndToEndForAllChats = preferences.getBoolean("forceEndToEndForAllChats", false);
             forceEndToEndChatsSnapshotted = preferences.getBoolean("forceEndToEndChatsSnapshotted", false);

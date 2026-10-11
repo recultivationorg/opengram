@@ -902,7 +902,7 @@ public class LocationController extends BaseController implements NotificationCe
     }
 
     public void markLiveLoactionsAsRead(long dialogId) {
-        if (SharedConfig.ghostMode || DialogObject.isEncryptedDialog(dialogId)) {
+        if (UserConfig.isGhostMode(currentAccount) || DialogObject.isEncryptedDialog(dialogId)) {
             return;
         }
         ArrayList<TLRPC.Message> messages = locationsCache.get(dialogId);
