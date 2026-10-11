@@ -456,20 +456,20 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
         this.menuItemsOffset = menuItemsOffset;
     }
 
-    private long pendingGhostDialogId;
+    private boolean pendingGhostViews;
 
     public void openStoryForCell(StoryCell cell) {
         openStoryForCell(cell, false);
     }
 
     public void openStoryForCellAsGhost(StoryCell cell) {
-        if (cell != null) {
-            pendingGhostDialogId = cell.dialogId;
-        }
+        pendingGhostViews = true;
         openStoryForCell(cell, false);
     }
 
     private void openStoryForCell(StoryCell cell, boolean overscroll) {
+        final boolean ghostViews = pendingGhostViews;
+        pendingGhostViews = false;
         if (overscroll && expandOvershootAnimator != null && expandOvershootAnimator.isRunning()) {
             return;
         }
@@ -544,11 +544,12 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
                 }
             }
             StoryViewer storyViewer = fragment.getOrCreateStoryViewer();
-            storiesController.ghostReadDialogId = pendingGhostDialogId == startFromDialogId ? startFromDialogId : 0;
-            pendingGhostDialogId = 0;
+            if (ghostViews) {
+                storyViewer.requestGhostViews();
+            }
             storyViewer.doOnAnimationReady(() -> storiesController.setLoading(startFromDialogId, false));
             boolean finalOnlySelfStories = onlySelfStories;
-            storyViewer.open(getContext(), null, peerIds, position, null, null, StoriesListPlaceProvider.of(recyclerListView).with(forward -> {
+            storyViewer.open(currentAccount, getContext(), null, peerIds, position, null, null, StoriesListPlaceProvider.of(recyclerListView).with(forward -> {
                 if (finalOnlySelfStories) {
                     return;
                 }

@@ -1319,7 +1319,21 @@ public class StoriesController {
         return markStoryAsRead(userStories, storyItem, false);
     }
 
-    public long ghostReadDialogId;
+    private int ghostViewHolds;
+
+    public void acquireGhostViews() {
+        ghostViewHolds++;
+    }
+
+    public void releaseGhostViews() {
+        if (ghostViewHolds > 0) {
+            ghostViewHolds--;
+        }
+    }
+
+    public boolean storyViewsAreGhost() {
+        return ghostViewHolds > 0;
+    }
 
     public boolean markStoryAsRead(TL_stories.PeerStories userStories, TL_stories.StoryItem storyItem, boolean profile) {
         if (storyItem == null || userStories == null) {
@@ -1341,7 +1355,7 @@ public class StoriesController {
             if (!profile) {
                 storiesStorage.updateMaxReadId(dialogId, newReadId);
             }
-            if (!UserConfig.isGhostMode(currentAccount) && dialogId != ghostReadDialogId) {
+            if (!UserConfig.isGhostMode(currentAccount) && !storyViewsAreGhost()) {
                 TL_stories.TL_stories_readStories req = new TL_stories.TL_stories_readStories();
                 req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
                 req.max_id = storyItem.id;
@@ -3777,7 +3791,7 @@ public class StoriesController {
             if (seenStories.contains(storyId)) return false;
             seenStories.add(storyId);
             saveCache();
-            if (!UserConfig.isGhostMode(currentAccount) && dialogId != MessagesController.getInstance(currentAccount).getStoriesController().ghostReadDialogId) {
+            if (!UserConfig.isGhostMode(currentAccount) && !MessagesController.getInstance(currentAccount).getStoriesController().storyViewsAreGhost()) {
                 TL_stories.TL_stories_incrementStoryViews req = new TL_stories.TL_stories_incrementStoryViews();
                 req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
                 req.id.add(storyId);

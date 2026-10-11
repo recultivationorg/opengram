@@ -244,7 +244,7 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
             if (item.view instanceof TL_stories.TL_storyView) {
                 storyViewer.presentFragment(ProfileActivity.of(item.view.user_id));
             } else if (item.view instanceof TL_stories.TL_storyViewPublicRepost) {
-                storyViewer.fragment.createOverlayStoryViewer().open(getContext(), ((TL_stories.TL_storyViewPublicRepost) item.view).story, StoriesListPlaceProvider.of(recyclerListView));
+                storyViewer.fragment.createOverlayStoryViewer().open(currentAccount, getContext(), ((TL_stories.TL_storyViewPublicRepost) item.view).story, StoriesListPlaceProvider.of(recyclerListView));
             } else if (item.reaction instanceof TL_stories.TL_storyReaction) {
                 storyViewer.presentFragment(ProfileActivity.of(DialogObject.getPeerDialogId(item.reaction.peer_id)));
             } else if (item.reaction instanceof TL_stories.TL_storyReactionPublicRepost) {
@@ -272,7 +272,7 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
                     repostsListConsumedCount = consumed;
                     final ViewsModel modelRef = currentModel;
                     storyViewer.fragment.createOverlayStoryViewer().open(
-                        getContext(), clickedIndex, currentRepostsList,
+                        currentAccount, getContext(), clickedIndex, currentRepostsList,
                         StoriesListPlaceProvider.of(recyclerListView).with(forward -> {
                             if (modelRef != null) {
                                 modelRef.loadNext();
@@ -281,7 +281,7 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
                     );
                 } else {
                     currentRepostsList = null;
-                    storyViewer.fragment.createOverlayStoryViewer().open(getContext(), ((TL_stories.TL_storyReactionPublicRepost) item.reaction).story, StoriesListPlaceProvider.of(recyclerListView));
+                    storyViewer.fragment.createOverlayStoryViewer().open(currentAccount, getContext(), ((TL_stories.TL_storyReactionPublicRepost) item.reaction).story, StoriesListPlaceProvider.of(recyclerListView));
                 }
             } else if (item.reaction instanceof TL_stories.TL_storyReactionPublicForward || item.view instanceof TL_stories.TL_storyViewPublicForward) {
                 TLRPC.Message message;
@@ -890,7 +890,7 @@ public class SelfStoryViewsPage extends FrameLayout implements NotificationCente
                             }
                             StoryViewer storyViewer1 = lastFragment.createOverlayStoryViewer();
                             storyViewer1.doOnAnimationReady(onDone);
-                            storyViewer1.open(getContext(), dialogId, StoriesListPlaceProvider.of(recyclerListView));
+                            storyViewer1.open(currentAccount, getContext(), dialogId, StoriesListPlaceProvider.of(recyclerListView));
                         }
                     };
                     break;

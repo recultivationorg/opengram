@@ -192,6 +192,10 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
     Uri lastUri;
     PeerStoriesView.VideoPlayerSharedScope currentPlayerScope;
     private boolean isClosed = true;
+    private boolean ghostViewsRequested;
+    private boolean ghostViewsActive;
+    private boolean ghostViewHoldOwned;
+    private int ghostViewAccount = -1;
     private boolean isRecording;
     AnimationNotificationsLocker locker = new AnimationNotificationsLocker();
     private boolean isWaiting;
@@ -333,20 +337,28 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
     }
 
     public void open(Context context, long dialogId, PlaceProvider placeProvider) {
-        currentAccount = UserConfig.selectedAccount;
-        int position = 0;
+        open(UserConfig.selectedAccount, context, dialogId, placeProvider);
+    }
+
+    public void open(int account, Context context, long dialogId, PlaceProvider placeProvider) {
         ArrayList<Long> peerIds = new ArrayList<>();
         peerIds.add(dialogId);
-        MessagesController.getInstance(currentAccount).getStoriesController().checkExpiredStories(dialogId);
-        open(context, null, peerIds, position, null, null, placeProvider, false);
+        MessagesController.getInstance(account).getStoriesController().checkExpiredStories(dialogId);
+        open(account, context, null, peerIds, 0, null, null, placeProvider, false);
     }
 
     public void open(Context context, int startStoryId, StoriesController.StoriesList storiesList, PlaceProvider placeProvider) {
-        currentAccount = UserConfig.selectedAccount;
+        open(UserConfig.selectedAccount, context, startStoryId, storiesList, placeProvider);
+    }
+
+    public void open(int account, Context context, int startStoryId, StoriesController.StoriesList storiesList, PlaceProvider placeProvider) {
+        if (storiesList == null) {
+            return;
+        }
         ArrayList<Long> peerIds = new ArrayList<>();
         peerIds.add(storiesList.dialogId);
         dayStoryId = startStoryId;
-        open(context, null, peerIds, 0, storiesList, null, placeProvider, false);
+        open(account, context, null, peerIds, 0, storiesList, null, placeProvider, false);
     }
 
     public void open(Context context, TL_stories.PeerStories userStories, PlaceProvider placeProvider) {
@@ -372,7 +384,51 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
     public void open(Context context, TL_stories.StoryItem storyItem, ArrayList<Long> peerIds, int position, StoriesController.StoriesList storiesList, TL_stories.PeerStories userStories, PlaceProvider placeProvider, boolean reversed) {
         open(UserConfig.selectedAccount, context, storyItem, peerIds, position, storiesList, userStories, placeProvider, reversed);
     }
+    public void requestGhostViews() {
+        ghostViewsRequested = true;
+    }
+
+    private void acquireGhostViews(int account) {
+        if (account < 0 || account >= UserConfig.MAX_ACCOUNT_COUNT) {
+            return;
+        }
+        ghostViewsActive = true;
+        if (ghostViewHoldOwned) {
+            return;
+        }
+        ghostViewHoldOwned = true;
+        ghostViewAccount = account;
+        MessagesController.getInstance(account).getStoriesController().acquireGhostViews();
+    }
+
+    private void releaseGhostViewHold() {
+        if (!ghostViewHoldOwned) {
+            return;
+        }
+        ghostViewHoldOwned = false;
+        int account = ghostViewAccount;
+        ghostViewAccount = -1;
+        if (account < 0 || account >= UserConfig.MAX_ACCOUNT_COUNT) {
+            return;
+        }
+        MessagesController.getInstance(account).getStoriesController().releaseGhostViews();
+    }
+
+    private void finishGhostViews() {
+        ghostViewsActive = false;
+        releaseGhostViewHold();
+    }
+
+    private boolean storyViewsAreGhost() {
+        if (currentAccount < 0 || currentAccount >= UserConfig.MAX_ACCOUNT_COUNT) {
+            return false;
+        }
+        return MessagesController.getInstance(currentAccount).getStoriesController().storyViewsAreGhost();
+    }
+
     public void open(int account, Context context, TL_stories.StoryItem storyItem, ArrayList<Long> peerIds, int position, StoriesController.StoriesList storiesList, TL_stories.PeerStories userStories, PlaceProvider placeProvider, boolean reversed) {
+        final boolean requestGhost = ghostViewsRequested;
+        ghostViewsRequested = false;
         if (!isContextSafe(context)) {
             doOnAnimationReadyRunnables.clear();
             return;
@@ -383,6 +439,9 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
         }
         if (isShowing) {
             doOnAnimationReadyRunnables.clear();
+            if (requestGhost && !isClosed && currentAccount == account) {
+                acquireGhostViews(account);
+            }
             return;
         }
         setSpeed(1f);
@@ -400,6 +459,9 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
         this.placeProvider = placeProvider;
         this.reversed = reversed;
         currentAccount = account;
+        if (requestGhost || storyViewsAreGhost()) {
+            acquireGhostViews(account);
+        }
         swipeToDismissOffset = 0;
         swipeToDismissHorizontalOffset = 0;
         if (storiesViewPager != null) {
@@ -1387,6 +1449,41 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
 
                 @Override
                 public void requestPlayer(TL_stories.StoryItem storyItem, long dialogId, int storyId, boolean rtmp_stream, TLRPC.InputGroupCall call, PeerStoriesView.VideoPlayerSharedScope scope) {
+                    final boolean ownBroadcast = LivePlayer.recording != null && call != null && LivePlayer.recording.equals(call);
+                    if (isClosed && !ownBroadcast) {
+                        scope.firstFrameRendered = false;
+                        scope.player = null;
+                        scope.livePlayer = null;
+                        return;
+                    }
+                    if ((ghostViewsActive || storyViewsAreGhost()) && !ownBroadcast) {
+                        if (liveView != null) {
+                            liveView.setScope(0, null);
+                            liveView.reset();
+                        }
+                        if (livePlayer != null && !livePlayer.outgoing && !LiveStoryPipOverlay.isVisible(livePlayer)) {
+                            livePlayer.destroy();
+                            livePlayer = null;
+                        }
+                        if (playerHolder != null) {
+                            playerHolder.release(null);
+                            playerHolder = null;
+                        }
+                        if (currentPlayerScope != null) {
+                            currentPlayerScope.player = null;
+                            currentPlayerScope.livePlayer = null;
+                            currentPlayerScope.firstFrameRendered = false;
+                            currentPlayerScope.renderView = null;
+                            currentPlayerScope.textureView = null;
+                            currentPlayerScope.surfaceView = null;
+                            currentPlayerScope.invalidate();
+                            currentPlayerScope = null;
+                        }
+                        scope.firstFrameRendered = false;
+                        scope.player = null;
+                        scope.livePlayer = null;
+                        return;
+                    }
                     switchToLive(true, true);
 //                    call = new TLRPC.TL_inputGroupCall();
 //                    call.access_hash = -1333869356067995675L;
@@ -2665,12 +2762,17 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
         doOnAnimationReadyRunnables.clear();
         selfStoriesViewsOffset = 0;
         lastStoryItem = null;
+        finishGhostViews();
+    }
+
+    public boolean isClosed() {
+        return isClosed;
     }
 
     public void close(boolean backAnimation) {
-        MessagesController.getInstance(currentAccount).getStoriesController().ghostReadDialogId = 0;
-        AndroidUtilities.hideKeyboard(windowView);
         isClosed = true;
+        releaseGhostViewHold();
+        AndroidUtilities.hideKeyboard(windowView);
         invalidateOutRect = true;
         updatePlayingMode();
         startCloseAnimation(backAnimation);

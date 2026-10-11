@@ -1127,7 +1127,7 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                         }
                         fwdStoryItem.dialogId = panel.peerId;
                         StoryViewer overlayStoryViewer = lastFragment.createOverlayStoryViewer();
-                        overlayStoryViewer.open(getContext(), fwdStoryItem, null);
+                        overlayStoryViewer.open(currentAccount, getContext(), fwdStoryItem, null);
                         overlayStoryViewer.setOnCloseListener(() -> {
                             storyViewer.updatePlayingMode();
                         });
@@ -6960,6 +6960,9 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
         }
 
         public void checkSendView() {
+            if (storyViewer != null && storyViewer.isClosed()) {
+                return;
+            }
             TL_stories.PeerStories userStories = PeerStoriesView.this.userStories;
             if (userStories == null) {
                 userStories = storiesController.getStories(dialogId);
