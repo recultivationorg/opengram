@@ -150,7 +150,6 @@ import org.telegram.ui.Gifts.ProfileGiftsContainer;
 import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.LocationActivity;
 import org.telegram.ui.PhotoViewer;
-import org.telegram.ui.DownloadSpeedActivity;
 import org.telegram.ui.PremiumPreviewFragment;
 import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.ProfileActivity2;
@@ -11841,6 +11840,9 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
     }
 
     public void showPremiumFloodWaitBulletin(final boolean isUpload) {
+        if (!isUpload) {
+            return;
+        }
         if (profileActivity == null) return;
 
 //        final long now = System.currentTimeMillis();
@@ -11871,14 +11873,6 @@ public class SharedMediaLayout extends FrameLayout implements NotificationCenter
                 AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(R.string.UploadSpeedLimitedMessage), () -> {
                     profileActivity.presentFragment(new PremiumPreviewFragment("upload_speed"));
                 }), boldN)
-            ).setDuration(8000).show(true);
-        } else {
-            BulletinFactory.of(profileActivity).createSimpleBulletin(
-                R.raw.speed_limit,
-                LocaleController.getString(R.string.DownloadSpeedLimited),
-                LocaleController.getString(R.string.DownloadSpeedLimitedMessage),
-                LocaleController.getString(R.string.DownloadSpeedCappedGo),
-                () -> profileActivity.presentFragment(new DownloadSpeedActivity())
             ).setDuration(8000).show(true);
         }
     }

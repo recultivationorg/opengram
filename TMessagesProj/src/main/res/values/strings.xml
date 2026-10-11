@@ -6027,7 +6027,6 @@
     <string name="TopicIconChangedToInReply">changed topic icon to %s</string>
     <string name="TopicChangeIconAndTitleToInReply">changed the topic title and icon to %s</string>
     <string name="SelectTopicIconHint">Select Topic Icon</string>
-    <string name="PremiumSpeedPromo">Increase Speed</string>
     <string name="ChannelCaptionLimitPremiumPromo_one">Make the caption shorter or subscribe to *Telegram Premium* to double the limit to **%1$s** character.</string>
     <string name="ChannelCaptionLimitPremiumPromo_other">Make the caption shorter or subscribe to *Telegram Premium* to double the limit to **%1$s** characters.</string>
     <string name="AllChats">All Chats</string>
@@ -8085,9 +8084,6 @@
     <string name="ChartInUSD">%s in USD</string>
     <string name="BotAllowBiometryTitle">Allow biometry</string>
     <string name="BotAllowBiometryMessage">Do you want to allow **%s** to use biometry?</string>
-    <string name="DownloadSpeedLimited">Download speed capped</string>
-    <string name="DownloadSpeedLimitedMessage">Go to Opengram settings to increase it</string>
-    <string name="DownloadSpeedCappedGo">Go</string>
     <string name="UploadSpeedLimited">Upload speed limited</string>
     <string name="UploadSpeedLimitedMessage">Subscribe to **Telegram Premium** and increase upload speeds %d times.</string>
     <string name="PrivacyBiometryBotsButton">Bots with biometry access</string>

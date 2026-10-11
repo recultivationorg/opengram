@@ -1234,7 +1234,6 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_REMOVE_ADS = 35;
     public final static int OPTION_SEND_NOW = 100;
     public final static int OPTION_EDIT_SCHEDULE_TIME = 102;
-    public final static int OPTION_SPEED_PROMO = 103;
     public final static int OPTION_OPEN_PROFILE = 104;
     public final static int OPTION_FACT_CHECK = 106;
     public final static int OPTION_EDIT_PRICE = 107;
@@ -30919,28 +30918,6 @@ public class ChatActivity extends BaseFragment implements
                 icons.add(R.drawable.msg_user_search);
             }
 
-            if (!getUserConfig().isPremium() && !getMessagesController().premiumFeaturesBlocked() && message.getDocument() != null && message.getDocument().size >= 150 * 1024 * 1024 && FileLoader.getInstance(currentAccount).isLoadingFile(FileLoader.getAttachFileName(message.getDocument())) && chatMode != MODE_SAVED) {
-                items.add(LocaleController.getString(R.string.PremiumSpeedPromo));
-                options.add(OPTION_SPEED_PROMO);
-                icons.add(R.drawable.msg_speed);
-
-                if (SharedConfig.getDevicePerformanceClass() != SharedConfig.PERFORMANCE_CLASS_LOW) {
-                    TLRPC.TL_help_premiumPromo premiumPromo = MediaDataController.getInstance(currentAccount).getPremiumPromo();
-                    String typeString = PremiumPreviewFragment.featureTypeToServerString(PremiumPreviewFragment.PREMIUM_FEATURE_DOWNLOAD_SPEED);
-                    if (premiumPromo != null) {
-                        int index = -1;
-                        for (int i = 0; i < premiumPromo.video_sections.size(); i++) {
-                            if (premiumPromo.video_sections.get(i).equals(typeString)) {
-                                index = i;
-                                break;
-                            }
-                        }
-                        if (index != -1) {
-                            FileLoader.getInstance(currentAccount).loadFile(premiumPromo.videos.get(index), premiumPromo, FileLoader.PRIORITY_HIGH, 0);
-                        }
-                    }
-                }
-            }
             if (message.messageOwner.action instanceof TLRPC.TL_messageActionSetMessagesTTL && single && (dialog_id >= 0 || (currentChat != null && ChatObject.canUserDoAdminAction(currentChat, ChatObject.ACTION_DELETE_MESSAGES)))) {
                 AutoDeletePopupWrapper autoDeletePopupWrapper = new AutoDeletePopupWrapper(contentView.getContext(), null, new AutoDeletePopupWrapper.Callback() {
                     @Override
@@ -34274,10 +34251,6 @@ public class ChatActivity extends BaseFragment implements
             }
             case OPTION_REMOVE_ADS: {
                 hideAds();
-                break;
-            }
-            case OPTION_SPEED_PROMO: {
-                presentFragment(new DownloadSpeedActivity());
                 break;
             }
             case OPTION_OPEN_PROFILE: {
@@ -44486,6 +44459,9 @@ public class ChatActivity extends BaseFragment implements
     }
 
     public void showPremiumFloodWaitBulletin(final boolean isUpload) {
+        if (!isUpload) {
+            return;
+        }
         final long now = System.currentTimeMillis();
         if (now - ConnectionsManager.lastPremiumFloodWaitShown < 1000L * MessagesController.getInstance(currentAccount).uploadPremiumSpeedupNotifyPeriod) {
             return;
@@ -44512,14 +44488,6 @@ public class ChatActivity extends BaseFragment implements
                 AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(R.string.UploadSpeedLimitedMessage), () -> {
                     presentFragment(new PremiumPreviewFragment("upload_speed"));
                 }), boldN)
-            ).setDuration(8000).show(true);
-        } else {
-            BulletinFactory.of(this).createSimpleBulletin(
-                R.raw.speed_limit,
-                LocaleController.getString(R.string.DownloadSpeedLimited),
-                LocaleController.getString(R.string.DownloadSpeedLimitedMessage),
-                LocaleController.getString(R.string.DownloadSpeedCappedGo),
-                () -> presentFragment(new DownloadSpeedActivity())
             ).setDuration(8000).show(true);
         }
     }

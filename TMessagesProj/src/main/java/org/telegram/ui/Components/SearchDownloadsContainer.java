@@ -41,7 +41,6 @@ import org.telegram.ui.Cells.SharedAudioCell;
 import org.telegram.ui.Cells.SharedDocumentCell;
 import org.telegram.ui.FilteredSearchView;
 import org.telegram.ui.PhotoViewer;
-import org.telegram.ui.DownloadSpeedActivity;
 import org.telegram.ui.PremiumPreviewFragment;
 
 import java.util.ArrayList;
@@ -781,6 +780,9 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
     }
 
     public void showPremiumFloodWaitBulletin(final boolean isUpload) {
+        if (!isUpload) {
+            return;
+        }
         if (parentFragment == null || !recyclerListView.isAttachedToWindow()) return;
 
         final long now = System.currentTimeMillis();
@@ -809,14 +811,6 @@ public class SearchDownloadsContainer extends FrameLayout implements Notificatio
                     AndroidUtilities.replaceCharSequence("%d", AndroidUtilities.premiumText(LocaleController.getString(R.string.UploadSpeedLimitedMessage), () -> {
                         parentFragment.presentFragment(new PremiumPreviewFragment("upload_speed"));
                     }), boldN)
-            ).setDuration(8000).show(false);
-        } else {
-            BulletinFactory.of(parentFragment).createSimpleBulletin(
-                    R.raw.speed_limit,
-                    LocaleController.getString(R.string.DownloadSpeedLimited),
-                    LocaleController.getString(R.string.DownloadSpeedLimitedMessage),
-                    LocaleController.getString(R.string.DownloadSpeedCappedGo),
-                    () -> parentFragment.presentFragment(new DownloadSpeedActivity())
             ).setDuration(8000).show(false);
         }
     }
