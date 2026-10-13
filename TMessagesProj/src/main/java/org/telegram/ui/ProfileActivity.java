@@ -600,6 +600,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private final static int delete_group = 45;
     private final static int enable_no_forwards = 46;
     private final static int disable_no_forwards = 47;
+    private final static int send_money = 48;
 
     private Rect rect = new Rect();
 
@@ -13974,7 +13975,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     if (position == infoSectionRow) {
                         final long did = getDialogId();
                         TLObject obj = getMessagesController().getUserOrChat(did);
-                        TL_bots.botVerification bot_verification = userInfo != null ? userInfo.bot_verification : chatInfo != null ? chatInfo.bot_verification : null;
+                        TL_bots.BotVerification bot_verification = userInfo != null ? userInfo.bot_verification : chatInfo != null ? chatInfo.bot_verification : null;
                         Long bot_manager_id = userInfo != null && TLObject.hasFlag(userInfo.flags2, TLObject.FLAG_25) ? userInfo.bot_manager_id : null;
                         if (botAppRow >= 0 || bot_verification != null || bot_manager_id != null) {
                             cell.setFixedSize(0);
@@ -13994,7 +13995,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 sb.append("x");
                                 sb.setSpan(new AnimatedEmojiSpan(bot_verification.icon, cell.getTextView().getPaint().getFontMetricsInt()), sb.length() - 1, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                                 sb.append(" ");
-                                SpannableString description = new SpannableString(bot_verification.description);
+                                SpannableString description = new SpannableString(MessageObject.formatTextWithEntities(bot_verification.description));
                                 try {
                                     AndroidUtilities.addLinksSafe(description, Linkify.WEB_URLS, false, false);
                                     URLSpan[] spans = description.getSpans(0, description.length(), URLSpan.class);

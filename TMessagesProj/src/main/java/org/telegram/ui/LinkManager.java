@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 
+import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BirthdayController;
@@ -80,6 +81,8 @@ public class LinkManager {
     public boolean handle(Uri uri) {
         if (uri == null) return false;
 
+        FileLog.d("link manager handle " + uri);
+
         final String scheme = uri.getScheme();
 
         if ("tonsite".equalsIgnoreCase(scheme))
@@ -90,6 +93,11 @@ public class LinkManager {
 
         if ("tg".equalsIgnoreCase(scheme))
             return handleTg(uri);
+
+        if ("ton".equalsIgnoreCase(scheme))
+            return handleTon(uri);
+        if ("tc".equalsIgnoreCase(scheme))
+            return handleTc(uri);
 
         return false;
     }
@@ -120,6 +128,9 @@ public class LinkManager {
 
         final String first = segments.get(0);
         final String second = segments.size() > 1 ? segments.get(1) : null;
+
+        if ("sendgrams".equalsIgnoreCase(first))
+            return handleSendGrams(uri);
 
         if ("$".equalsIgnoreCase(first))
             return handleInvoiceSlug(path.substring(1));
@@ -154,6 +165,7 @@ public class LinkManager {
     }
 
     private boolean handleTg(Uri uri) {
+        uri = Uri.parse(uri.toString().replaceFirst("(?i)^tg:(//)?sendgrams&", "tg://sendgrams?"));
         uri = normalizeTgUri(uri);
 
         final List<String> _segments = uri.getPathSegments();
@@ -166,6 +178,9 @@ public class LinkManager {
 
         final String first = segments.get(0);
         final String second = segments.size() > 1 ? segments.get(1) : null;
+
+        if ("sendgrams".equalsIgnoreCase(first))
+            return handleSendGrams(uri);
 
         if ("newbot".equalsIgnoreCase(first))
             return handleNewBot(uri.getQueryParameter("manager"), uri.getQueryParameter("username"), uri.getQueryParameter("name"));
@@ -276,6 +291,9 @@ public class LinkManager {
 
         final String domain = uri.getQueryParameter("domain");
         final String startapp = uri.getQueryParameter("startapp");
+
+        if ("sendgrams".equalsIgnoreCase(domain))
+            return handleSendGrams(uri);
 
         if ("oauth".equalsIgnoreCase(domain) && !isEmpty(startapp))
             return handleOAuth(uri, startapp);
@@ -1477,6 +1495,8 @@ public class LinkManager {
     }
 
     private void cancel() {
+        tonConnectCancelled = true;
+        if (tonConnectRetry != null) AndroidUtilities.cancelRunOnUIThread(tonConnectRetry);
         if (currentRequestId >= 0) {
             getConnectionsManager().cancelRequest(currentRequestId, true);
             currentRequestId = -1;

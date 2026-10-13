@@ -814,6 +814,10 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             return false;
         }
 
+        public boolean shouldRestoreKeyboardOnDismiss() {
+            return true;
+        }
+
         public boolean onCustomMeasure(View view, int width, int height) {
             return false;
         }
@@ -903,6 +907,10 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
         }
 
+        public void onContainerTranslationUpdated(float currentPanTranslationY, float progress, boolean keyboardVisible) {
+            onContainerTranslationUpdated(currentPanTranslationY);
+        }
+
         public void onHideShowProgress(float progress) {
 
         }
@@ -985,6 +993,10 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
         public boolean shouldHideBottomButtons() {
             return true;
+        }
+
+        public boolean disableTopFade() {
+            return false;
         }
 
         public boolean disableBottomFade() {
@@ -1384,7 +1396,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 @Override
                 protected void onTransitionStart(boolean keyboardVisible, int contentHeight) {
                     super.onTransitionStart(keyboardVisible, contentHeight);
-                    if (previousScrollOffsetY > 0 && previousScrollOffsetY != scrollOffsetY[0] && keyboardVisible) {
+                    if (previousScrollOffsetY > 0 && previousScrollOffsetY != scrollOffsetY[0] && (keyboardVisible || currentAttachLayout == gramLayout)) {
                         fromScrollY = previousScrollOffsetY;
                         toScrollY = scrollOffsetY[0];
                     } else {
@@ -1426,7 +1438,9 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 protected void onPanTranslationUpdate(float y, float progress, boolean keyboardVisible) {
                     currentPanTranslationY = y;
                     if (fromScrollY > 0) {
-                        currentPanTranslationY += (fromScrollY - toScrollY) * (1f - progress);
+                        final float remaining = currentAttachLayout == gramLayout && !keyboardVisible
+                                ? progress : 1f - progress;
+                        currentPanTranslationY += (fromScrollY - toScrollY) * remaining;
                     }
                     actionBar.setTranslationY(currentPanTranslationY);
                     selectedMenuItem.setTranslationY(currentPanTranslationY);
@@ -1443,20 +1457,20 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                     // actionBarShadow.setTranslationY(currentPanTranslationY);
                     updateSelectedPosition(0);
 
-                    setCurrentPanTranslationY(currentPanTranslationY);
+                    setCurrentPanTranslationY(currentAttachLayout == gramLayout ? 0f : currentPanTranslationY);
                     invalidate();
                     frameLayout2.invalidate();
 
                     updateCommentTextViewPosition();
 
                     if (currentAttachLayout != null) {
-                        currentAttachLayout.onContainerTranslationUpdated(currentPanTranslationY);
+                        currentAttachLayout.onContainerTranslationUpdated(currentPanTranslationY, progress, keyboardVisible);
                     }
                 }
 
                 @Override
                 protected boolean heightAnimationEnabled() {
-                    if (isDismissed() || !openTransitionFinished) {
+                    if ((isDismissed() && !gramSendDismissalInProgress) || !openTransitionFinished) {
                         return false;
                     }
                     return (
@@ -2133,7 +2147,8 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                     }
                     containerView.invalidate();
                 }
-                super.setTranslationY(translationY - currentPanTranslationY);
+                // Keyboard panning and the send exit animate independently.
+                super.setTranslationY(translationY - currentPanTranslationY + gramSendExitTranslationY);
                 if (currentSheetAnimationType != 1) {
                     currentAttachLayout.onContainerTranslationUpdated(currentPanTranslationY);
                 }
@@ -5443,10 +5458,17 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
             boolean keyboardVisible = delegate.needEnterComment();
             enterCommentEventSent = true;
             AndroidUtilities.runOnUIThread(() -> {
+                if (isDismissed() || !editText.isFocusable() || !editText.isShown()) {
+                    return;
+                }
                 setFocusable(true);
                 editText.requestFocus();
                 if (showKeyboard) {
-                    AndroidUtilities.runOnUIThread(() -> AndroidUtilities.showKeyboard(editText));
+                    AndroidUtilities.runOnUIThread(() -> {
+                        if (!isDismissed() && editText.isFocusable() && editText.hasFocus() && editText.isShown()) {
+                            AndroidUtilities.showKeyboard(editText);
+                        }
+                    });
                 }
             }, keyboardVisible ? 200 : 0);
         }
@@ -5756,7 +5778,15 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 actionBarAnimation = new AnimatorSet();
                 actionBarAnimation.setDuration((long) (180 * Math.abs((show ? 1.0f : 0.0f) - actionBar.getAlpha())));
                 ArrayList<Animator> animators = new ArrayList<>();
-                animators.add(ObjectAnimator.ofFloat(actionBar, View.ALPHA, show ? 1.0f : 0.0f));
+                final ObjectAnimator actionBarAlphaAnimator = ObjectAnimator.ofFloat(actionBar, View.ALPHA, show ? 1.0f : 0.0f);
+                actionBarAlphaAnimator.addUpdateListener(animation -> {
+                    // The inline Money menu crossfades with this sibling view.
+                    // Alpha updates alone do not redraw the layout's display list.
+                    if (currentAttachLayout == gramLayout && gramLayout != null) {
+                        gramLayout.invalidate();
+                    }
+                });
+                animators.add(actionBarAlphaAnimator);
                 // animators.add(ObjectAnimator.ofFloat(actionBarShadow, View.ALPHA, show ? 1.0f : 0.0f));
                 if (needsSearchItem) {
                     animators.add(ObjectAnimator.ofFloat(searchItem, View.ALPHA, show ? 1.0f : 0.0f));
@@ -6510,6 +6540,18 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         return Build.VERSION.SDK_INT < 23 || ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED;
     }
 
+    private static boolean isMoneyTabRecipient(TLRPC.User user) {
+        return user != null
+                && !UserObject.isUserSelf(user)
+                && !UserObject.isBot(user)
+                && !UserObject.isDeleted(user)
+                && !UserObject.isService(user.id)
+                && !UserObject.isReplyUser(user)
+                && !UserObject.isAnonymous(user)
+                && user.id != UserObject.VERIFY
+                && !MessagesController.isSupportUser(user);
+    }
+
     private static boolean checkMusicPermission(Context context) {
         return Build.VERSION.SDK_INT < 23 || ContextCompat.checkSelfPermission(context, Build.VERSION.SDK_INT >= 33 ? Manifest.permission.READ_MEDIA_AUDIO : Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
     }
@@ -6745,16 +6787,33 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 if (pollsEnabled) {
                     pollButton = buttonsCount++;
                 }
-                if (todoEnabled) {
-                    todoButton = buttonsCount++;
-                }
                 if (plainTextEnabled) {
                     contactButton = buttonsCount++;
+                }
+                musicButton = buttonsCount++;
+                if (todoEnabled) {
+                    todoButton = buttonsCount++;
                 }
                 if (baseFragment instanceof ChatActivity && ((ChatActivity) baseFragment).getChatMode() == 0 && user != null && !paidUser && !user.bot && QuickRepliesController.getInstance(currentAccount).hasReplies()) {
                     quickRepliesButton = buttonsCount++;
                 }
-                musicButton = buttonsCount++;
+
+                if ((photosEnabled || videosEnabled) && !paidUser && (chat == null || !ChatObject.isMonoForum(chat))) {
+                    if (baseFragment instanceof ChatActivity && !((ChatActivity) baseFragment).isInScheduleMode() && !((ChatActivity) baseFragment).isSecretChat() && ((ChatActivity) baseFragment).getChatMode() != ChatActivity.MODE_QUICK_REPLIES) {
+                        ChatActivity chatActivity = (ChatActivity) baseFragment;
+
+                        attachBotsStartRow = buttonsCount;
+                        attachMenuBots.clear();
+                        for (TLRPC.TL_attachMenuBot bot : MediaDataController.getInstance(currentAccount).getAttachMenuBots().bots) {
+                            if (bot.show_in_attach_menu && MediaDataController.canShowAttachMenuBot(bot, chatActivity.getCurrentChat() != null ? chatActivity.getCurrentChat() : chatActivity.getCurrentUser())) {
+                                attachMenuBots.add(bot);
+                            }
+                        }
+
+                        buttonsCount += attachMenuBots.size();
+                        attachBotsEndRow = buttonsCount;
+                    }
+                }
             }
             super.notifyDataSetChanged();
         }
@@ -6798,6 +6857,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         todoLayout = null;
         locationLayout = null;
         documentLayout = null;
+        gramLayout = null;
         for (int a = 1; a < layouts.length; a++) {
             if (layouts[a] == null) {
                 continue;
@@ -6808,6 +6868,13 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         }
         updateActionBarVisibility(false, false);
         super.dismissInternal();
+        if (gramSendDismissalInProgress) {
+            gramSendDismissalInProgress = false;
+            gramSendExitTranslationY = 0f;
+            if (baseFragment != null && baseFragment.getFragmentView() != null) {
+                ViewCompat.requestApplyInsets(baseFragment.getFragmentView());
+            }
+        }
     }
 
     @Override
@@ -6869,10 +6936,11 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         if (currentAttachLayout.onDismiss() || isDismissed()) {
             return;
         }
-        if (commentTextView != null) {
+        gramSendDismissalInProgress = currentAttachLayout == gramLayout && gramLayout != null && gramLayout.hasQueuedSend();
+        if (!gramSendDismissalInProgress && commentTextView != null) {
             AndroidUtilities.hideKeyboard(commentTextView.getEditText());
         }
-        if (topCommentTextView != null) {
+        if (!gramSendDismissalInProgress && topCommentTextView != null) {
             AndroidUtilities.hideKeyboard(topCommentTextView.getEditText());
         }
         botAttachLayouts.clear();
@@ -7250,8 +7318,10 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
     private void checkUi_fadeTopAlpha() {
         if (fadeView != null && actionBar != null) {
+            final AttachAlertLayout layout = nextAttachLayout != null ? nextAttachLayout : currentAttachLayout;
+            final boolean disableFade = layout != null && layout.disableTopFade();
             final boolean isDark = resourcesProvider != null ? resourcesProvider.isDark() : Theme.isCurrentThemeDark();
-            fadeView.setFadeTopAlpha(actionBar.getVisibility() == View.VISIBLE ? (int) ((isDark ? 255 : 160) * actionBar.getAlpha()) : 0);
+            fadeView.setFadeTopAlpha(!disableFade && actionBar.getVisibility() == View.VISIBLE ? (int) ((isDark ? 255 : 160) * actionBar.getAlpha()) : 0);
         }
     }
 

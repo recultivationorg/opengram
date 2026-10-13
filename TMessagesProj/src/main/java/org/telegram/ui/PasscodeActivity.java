@@ -1035,6 +1035,12 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
         this.openedSettings = openedSettings;
     }
 
+    private Runnable enteredCode;
+    public PasscodeActivity setOnEnteredCode(Runnable enteredCode) {
+        this.enteredCode = enteredCode;
+        return this;
+    }
+
     private void onPasscodeError() {
         if (getParentActivity() == null) return;
         try {
@@ -1075,7 +1081,7 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
             int position = holder.getAdapterPosition();
             return position == fingerprintRow || position == autoLockRow || position == captureRow ||
-                    position == changePasscodeRow || position == disablePasscodeRow;
+                    position == changePasscodeRow || position == disablePasscodeRow || position == walletPasscodeRow || position == walletFingerprintRow;
         }
 
         @Override

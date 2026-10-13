@@ -121,6 +121,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.dynamicanimation.animation.FloatValueHolder;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
+
 import org.telegram.ui.recyclerview.ChatListItemAnimator;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.GridLayoutManagerFixed;
@@ -146,7 +147,7 @@ import org.telegram.messenger.ChatMessageSharedResources;
 import org.telegram.messenger.ChatMessagesMetadataController;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ChatThemeController;
-import org.telegram.messenger.CodeHighlighting;
+import org.telegram.utils.code.highlight.CodeHighlighting;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DocumentObject;
@@ -401,7 +402,12 @@ public class ChatActivity extends BaseFragment implements
 
     private HashMap<MessageObject, Boolean> alreadyPlayedStickers = new HashMap<>();
 
-    private final WindowInsetsStateHolder windowInsetsStateHolder = new WindowInsetsStateHolder(this::checkInsets);
+    private final WindowInsetsStateHolder windowInsetsStateHolder = new WindowInsetsStateHolder(this::checkInsets) {
+        @Override
+        protected WindowInsetsCompat filterInsets(@Nullable WindowInsetsCompat insets) {
+            return getChatWindowInsets(insets);
+        }
+    };
 
     private BlurredBackgroundColorProviderThemed blurredBackgroundColorProvider;
     private BlurredBackgroundColorProviderThemed blurredBackgroundColorProviderWhite;
@@ -4321,62 +4327,66 @@ public class ChatActivity extends BaseFragment implements
                 savedChatsItem.setVisibility(getMessagesController().getSavedMessagesController().hasDialogs() ? View.VISIBLE : View.GONE);
                 savedChatsGap.setVisibility(getMessagesController().getSavedMessagesController().hasDialogs() ? View.VISIBLE : View.GONE);
             } else if (chatMode != MODE_SAVED && (currentUser == null || !currentUser.self)) {
-                chatNotificationsPopupWrapper = new ChatNotificationsPopupWrapper(context, currentAccount, headerItem.getPopupLayout().getSwipeBack(), false, false, new ChatNotificationsPopupWrapper.Callback() {
-                    @Override
-                    public void dismiss() {
-                        headerItem.toggleSubMenu();
-                    }
-
-                    @Override
-                    public void toggleSound() {
-                        SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
-                        boolean enabled = !preferences.getBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(dialog_id, getTopicId()), true);
-                        preferences.edit().putBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(dialog_id, getTopicId()), enabled).apply();
-                        if (BulletinFactory.canShowBulletin(ChatActivity.this)) {
-                            BulletinFactory.createSoundEnabledBulletin(ChatActivity.this, enabled ? NotificationsController.SETTING_SOUND_ON : NotificationsController.SETTING_SOUND_OFF, getResourceProvider()).show();
+                chatNotificationsPopupWrapper = null;
+                muteItem = headerItem.lazilyAddSwipeBackItem(R.drawable.msg_mute, null, null, () -> {
+                    chatNotificationsPopupWrapper = new ChatNotificationsPopupWrapper(context, currentAccount, headerItem.getPopupLayout().getSwipeBack(), false, false, new ChatNotificationsPopupWrapper.Callback() {
+                        @Override
+                        public void dismiss() {
+                            headerItem.toggleSubMenu();
                         }
-                        updateTitleIcons();
-                    }
 
-                    @Override
-                    public void muteFor(int timeInSeconds) {
-                        if (timeInSeconds == 0) {
-                            if (getMessagesController().isDialogMuted(dialog_id, getTopicId())) {
-                                ChatActivity.this.toggleMute(true);
-                            }
+                        @Override
+                        public void toggleSound() {
+                            SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
+                            boolean enabled = !preferences.getBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(dialog_id, getTopicId()), true);
+                            preferences.edit().putBoolean("sound_enabled_" + NotificationsController.getSharedPrefKey(dialog_id, getTopicId()), enabled).apply();
                             if (BulletinFactory.canShowBulletin(ChatActivity.this)) {
-                                BulletinFactory.createMuteBulletin(ChatActivity.this, NotificationsController.SETTING_MUTE_UNMUTE, timeInSeconds, getResourceProvider()).show();
+                                BulletinFactory.createSoundEnabledBulletin(ChatActivity.this, enabled ? NotificationsController.SETTING_SOUND_ON : NotificationsController.SETTING_SOUND_OFF, getResourceProvider()).show();
                             }
-                        } else {
-                            getNotificationsController().muteUntil(dialog_id, getTopicId(), timeInSeconds);
-                            if (BulletinFactory.canShowBulletin(ChatActivity.this)) {
-                                BulletinFactory.createMuteBulletin(ChatActivity.this, NotificationsController.SETTING_MUTE_CUSTOM, timeInSeconds, getResourceProvider()).show();
+                            updateTitleIcons();
+                        }
+
+                        @Override
+                        public void muteFor(int timeInSeconds) {
+                            if (timeInSeconds == 0) {
+                                if (getMessagesController().isDialogMuted(dialog_id, getTopicId())) {
+                                    ChatActivity.this.toggleMute(true);
+                                }
+                                if (BulletinFactory.canShowBulletin(ChatActivity.this)) {
+                                    BulletinFactory.createMuteBulletin(ChatActivity.this, NotificationsController.SETTING_MUTE_UNMUTE, timeInSeconds, getResourceProvider()).show();
+                                }
+                            } else {
+                                getNotificationsController().muteUntil(dialog_id, getTopicId(), timeInSeconds);
+                                if (BulletinFactory.canShowBulletin(ChatActivity.this)) {
+                                    BulletinFactory.createMuteBulletin(ChatActivity.this, NotificationsController.SETTING_MUTE_CUSTOM, timeInSeconds, getResourceProvider()).show();
+                                }
                             }
                         }
-                    }
 
-                    @Override
-                    public void showCustomize() {
-                        if (dialog_id != 0 && chatMode != MODE_SAVED) {
-                            if (currentUser != null) {
-                                getMessagesController().putUser(currentUser, true);
+                        @Override
+                        public void showCustomize() {
+                            if (dialog_id != 0 && chatMode != MODE_SAVED) {
+                                if (currentUser != null) {
+                                    getMessagesController().putUser(currentUser, true);
+                                }
+                                Bundle args = new Bundle();
+                                args.putLong("dialog_id", dialog_id);
+                                if (getTopicId() != 0) {
+                                    args.putLong("topic_id", getTopicId());
+                                }
+                                presentFragment(new ProfileNotificationsActivity(args, themeDelegate));
                             }
-                            Bundle args = new Bundle();
-                            args.putLong("dialog_id", dialog_id);
-                            if (getTopicId() != 0) {
-                                args.putLong("topic_id", getTopicId());
-                            }
-                            presentFragment(new ProfileNotificationsActivity(args, themeDelegate));
                         }
-                    }
 
-                    @Override
-                    public void toggleMute() {
-                        ChatActivity.this.toggleMute(true);
-                        BulletinFactory.createMuteBulletin(ChatActivity.this, getMessagesController().isDialogMuted(dialog_id, getTopicId()), themeDelegate).show();
-                    }
-                }, getResourceProvider());
-                muteItem = headerItem.lazilyAddSwipeBackItem(R.drawable.msg_mute, null, null, chatNotificationsPopupWrapper.windowLayout);
+                        @Override
+                        public void toggleMute() {
+                            ChatActivity.this.toggleMute(true);
+                            BulletinFactory.createMuteBulletin(ChatActivity.this, getMessagesController().isDialogMuted(dialog_id, getTopicId()), themeDelegate).show();
+                        }
+                    }, getResourceProvider());
+                    chatNotificationsPopupWrapper.update(dialog_id, getTopicId(), null);
+                    return chatNotificationsPopupWrapper.windowLayout;
+                });
                 muteItem.setOnClickListener(view -> {
                     boolean muted = MessagesController.getInstance(currentAccount).isDialogMuted(dialog_id, getTopicId());
                     if (muted) {
@@ -9023,8 +9033,21 @@ public class ChatActivity extends BaseFragment implements
     private int insetSystemLeft;
     private int insetSystemRight;
 
+    @Nullable
+    private WindowInsetsCompat getChatWindowInsets(@Nullable WindowInsetsCompat insets) {
+        if (insets != null && chatAttachAlert != null && chatAttachAlert.isShowing()) {
+            // The attachment sheet owns this IME; it must not move the chat behind it.
+            return new WindowInsetsCompat.Builder(insets)
+                .setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE)
+                .setVisible(WindowInsetsCompat.Type.ime(), false)
+                .build();
+        }
+        return insets;
+    }
+
     @NonNull
     private WindowInsetsCompat onApplyWindowInsets(@NonNull View v, @NonNull WindowInsetsCompat insets) {
+        insets = getChatWindowInsets(insets);
         final Insets systemInsets = AndroidUtilities.getDefaultWindowInsets(insets, false);
 
         final int insetsLeft = systemInsets.left;
@@ -12581,6 +12604,9 @@ public class ChatActivity extends BaseFragment implements
                     }
                     super.dismissInternal();
                     onEditTextDialogClose(false, true);
+                    if (contentView != null) {
+                        ViewCompat.requestApplyInsets(contentView);
+                    }
                 }
 
                 @Override
@@ -17092,6 +17118,14 @@ public class ChatActivity extends BaseFragment implements
     }
 
     public class ChatActivityFragmentView extends SizeNotifierFrameLayout {
+
+        @Override
+        public int measureKeyboardHeight() {
+            if (chatAttachAlert != null && chatAttachAlert.isShowing()) {
+                return keyboardHeight = 0;
+            }
+            return super.measureKeyboardHeight();
+        }
 
         public ChatActivity getChatActivity() {
             return ChatActivity.this;
@@ -29092,7 +29126,7 @@ public class ChatActivity extends BaseFragment implements
         int chatWithAdminDate = preferences.getInt("dialog_bar_chat_with_date" + did, 0);
         boolean showAddMembersToGroup = preferences.getBoolean("dialog_bar_invite" + did, false);
         TLRPC.EmojiStatus showEmojiStatusReport = currentUser != null && (showReport || showBlock) ? DialogObject.filterEmojiStatus(currentUser.emoji_status) : null;
-        TL_bots.botVerification showBotVerificationReport = (show && (showReport || showBlock) || shownBotVerification || preferences.getBoolean("dialog_bar_botver" + did, true)) ? (userInfo != null && !UserObject.isUserSelf(currentUser) && userInfo.bot_verification != null ? userInfo.bot_verification : chatInfo != null && chatInfo.bot_verification != null ? chatInfo.bot_verification : null) : null;
+        TL_bots.BotVerification showBotVerificationReport = (show && (showReport || showBlock) || shownBotVerification || preferences.getBoolean("dialog_bar_botver" + did, true)) ? (userInfo != null && !UserObject.isUserSelf(currentUser) && userInfo.bot_verification != null ? userInfo.bot_verification : chatInfo != null && chatInfo.bot_verification != null ? chatInfo.bot_verification : null) : null;
         long showCost = 0;
         if (ChatObject.isMonoForum(currentChat) && ChatObject.canManageMonoForum(currentAccount, currentChat)) {
             TLRPC.TL_forumTopic topic = getMessagesController().getTopicsController().findTopic(-dialog_id, getThreadId());
@@ -29626,7 +29660,7 @@ public class ChatActivity extends BaseFragment implements
             SpannableStringBuilder text = new SpannableStringBuilder("x");
             text.setSpan(new AnimatedEmojiSpan(showBotVerificationReport.icon, emojiStatusSpamHint.getPaint().getFontMetricsInt()), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             text.append(" ");
-            text.append(showBotVerificationReport.description);
+            text.append(MessageObject.formatTextWithEntities(showBotVerificationReport.description));
             ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) emojiStatusSpamHint.getLayoutParams();
             lp.leftMargin = dp(25 + (isSideMenued() ? 32 : 0));
             lp.rightMargin = dp(25 + (isSideMenued() ? 32 : 0));
@@ -44735,7 +44769,7 @@ public class ChatActivity extends BaseFragment implements
         showDialog(dialog);
     }
 
-
+    
     public void didLongPressCard(ChatMessageCell cell, CharacterStyle link, String card) {
         final Browser.Progress progress = makeProgressForLink(cell, link);
         TLRPC.TL_payments_getBankCardData req = new TLRPC.TL_payments_getBankCardData();

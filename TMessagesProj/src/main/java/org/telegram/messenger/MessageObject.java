@@ -7307,13 +7307,16 @@ public class MessageObject {
     }
 
     public static CharSequence replaceWithLink(CharSequence source, String param, TLObject object) {
+        return replaceWithLink(source, param, object, false);
+    }
+    public static CharSequence replaceWithLink(CharSequence source, String param, TLObject object, boolean makeShort) {
         int start = TextUtils.indexOf(source, param);
         if (start >= 0) {
             CharSequence name;
             String id;
             TLObject spanObject = null;
             if (object instanceof TLRPC.User) {
-                name = UserObject.getUserName((TLRPC.User) object).replace('\n', ' ');
+                name = makeShort ? UserObject.getForcedFirstName((TLRPC.User) object).replace('\n', ' ') : UserObject.getUserName((TLRPC.User) object).replace('\n', ' ');
                 id = "" + ((TLRPC.User) object).id;
             } else if (object instanceof TLRPC.Chat) {
                 name = ((TLRPC.Chat) object).title.replace('\n', ' ');
@@ -8332,6 +8335,9 @@ public class MessageObject {
                 if (linksCount >= MediaDataController.MAX_LINKS_COUNT) continue;
                 linksCount++;
                 spannable.setSpan(new FormattedDateSpan(url, run, (TLRPC.TL_messageEntityFormattedDate) run.urlEntity), run.start, run.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else if (run.urlEntity instanceof TLRPC.TL_messageEntityTonAddress) {
+                hasUrls = true;
+                spannable.setSpan(new URLSpanNoUnderline("tonaddress:" + url, run), run.start, run.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else if (run.urlEntity instanceof TLRPC.TL_messageEntityBankCard) {
                 hasUrls = true;
                 spannable.setSpan(new URLSpanNoUnderline("card:" + url, run), run.start, run.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -13100,7 +13106,7 @@ public class MessageObject {
         if (messageOwner.entities == null) return false;
         for (int i = 0; i < messageOwner.entities.size(); ++i) {
             final TLRPC.MessageEntity e = messageOwner.entities.get(i);
-            if (e instanceof TLRPC.TL_messageEntityPhone || e instanceof TLRPC.TL_messageEntityBankCard)
+            if (e instanceof TLRPC.TL_messageEntityPhone || e instanceof TLRPC.TL_messageEntityBankCard || e instanceof TLRPC.TL_messageEntityTonAddress)
                 return true;
         }
         return false;

@@ -56,9 +56,6 @@ import org.telegram.ui.Components.ColoredImageSpan;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.FireworksOverlay;
 import org.telegram.ui.Components.LayoutHelper;
-import org.telegram.ui.Components.Premium.GLIcon.GLIconRenderer;
-import org.telegram.ui.Components.Premium.GLIcon.GLIconTextureView;
-import org.telegram.ui.Components.Premium.GLIcon.Icon3D;
 import org.telegram.ui.Components.Premium.StarParticlesView;
 import org.telegram.ui.Components.Premium.boosts.UserSelectorBottomSheet;
 import org.telegram.ui.Components.RecyclerListView;
@@ -248,7 +245,7 @@ public class TONIntroActivity extends GradientHeaderActivity implements Notifica
 
         starBalanceIcon = new SpannableStringBuilder("S");
         final ColoredImageSpan starBalanceIconSpan = new ColoredImageSpan(R.drawable.mini_gram_72);
-        starBalanceIconSpan.setOverrideColor(0xFF3391D4);
+        starBalanceIconSpan.recolorDrawable = false;
         starBalanceIconSpan.setScale(0.5f, 0.5f);
         starBalanceIconSpan.translate(-dp(3), 0);
         starBalanceIcon.setSpan(starBalanceIconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -389,6 +386,13 @@ public class TONIntroActivity extends GradientHeaderActivity implements Notifica
     @Override
     protected ContentView createContentView() {
         return new NestedFrameLayout(getContext());
+    }
+
+    @Override
+    protected void onHeaderCollapseProgress(float progress) {
+        if (iconTextureView != null) {
+            iconTextureView.setHeaderTilt(70f * progress);
+        }
     }
 
     private class NestedFrameLayout extends ContentView implements NestedScrollingParent3 {
@@ -570,7 +574,6 @@ public class TONIntroActivity extends GradientHeaderActivity implements Notifica
         super.onResume();
         if (iconTextureView != null) {
             iconTextureView.setPaused(false);
-            iconTextureView.setDialogVisible(false);
         }
     }
 
@@ -579,7 +582,6 @@ public class TONIntroActivity extends GradientHeaderActivity implements Notifica
         super.onPause();
         if (iconTextureView != null) {
             iconTextureView.setPaused(true);
-            iconTextureView.setDialogVisible(true);
         }
     }
 
@@ -623,7 +625,7 @@ public class TONIntroActivity extends GradientHeaderActivity implements Notifica
         items.add(UItem.asFullyCustom(getHeader(getContext())));
         items.add(UItem.asCustom(balanceLayout));
         if (allowTopUp) {
-            items.add(UItem.asShadow(getString(R.string.TopUpViaFragmentInfo)));
+            items.add(UItem.asShadow(getString(R.string.GramEarningsHint)));
         }
 
         if (hadTransactions = c.hasTransactions()) {
