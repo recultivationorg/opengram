@@ -703,10 +703,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(UItem.asShadow(null));
 
         items.add(SettingCell.Factory.ofCheck(25, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.msg_stories_stealth2, getString(R.string.GhostMode), getUserConfig().ghostMode).setIconScale(0.7f));
+        items.add(SettingCell.Factory.ofCheck(27, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.msg_download, getString(R.string.DownloadSpeedScaling), SharedConfig.premiumDownloadLimits).setIconScale(0.83f));
         items.add(SettingCell.Factory.of(26, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_secret, getString(R.string.ForceEndToEndEncryption)).setIconScale(0.7f));
-        UItem downloadSpeed = SettingCell.Factory.ofCheck(27, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.msg_download, getString(R.string.DownloadSpeedScaling), SharedConfig.premiumDownloadLimits).setIconScale(0.83f);
-        downloadSpeed.subtext = getString(R.string.DownloadSpeedScalingInfo);
-        items.add(downloadSpeed);
         items.add(UItem.asShadow(null));
 
         if ((!BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) || getUserConfig().isPremium()) {

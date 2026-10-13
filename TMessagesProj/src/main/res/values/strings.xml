@@ -3324,7 +3324,7 @@
     <string name="ForceEndToEndStrongBoxTitle">Potential information leak</string>
     <string name="ForceEndToEndStrongBoxWarning">This device has no Android StrongBox. The list of chats saved for this option is a potential information leak.</string>
     <string name="StartSecretChat">Start secret chat</string>
-    <string name="DownloadSpeedScaling">Premium download speed</string>
+    <string name="DownloadSpeedScaling">Lift download speed restrictions</string>
     <string name="DownloadSpeedScalingInfo">Downloads use the same limits as a Premium account.</string>
     <string name="ViewAsGhost">View as a ghost</string>
     <string name="GhostModeAlert">Ghost mode cannot cover sending messages, subscribing to channels, posting stories, and other interactions that involve servers.</string>
