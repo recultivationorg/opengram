@@ -227,10 +227,6 @@ public class PushListenerController {
                     switch (loc_key) {
                         case "MESSAGE_WALLET_TONCONNECT_REQUEST":
                         case "MESSAGE_WALLET_TONCONNECT_REQUEST_DAPP": {
-                            JSONArray args = json.optJSONArray("loc_args");
-                            String dapp = "MESSAGE_WALLET_TONCONNECT_REQUEST_DAPP".equals(loc_key) && args != null
-                                    ? args.optString(1, null) : null;
-                            NotificationsController.getInstance(currentAccount).showTonConnectNotification(dapp, time);
                             ConnectionsManager.onInternalPushReceived(currentAccount);
                             ConnectionsManager.getInstance(currentAccount).resumeNetworkMaybe();
                             countDownLatch.countDown();

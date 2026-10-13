@@ -1495,8 +1495,6 @@ public class LinkManager {
     }
 
     private void cancel() {
-        tonConnectCancelled = true;
-        if (tonConnectRetry != null) AndroidUtilities.cancelRunOnUIThread(tonConnectRetry);
         if (currentRequestId >= 0) {
             getConnectionsManager().cancelRequest(currentRequestId, true);
             currentRequestId = -1;

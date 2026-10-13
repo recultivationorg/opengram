@@ -54477,7 +54477,6 @@ public class TLRPC {
             flags = setFlag(flags, FLAG_0, write_allowed);
             flags = setFlag(flags, FLAG_3, share_phone_number);
             flags = setFlag(flags, FLAG_4, match_code != null);
-            flags = setFlag(flags, FLAG_5, tonconnect_session != null);
             stream.writeInt32(flags);
             if (hasFlag(flags, FLAG_1)) {
                 peer.serializeToStream(stream);
@@ -54489,9 +54488,6 @@ public class TLRPC {
             }
             if (hasFlag(flags, FLAG_4)) {
                 stream.writeString(match_code);
-            }
-            if (hasFlag(flags, FLAG_5)) {
-                tonconnect_session.serializeToStream(stream);
             }
         }
     }

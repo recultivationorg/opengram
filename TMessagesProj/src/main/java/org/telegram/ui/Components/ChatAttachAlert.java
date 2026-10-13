@@ -1396,7 +1396,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 @Override
                 protected void onTransitionStart(boolean keyboardVisible, int contentHeight) {
                     super.onTransitionStart(keyboardVisible, contentHeight);
-                    if (previousScrollOffsetY > 0 && previousScrollOffsetY != scrollOffsetY[0] && (keyboardVisible || currentAttachLayout == gramLayout)) {
+                    if (previousScrollOffsetY > 0 && previousScrollOffsetY != scrollOffsetY[0] && keyboardVisible) {
                         fromScrollY = previousScrollOffsetY;
                         toScrollY = scrollOffsetY[0];
                     } else {
@@ -1438,8 +1438,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 protected void onPanTranslationUpdate(float y, float progress, boolean keyboardVisible) {
                     currentPanTranslationY = y;
                     if (fromScrollY > 0) {
-                        final float remaining = currentAttachLayout == gramLayout && !keyboardVisible
-                                ? progress : 1f - progress;
+                        final float remaining = 1f - progress;
                         currentPanTranslationY += (fromScrollY - toScrollY) * remaining;
                     }
                     actionBar.setTranslationY(currentPanTranslationY);
@@ -1457,7 +1456,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                     // actionBarShadow.setTranslationY(currentPanTranslationY);
                     updateSelectedPosition(0);
 
-                    setCurrentPanTranslationY(currentAttachLayout == gramLayout ? 0f : currentPanTranslationY);
+                    setCurrentPanTranslationY(currentPanTranslationY);
                     invalidate();
                     frameLayout2.invalidate();
 
@@ -1470,7 +1469,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
                 @Override
                 protected boolean heightAnimationEnabled() {
-                    if ((isDismissed() && !gramSendDismissalInProgress) || !openTransitionFinished) {
+                    if (isDismissed() || !openTransitionFinished) {
                         return false;
                     }
                     return (
@@ -2148,7 +2147,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                     containerView.invalidate();
                 }
                 // Keyboard panning and the send exit animate independently.
-                super.setTranslationY(translationY - currentPanTranslationY + gramSendExitTranslationY);
+                super.setTranslationY(translationY - currentPanTranslationY);
                 if (currentSheetAnimationType != 1) {
                     currentAttachLayout.onContainerTranslationUpdated(currentPanTranslationY);
                 }
@@ -5778,15 +5777,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 actionBarAnimation = new AnimatorSet();
                 actionBarAnimation.setDuration((long) (180 * Math.abs((show ? 1.0f : 0.0f) - actionBar.getAlpha())));
                 ArrayList<Animator> animators = new ArrayList<>();
-                final ObjectAnimator actionBarAlphaAnimator = ObjectAnimator.ofFloat(actionBar, View.ALPHA, show ? 1.0f : 0.0f);
-                actionBarAlphaAnimator.addUpdateListener(animation -> {
-                    // The inline Money menu crossfades with this sibling view.
-                    // Alpha updates alone do not redraw the layout's display list.
-                    if (currentAttachLayout == gramLayout && gramLayout != null) {
-                        gramLayout.invalidate();
-                    }
-                });
-                animators.add(actionBarAlphaAnimator);
+                animators.add(ObjectAnimator.ofFloat(actionBar, View.ALPHA, show ? 1.0f : 0.0f));
                 // animators.add(ObjectAnimator.ofFloat(actionBarShadow, View.ALPHA, show ? 1.0f : 0.0f));
                 if (needsSearchItem) {
                     animators.add(ObjectAnimator.ofFloat(searchItem, View.ALPHA, show ? 1.0f : 0.0f));
@@ -6857,7 +6848,6 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         todoLayout = null;
         locationLayout = null;
         documentLayout = null;
-        gramLayout = null;
         for (int a = 1; a < layouts.length; a++) {
             if (layouts[a] == null) {
                 continue;
@@ -6868,13 +6858,6 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         }
         updateActionBarVisibility(false, false);
         super.dismissInternal();
-        if (gramSendDismissalInProgress) {
-            gramSendDismissalInProgress = false;
-            gramSendExitTranslationY = 0f;
-            if (baseFragment != null && baseFragment.getFragmentView() != null) {
-                ViewCompat.requestApplyInsets(baseFragment.getFragmentView());
-            }
-        }
     }
 
     @Override
@@ -6936,11 +6919,10 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         if (currentAttachLayout.onDismiss() || isDismissed()) {
             return;
         }
-        gramSendDismissalInProgress = currentAttachLayout == gramLayout && gramLayout != null && gramLayout.hasQueuedSend();
-        if (!gramSendDismissalInProgress && commentTextView != null) {
+        if (commentTextView != null) {
             AndroidUtilities.hideKeyboard(commentTextView.getEditText());
         }
-        if (!gramSendDismissalInProgress && topCommentTextView != null) {
+        if (topCommentTextView != null) {
             AndroidUtilities.hideKeyboard(topCommentTextView.getEditText());
         }
         botAttachLayouts.clear();

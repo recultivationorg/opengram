@@ -106,6 +106,9 @@ public class AppGlobalConfig {
 
     public final ConfigBoolean starsSpendTopUpInvoiceDisabled = ofBoolean("stars_spend_topup_invoice_disabled", false);
 
+    public final ConfigBoolean roundVideoRecorder2Allowed = ofBoolean("round_video_recorder_2_allowed", true);
+    public final ConfigStringSet botAllowedSuffixes = ofStringSet("bot_allowed_suffixes", Collections.singleton("bot"));
+
     /* * */
 
     public boolean apply(SharedPreferences.Editor editor, TLRPC.TL_jsonObject object) {

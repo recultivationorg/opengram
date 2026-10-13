@@ -397,7 +397,6 @@ public class OAuthSheet {
         final Runnable accept = () -> {
             if (login.isLoading()) return;
             if (cancel.isLoading()) return;
-            if (r.request_wallet && walletGrant[0] == null) return;
 
             login.setLoading(true);
 
@@ -418,21 +417,13 @@ public class OAuthSheet {
 
             req.write_allowed = allowMessages != null && allowMessages.isChecked();
             req.share_phone_number = allowPhoneNumber[0];
-            req.tonconnect_session = walletGrant[0];
-            walletGrant[0] = null;
 
             final Runnable submit = () -> {
                 if (dismissed[0]) {
-                    if (req.tonconnect_session != null) {
-                        java.util.Arrays.fill(req.tonconnect_session.challenge_answer, (byte) 0);
-                    }
                     return;
                 }
                 ConnectionsManager.getInstance(selectedAccount[0]).sendRequestTyped(req, AndroidUtilities::runOnUIThread, (res, err) -> {
                     login.setLoading(false);
-                    if (req.tonconnect_session != null) {
-                        java.util.Arrays.fill(req.tonconnect_session.challenge_answer, (byte) 0);
-                    }
                     processed[0] = true;
                     sheet.dismiss();
                     if (err != null) {
@@ -483,14 +474,6 @@ public class OAuthSheet {
         });
         sheet.setOnDismissListener(d -> {
             dismissed[0] = true;
-            if (walletGrant[0] != null) {
-                java.util.Arrays.fill(walletGrant[0].challenge_answer, (byte) 0);
-                walletGrant[0] = null;
-            }
-            if (walletSheet[0] != null) {
-                walletSheet[0].dismiss();
-                walletSheet[0] = null;
-            }
             showing = null;
             if (showingMatchCodes[0] != null) {
                 showingMatchCodes[0].dismiss();

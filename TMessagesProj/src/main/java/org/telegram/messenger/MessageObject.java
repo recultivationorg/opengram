@@ -102,6 +102,7 @@ import org.telegram.ui.Stars.StarsController;
 import org.telegram.ui.Stars.StarsIntroActivity;
 import org.telegram.ui.Stories.StoriesController;
 import org.telegram.ui.community.CommunityUtils;
+import org.telegram.utils.code.highlight.CodeHighlighting;
 import org.telegram.ui.web.BotWebViewContainer;
 
 import java.io.BufferedReader;

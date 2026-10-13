@@ -203,21 +203,10 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
                     setMessageObject(messageObject, true);
                 }
             }
-        } else if (id == NotificationCenter.walletUpdate) {
-            if (hasWalletActionLayout()) {
-                accessibilityText = null;
-                previousWidth = 0;
-                requestLayout();
-                invalidate();
-            }
         }
     }
 
     public void setSpoilersSuppressed(boolean s) {
-        spoilersSuppressed = s;
-        if (walletActionLayout != null) {
-            walletActionLayout.setSpoilersSuppressed(s);
-        }
         for (SpoilerEffect eff : spoilers) {
             eff.setSuppressUpdates(s);
         }
@@ -365,8 +354,6 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
 
     private float lastTouchX;
     private float lastTouchY;
-    private float walletTouchDownX;
-    private float walletTouchDownY;
 
     private boolean wasLayout;
 
@@ -374,7 +361,7 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
 
     public final ReactionsLayoutInBubble reactionsLayoutInBubble = new ReactionsLayoutInBubble(this);
     public float starGiftLayoutX, starGiftLayoutY;
-    public final StarGiftUniqueActionLayout starGiftLayout;
+    public StarGiftUniqueActionLayout starGiftLayout;
 
     public SuggestBirthdayActionLayout birthdayLayout;
 
@@ -1159,8 +1146,6 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         rippleView.layout((int) giftButtonRect.left, (int) giftButtonRect.top, (int) giftButtonRect.right, (int) giftButtonRect.bottom);
-        View diamond = walletActionLayout == null ? null : walletActionLayout.getDiamondSurface();
-        if (diamond != null) diamond.layout(0, 0, dp(42), dp(42));
     }
 
     @Override
@@ -1180,7 +1165,6 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.didUpdateTonGiftStickers);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.starGiftsLoaded);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.diceStickersDidLoad);
-        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.walletUpdate);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiLoaded);
         avatarStoryParams.onDetachFromWindow();
 
@@ -1219,7 +1203,6 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.didUpdateTonGiftStickers);
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.starGiftsLoaded);
         NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.diceStickersDidLoad);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.walletUpdate);
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.emojiLoaded);
 
         if (currentMessageObject != null && currentMessageObject.type == MessageObject.TYPE_SUGGEST_PHOTO) {
@@ -1290,31 +1273,6 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
         }
 
         if (hasStarGiftLayout() && starGiftLayout.onTouchEvent(starGiftLayoutX, starGiftLayoutY, event)) {
-            return true;
-        }
-
-        if (hasWalletActionLayout() && walletActionLayout.onTouchEvent(
-            walletActionLayoutX + sideMenuWidth / 2.0f,
-            walletActionLayoutY + getPaddingTop(),
-            event
-        )) {
-            if (walletActionLayout.isDiamondDragging()) {
-                cancelCheckLongPress();
-                return true;
-            }
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                walletTouchDownX = event.getX();
-                walletTouchDownY = event.getY();
-                startCheckLongPress();
-            } else if (event.getAction() == MotionEvent.ACTION_MOVE) {
-                final int touchSlop = android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop();
-                if (Math.abs(event.getX() - walletTouchDownX) > touchSlop
-                        || Math.abs(event.getY() - walletTouchDownY) > touchSlop) {
-                    cancelCheckLongPress();
-                }
-            } else {
-                cancelCheckLongPress();
-            }
             return true;
         }
 
@@ -1861,11 +1819,6 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        View diamond = walletActionLayout == null ? null : walletActionLayout.getDiamondSurface();
-        if (diamond != null) {
-            final int spec = MeasureSpec.makeMeasureSpec(dp(42), MeasureSpec.EXACTLY);
-            diamond.measure(spec, spec);
-        }
         MessageObject messageObject = currentMessageObject;
         if (messageObject == null && customText == null) {
             setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), topicSeparatorTopPadding + textHeight + dp(14));
@@ -1906,8 +1859,6 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
                 additionalHeight = AndroidUtilities.roundMessageSize + dp(10);
             } else if (isButtonLayout(messageObject)) {
                 additionalHeight = giftRectSize + dp(12);
-            } else if (hasWalletActionLayout()) {
-                additionalHeight = dp(8) + walletActionLayout.getHeight();
             }
         }
 
@@ -2868,18 +2819,6 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
 
         drawBackground(canvas, false);
 
-        if (hasWalletActionLayout()) {
-            canvas.save();
-            canvas.translate(
-                walletActionLayoutX = (getWidth() - walletActionLayout.getWidth()) / 2.0f,
-                walletActionLayoutY = getWalletActionTop()
-            );
-            walletActionLayout.setSurfaceOrigin(walletActionLayoutX + sideMenuWidth / 2f,
-                    walletActionLayoutY + getPaddingTop());
-            walletActionLayout.draw(canvas);
-            canvas.restore();
-        }
-
         if (hasStarGiftLayout()) {
             canvas.save();
             canvas.translate(starGiftLayoutX = (getWidth() - starGiftLayout.getWidth()) / 2.0f, starGiftLayoutY = starGiftLayout.repost ? dp(4) : textY + textHeight + dp(4 + 6 + 6));
@@ -3592,32 +3531,6 @@ public class ChatActionCell extends BaseCell implements DownloadController.FileD
                 canvas.drawPath(backgroundPath, dimPaint);
                 dimPaint.setAlpha(wasAlpha);
             }
-        }
-
-        if (hasWalletActionLayout()) {
-            final float x = (getWidth() - walletActionLayout.getWidth()) / 2.0f;
-            final float y = getWalletActionTop();
-            walletActionRect.set(
-                x,
-                y,
-                x + walletActionLayout.getWidth(),
-                y + walletActionLayout.getHeight()
-            );
-            canvas.save();
-            walletActionLayout.applyCardTransform(canvas, x, y);
-            canvas.drawRoundRect(walletActionRect, dp(20), dp(20), backgroundPaint);
-            if (hasGradientService() && darkenBackgroundPaint.getAlpha() > 0) {
-                canvas.drawRoundRect(walletActionRect, dp(20), dp(20), darkenBackgroundPaint);
-            }
-            if (dimAmount > 0) {
-                int wasAlpha = dimPaint.getAlpha();
-                if (fromParent) {
-                    dimPaint.setAlpha((int) (wasAlpha * getAlpha()));
-                }
-                canvas.drawRoundRect(walletActionRect, dp(20), dp(20), dimPaint);
-                dimPaint.setAlpha(wasAlpha);
-            }
-            canvas.restore();
         }
 
         MessageObject messageObject = currentMessageObject;

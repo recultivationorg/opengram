@@ -53,6 +53,10 @@ public class Icon3D {
 
     int[] trianglesCount;
     float enterAlpha = 0f;
+    private DiamondRenderer diamondRenderer;
+    float diamondYaw, diamondPitch, diamondRoll;
+    float diamondResolutionScale = 1f;
+    int diamondAppearance;
     public float diamondAlpha = 1f;
 
     public float spec1 = 2f;
@@ -110,17 +114,22 @@ public class Icon3D {
 
     public Icon3D(Context context, int type) {
         this.type = type;
+        if (type == TYPE_DIAMOND) {
+            String version = GLES20.glGetString(GLES20.GL_VERSION);
+            if (version == null || !version.startsWith("OpenGL ES 3")) {
+                throw new IllegalStateException("Diamond requires OpenGL ES 3");
+            }
+            diamondRenderer = new DiamondRenderer(context);
+            N = 1;
+            return;
+        }
         String[] modelPaths;
-        float modelScale = 1.0f;
         if (type == TYPE_COIN) {
             modelPaths = coinModel;
         } else if (type == TYPE_DEAL) {
             modelPaths = dealModel;
         } else if (type == TYPE_STAR || type == TYPE_GOLDEN_STAR) {
             modelPaths = starModel;
-        } else if (type == TYPE_DIAMOND) {
-            modelPaths = diamondModel;
-            modelScale = 8.0f;
         } else {
             modelPaths = new String[0];
         }
