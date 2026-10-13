@@ -94,11 +94,6 @@ public class LinkManager {
         if ("tg".equalsIgnoreCase(scheme))
             return handleTg(uri);
 
-        if ("ton".equalsIgnoreCase(scheme))
-            return handleTon(uri);
-        if ("tc".equalsIgnoreCase(scheme))
-            return handleTc(uri);
-
         return false;
     }
 
@@ -128,9 +123,6 @@ public class LinkManager {
 
         final String first = segments.get(0);
         final String second = segments.size() > 1 ? segments.get(1) : null;
-
-        if ("sendgrams".equalsIgnoreCase(first))
-            return handleSendGrams(uri);
 
         if ("$".equalsIgnoreCase(first))
             return handleInvoiceSlug(path.substring(1));
@@ -178,9 +170,6 @@ public class LinkManager {
 
         final String first = segments.get(0);
         final String second = segments.size() > 1 ? segments.get(1) : null;
-
-        if ("sendgrams".equalsIgnoreCase(first))
-            return handleSendGrams(uri);
 
         if ("newbot".equalsIgnoreCase(first))
             return handleNewBot(uri.getQueryParameter("manager"), uri.getQueryParameter("username"), uri.getQueryParameter("name"));
@@ -291,9 +280,6 @@ public class LinkManager {
 
         final String domain = uri.getQueryParameter("domain");
         final String startapp = uri.getQueryParameter("startapp");
-
-        if ("sendgrams".equalsIgnoreCase(domain))
-            return handleSendGrams(uri);
 
         if ("oauth".equalsIgnoreCase(domain) && !isEmpty(startapp))
             return handleOAuth(uri, startapp);

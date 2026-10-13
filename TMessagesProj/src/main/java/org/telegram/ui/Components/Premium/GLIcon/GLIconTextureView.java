@@ -887,6 +887,12 @@ public class GLIconTextureView extends TextureView implements TextureView.Surfac
         animatorSet.start();
     }
 
+    public void setHeaderTilt(float degrees) {
+        if (mRenderer != null) {
+            mRenderer.headerTilt = degrees;
+        }
+    }
+
     public void setStarParticlesView(StarParticlesView starParticlesView) {
         this.starParticlesView = starParticlesView;
     }

@@ -153,7 +153,7 @@ public class LogoutActivity extends BaseFragment {
                 if (getParentActivity() == null) {
                     return;
                 }
-                showLogOutDialog();
+                showDialog(makeLogOutDialog(getParentActivity(), currentAccount));
             }
         });
         listView.setSections();

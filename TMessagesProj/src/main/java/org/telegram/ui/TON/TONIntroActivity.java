@@ -213,7 +213,7 @@ public class TONIntroActivity extends GradientHeaderActivity implements Notifica
         iconTextureView.mRenderer.updateColors();
         iconTextureView.setStarParticlesView(particlesView);
         aboveTitleView.addView(iconTextureView, LayoutHelper.createFrame(170, 170, Gravity.CENTER, 0, 32, 0, 24));
-        configureHeader(getString(R.string.TONBalanceTitle), AndroidUtilities.replaceArrows(AndroidUtilities.replaceSingleTag(getString(R.string.TONBalanceText), () -> {
+        configureHeader(getString(R.string.GramEarningsTitle), AndroidUtilities.replaceArrows(AndroidUtilities.replaceSingleTag(getString(R.string.GramEarningsText), () -> {
             new ExplainStarsSheet(context).show();
         }), true), aboveTitleView, null);
 

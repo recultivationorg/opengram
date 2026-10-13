@@ -369,6 +369,7 @@ public class OAuthSheet {
                 .translate(-dp(8), -dp(8))
                 .show();
         });
+        final boolean[] dismissed = new boolean[1];
         final boolean[] processed = new boolean[1];
         cancel.setOnClickListener(v -> {
             if (login.isLoading()) return;
@@ -486,9 +487,12 @@ public class OAuthSheet {
             showing = null;
         }
 
-        if (!r.match_codes_first || r.match_codes.isEmpty() || !TextUtils.isEmpty(selectedMatchCode[0])) {
+        final Runnable showConfirmation = () -> {
             showing = sheet;
             sheet.show();
+        };
+        if (!r.match_codes_first || r.match_codes.isEmpty() || !TextUtils.isEmpty(selectedMatchCode[0])) {
+            showConfirmation.run();
         } else {
             showing = showMatchCodeSheet(context, currentAccount, r.match_codes, domain, code -> {
                 final AlertDialog progressDialog = new AlertDialog(context, AlertDialog.ALERT_TYPE_SPINNER);
