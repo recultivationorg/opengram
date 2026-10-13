@@ -308,13 +308,6 @@ public class FileLoadOperation {
             maxDownloadRequests = 4;
             maxDownloadRequestsBig = 4;
         }
-        if (SharedConfig.downloadSpeedScale > 0) {
-            maxDownloadRequests = SharedConfig.downloadRequestCount();
-            maxDownloadRequestsBig = maxDownloadRequests;
-            if (SharedConfig.downloadSpeedScale >= 2) {
-                downloadChunkSizeBig = 1024 * 512;
-            }
-        }
         maxDownloadRequestsAnimation = Math.max(maxDownloadRequestsAnimation, maxDownloadRequests / 2);
         maxCdnParts = (int) (FileLoader.DEFAULT_MAX_FILE_SIZE / downloadChunkSizeBig);
     }
@@ -875,9 +868,9 @@ public class FileLoadOperation {
                         totalBytesCount > 0 && key == null && !encryptFile && !isAudioDocument && stream == null &&
                         !isPreloadVideoOperation && !supportsPreloading && preloadPrefixSize == 0;
                 if (useDownloadByteBudget) {
-                    boolean premium = UserConfig.getInstance(currentAccount).isPremium();
-                    downloadConnectionsCount = premium ? ConnectionsManager.DownloadConnectionsCount : 2;
-                    int byteBudget = (premium ? 16 : 2) * 1024 * 1024;
+                    boolean premiumLimits = UserConfig.getInstance(currentAccount).isPremium() || SharedConfig.premiumDownloadLimits;
+                    downloadConnectionsCount = premiumLimits ? ConnectionsManager.DownloadConnectionsCount : 2;
+                    int byteBudget = (premiumLimits ? 16 : 2) * 1024 * 1024;
                     currentMaxDownloadRequests = byteBudget / currentDownloadChunkSize;
                 }
             }

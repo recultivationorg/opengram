@@ -41,6 +41,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SendMessagesHelper;
+import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBarMenu;
@@ -68,7 +69,6 @@ import org.telegram.ui.Components.blur3.capture.IBlur3Capture;
 import org.telegram.ui.Components.blur3.utils.Blur3Utils;
 import org.telegram.ui.DialogsActivity;
 import org.telegram.ui.FilteredSearchView;
-import org.telegram.ui.DownloadSpeedActivity;
 import org.telegram.ui.PremiumPreviewFragment;
 import org.telegram.ui.ReportBottomSheet;
 import org.telegram.ui.SearchAdsInfoBottomSheet;
@@ -923,7 +923,7 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
     }
 
     private boolean isSpeedItemVisible() {
-        if (UserConfig.getInstance(currentAccount).isPremium() || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
+        if (SharedConfig.premiumDownloadLimits || UserConfig.getInstance(currentAccount).isPremium() || MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
             return false;
         }
         for (MessageObject obj : selectedFiles.values()) {
@@ -967,7 +967,10 @@ public class SearchViewPager extends ViewPagerFixed implements FilteredSearchVie
                 return;
             }
 
-            parent.presentFragment(new DownloadSpeedActivity());
+            SharedConfig.setPremiumDownloadLimits(true);
+            if (speedItem != null) {
+                speedItem.setVisibility(View.GONE);
+            }
         } else if (id == gotoItemId) {
             if (selectedFiles.size() != 1) {
                 return;

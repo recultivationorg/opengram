@@ -268,6 +268,7 @@ public class ConnectionsManager extends BaseController {
         if (getUserConfig().getCurrentUser() != null) {
             userPremium = getUserConfig().getCurrentUser().premium;
         }
+        userPremium |= SharedConfig.premiumDownloadLimits;
         int initRevision = initConnectionRevision(deviceModel, systemVersion, appVersion, fingerprint, pushString);
         init(initRevision, TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), userPremium, enablePushConnection);
     }
@@ -661,6 +662,11 @@ public class ConnectionsManager extends BaseController {
         native_setPushConnectionEnabled(currentAccount, value);
     }
 
+    public void applyRaisedDownloadLimits() {
+        boolean userPremium = getUserConfig().getCurrentUser() != null && getUserConfig().getCurrentUser().premium;
+        native_setUserPremium(currentAccount, userPremium || SharedConfig.premiumDownloadLimits);
+    }
+
     public void init(int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String systemLangCode, String configPath, String logPath, String regId, String cFingerprint, int timezoneOffset, long userId, boolean userPremium, boolean enablePushConnection) {
         final SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
         final ProxySettings proxySettings = ProxySettings.fromSharedPreferences(preferences);
@@ -997,6 +1003,7 @@ public class ConnectionsManager extends BaseController {
     public static native int native_getConnectionState(int currentAccount);
     public static native void native_setUserId(int currentAccount, long id);
     public static native void native_init(int currentAccount, int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String systemLangCode, String configPath, String logPath, String regId, String cFingerprint, String installer, String packageId, int timezoneOffset, long userId, boolean userPremium, boolean enablePushConnection, boolean hasNetwork, int networkType, int performanceClass);
+    private static native void native_setUserPremium(int currentAccount, boolean premium);
     public static native void native_setProxySettings(int currentAccount, String address, int port, String username, String password, String secret);
     public static native void native_setLangCode(int currentAccount, String langCode);
     public static native void native_setRegId(int currentAccount, String regId);

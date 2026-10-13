@@ -3291,7 +3291,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         if (initialDialogsType == DIALOGS_TYPE_DEFAULT) {
             speedItem = menu.addItem(-47, R.drawable.avd_speed);
             AndroidUtilities.removeFromParent(speedItem);
-            speedItem.setOnClickListener(v -> presentFragment(new DownloadSpeedActivity()));
+            speedItem.setOnClickListener(v -> {
+                SharedConfig.setPremiumDownloadLimits(true);
+                updateSpeedItem(true);
+            });
 
             fragmentSearchField.addAdditionalIcon(speedItem);
             fragmentSearchField.updateColors();
@@ -6670,7 +6673,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 break;
             }
         }
-        boolean visible = !getUserConfig().isPremium() && !getMessagesController().premiumFeaturesBlocked() && visibleByDownload && visibleByPosition;
+        boolean visible = !SharedConfig.premiumDownloadLimits && !getUserConfig().isPremium() && !getMessagesController().premiumFeaturesBlocked() && visibleByDownload && visibleByPosition;
         animatorSpeedButtonVisible.setValue(visible, true);
     }
 

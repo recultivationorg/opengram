@@ -246,24 +246,17 @@ public class SharedConfig {
     public static int forceEndToEndStorageMode;
     public static long forceEndToEndCutoff;
     public static int forceEndToEndSchema;
-    public static int downloadSpeedScale;
+    public static boolean premiumDownloadLimits;
 
-    public static int downloadRequestCount() {
-        switch (downloadSpeedScale) {
-            case 1:
-                return 8;
-            case 2:
-                return 12;
-            case 3:
-                return 16;
-            default:
-                return 4;
+    public static void setPremiumDownloadLimits(boolean enabled) {
+        if (premiumDownloadLimits == enabled) {
+            return;
         }
-    }
-
-    public static int scaledDownloadQueue(int base) {
-        int factor = Math.max(0, Math.min(downloadSpeedScale, 3)) + 1;
-        return Math.max(1, base) * factor;
+        premiumDownloadLimits = enabled;
+        saveConfig();
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            ConnectionsManager.getInstance(a).applyRaisedDownloadLimits();
+        }
     }
     public static int lastPauseTime;
     public static boolean isWaitingForPasscodeEnter;
@@ -486,7 +479,7 @@ public class SharedConfig {
                 editor.putInt("forceEndToEndStorageMode", forceEndToEndStorageMode);
                 editor.putLong("forceEndToEndCutoff", forceEndToEndCutoff);
                 editor.putInt("forceEndToEndSchema", forceEndToEndSchema);
-                editor.putInt("downloadSpeedScale", downloadSpeedScale);
+                editor.putBoolean("premiumDownloadLimits", premiumDownloadLimits);
                 editor.putString("pushString2", pushString);
                 editor.putInt("pushType", pushType);
                 editor.putBoolean("pushStatSent", pushStatSent);
@@ -574,7 +567,11 @@ public class SharedConfig {
             forceEndToEndStorageMode = preferences.getInt("forceEndToEndStorageMode", 0);
             forceEndToEndCutoff = preferences.getLong("forceEndToEndCutoff", 0);
             forceEndToEndSchema = preferences.getInt("forceEndToEndSchema", 0);
-            downloadSpeedScale = preferences.getInt("downloadSpeedScale", 0);
+            if (preferences.contains("premiumDownloadLimits")) {
+                premiumDownloadLimits = preferences.getBoolean("premiumDownloadLimits", false);
+            } else {
+                premiumDownloadLimits = preferences.getInt("downloadSpeedScale", 0) > 0;
+            }
             lastLocalId = preferences.getInt("lastLocalId", -210000);
             pushString = preferences.getString("pushString2", "");
             pushType = preferences.getInt("pushType", PushListenerController.PUSH_TYPE_FIREBASE);
