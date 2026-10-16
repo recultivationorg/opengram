@@ -641,6 +641,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(UItem.asCustomShadow(topView, 200 - 12));
 
+        items.add(UItem.asHeader(getString(R.string.GhostMode)));
+        items.add(SettingCell.Factory.ofCheck(25, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.msg_stories_stealth2, getString(R.string.GhostMode), getUserConfig().ghostMode).setIconScale(0.7f));
+        items.add(UItem.asShadow(null));
+
         accountNumbers.clear();
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
             if (UserConfig.getInstance(a).isClientActivated() && currentAccount != a) {
@@ -718,7 +722,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(UItem.asShadow(null));
 
-        items.add(SettingCell.Factory.ofCheck(25, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.msg_stories_stealth2, getString(R.string.GhostMode), getUserConfig().ghostMode).setIconScale(0.7f));
         items.add(SettingCell.Factory.ofCheck(27, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.msg_download, getString(R.string.DownloadSpeedScaling), SharedConfig.premiumDownloadLimits).setIconScale(0.83f));
         items.add(SettingCell.Factory.of(26, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_secret, getString(R.string.ForceEndToEndEncryption)).setIconScale(0.7f));
         items.add(SettingCell.Factory.of(28, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.msg_block, getString(R.string.MessageFilter), messageFilterSubtitle()).setIconScale(0.7f));
