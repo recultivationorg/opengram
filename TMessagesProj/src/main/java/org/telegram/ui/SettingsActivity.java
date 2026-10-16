@@ -83,6 +83,7 @@ import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.OpengramGhostReads;
+import org.telegram.messenger.OpengramMessageFilter;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.SharedPrefsHelper;
 import org.telegram.ui.Cells.TextCell;
@@ -500,6 +501,21 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         return fragmentView = contentView;
     }
 
+    private CharSequence messageFilterSubtitle() {
+        if (OpengramMessageFilter.phase(currentAccount) != OpengramMessageFilter.Phase.READY) {
+            return getString(R.string.MessageFilterOff);
+        }
+        return LocaleController.formatPluralString("MessageFilterKeywords", OpengramMessageFilter.keywordCount(currentAccount));
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (listView != null && listView.adapter != null) {
+            listView.adapter.update(false);
+        }
+    }
+
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
@@ -705,6 +721,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.ofCheck(25, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.msg_stories_stealth2, getString(R.string.GhostMode), getUserConfig().ghostMode).setIconScale(0.7f));
         items.add(SettingCell.Factory.ofCheck(27, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.msg_download, getString(R.string.DownloadSpeedScaling), SharedConfig.premiumDownloadLimits).setIconScale(0.83f));
         items.add(SettingCell.Factory.of(26, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_secret, getString(R.string.ForceEndToEndEncryption)).setIconScale(0.7f));
+        items.add(SettingCell.Factory.of(28, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.msg_block, getString(R.string.MessageFilter), messageFilterSubtitle()).setIconScale(0.7f));
         items.add(UItem.asShadow(null));
 
         if ((!BuildVars.DISABLE_PREMIUM_PROMO && !getMessagesController().premiumFeaturesBlocked()) || getUserConfig().isPremium()) {
@@ -908,6 +925,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
             case 26: {
                 presentFragment(new OpengramPreloadActivity());
+                break;
+            }
+            case 28: {
+                presentFragment(new OpengramMessageFilterActivity());
                 break;
             }
             case 27: {

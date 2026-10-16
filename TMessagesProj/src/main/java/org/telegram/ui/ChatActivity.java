@@ -174,6 +174,7 @@ import org.telegram.messenger.MessageSuggestionParams;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.OpengramMessageFilter;
 import org.telegram.messenger.OpengramPreload;
 import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
@@ -21036,6 +21037,25 @@ public class ChatActivity extends BaseFragment implements
         }
         for (int a = 0; a < messArr.size(); a++) {
             MessageObject obj = messArr.get(a);
+            if (obj != null && obj.messageOwner != null && OpengramMessageFilter.shouldHide(currentAccount, dialog_id, obj)) {
+                int messageId = obj.getId();
+                if (!MessageObject.isEphemeralMessageId(messageId)) {
+                    if (messageId > 0) {
+                        maxMessageId[loadIndex] = Math.min(messageId, maxMessageId[loadIndex]);
+                        minMessageId[loadIndex] = Math.max(messageId, minMessageId[loadIndex]);
+                    } else if (currentEncryptedChat != null) {
+                        maxMessageId[loadIndex] = Math.max(messageId, maxMessageId[loadIndex]);
+                        minMessageId[loadIndex] = Math.min(messageId, minMessageId[loadIndex]);
+                    }
+                }
+                if (obj.messageOwner != null && obj.messageOwner.date != 0) {
+                    maxDate[loadIndex] = Math.max(maxDate[loadIndex], obj.messageOwner.date);
+                    if (minDate[loadIndex] == 0 || obj.messageOwner.date < minDate[loadIndex]) {
+                        minDate[loadIndex] = obj.messageOwner.date;
+                    }
+                }
+                continue;
+            }
             if (obj.replyMessageObject != null) {
                 repliesMessagesDict.put(obj.replyMessageObject.getId(), obj.replyMessageObject);
                 addReplyMessageOwner(obj, 0);
@@ -25354,6 +25374,7 @@ public class ChatActivity extends BaseFragment implements
         processNewMessages(arr, true);
     }
     private void processNewMessages(ArrayList<MessageObject> arr, final boolean animatedFromBottom) {
+        arr = OpengramMessageFilter.withoutHidden(currentAccount, dialog_id, arr);
         FileLog.d("processNewMessages " + arr.size() + " messages");
 
         final boolean isBot = UserObject.isBot(currentUser);

@@ -76,6 +76,7 @@ import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.OpengramMessageFilter;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
@@ -1232,13 +1233,30 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private static final float BADGE_DRAWABLE_SIZE = 16;
     private static final float BADGE_DRAWABLE_OFFSET = (BADGE_SIZE - BADGE_DRAWABLE_SIZE) / 2f;
 
+    private boolean blankFilteredPreview() {
+        if (message == null || message.messageOwner == null) {
+            return false;
+        }
+        long dialogId = message.getDialogId();
+        if (dialogId == 0) {
+            dialogId = currentDialogId;
+        }
+        if (!OpengramMessageFilter.shouldHide(currentAccount, dialogId, message)) {
+            return false;
+        }
+        message = null;
+        groupMessages = null;
+        return true;
+    }
+
     public void buildLayout() {
         if (isTransitionSupport) {
             return;
         }
+        boolean filteredPreview = blankFilteredPreview();
         if (isDialogCell) {
             boolean needUpdate = updateHelper.update();
-            if (!needUpdate && currentDialogFolderId == 0 && currentDialogCommunityId == 0 && encryptedChat == null) {
+            if (!filteredPreview && !needUpdate && currentDialogFolderId == 0 && currentDialogCommunityId == 0 && encryptedChat == null) {
                 return;
             }
         }

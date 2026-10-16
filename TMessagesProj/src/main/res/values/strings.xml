@@ -3328,6 +3328,16 @@
     <string name="DownloadSpeedScalingInfo">Downloads use the same limits as a Premium account.</string>
     <string name="ViewAsGhost">View as a ghost</string>
     <string name="GhostModeAlert">Ghost mode cannot cover sending messages, subscribing to channels, posting stories, and other interactions that involve servers.</string>
+    <string name="MessageFilter">Opengram Message Filter</string>
+    <string name="MessageFilterOff">Off</string>
+    <string name="MessageFilterKeywords">Keywords</string>
+    <string name="MessageFilterKeywordsHint">word, another word</string>
+    <string name="MessageFilterKeywords_one">%1$d keyword</string>
+    <string name="MessageFilterKeywords_other">%1$d keywords</string>
+    <string name="MessageFilterInfo">Posts in channels and bot chats that contain these keywords are hidden. Personal chats, groups, and secret chats stay visible. Up to 32 keywords, 48 characters each.</string>
+    <string name="MessageFilterError">The keyword list could not be read. Filtering is stopped. Turn this off and on again.</string>
+    <string name="MessageFilterStorageError">Secure storage for the keyword list failed. Nothing was written in plaintext.</string>
+    <string name="MessageFilterStrongBoxWarning">This device has no Android StrongBox. The keyword list saved for this option is a potential information leak.</string>
     <string name="ExpireOnce">Expire</string>
     <string name="Of">%1$d of %2$d</string>
     <string name="OfS">%1$s of %2$s</string>

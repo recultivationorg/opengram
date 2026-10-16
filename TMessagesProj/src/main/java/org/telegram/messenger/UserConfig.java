@@ -54,6 +54,8 @@ public class UserConfig extends BaseController {
     public long migrateOffsetAccess = -1;
     public boolean filtersLoaded;
     public boolean ghostMode;
+    public boolean messageFilter;
+    public int messageFilterMode;
 
     public int sharingMyLocationUntil;
     public int lastMyLocationShareTime;
@@ -172,6 +174,8 @@ public class UserConfig extends BaseController {
                     editor.putInt("lastMyLocationShareTime", lastMyLocationShareTime);
                     editor.putBoolean("filtersLoaded", filtersLoaded);
                     editor.putBoolean("ghostMode", ghostMode);
+                    editor.putBoolean("messageFilter", messageFilter);
+                    editor.putInt("messageFilterMode", messageFilterMode);
                     editor.putString("premiumGiftsStickerPack", premiumGiftsStickerPack);
                     editor.putLong("lastUpdatedPremiumGiftsStickerPack", lastUpdatedPremiumGiftsStickerPack);
 
@@ -339,6 +343,8 @@ public class UserConfig extends BaseController {
                 ghostMode = SharedConfig.ghostMode;
                 preferences.edit().putBoolean("ghostMode", ghostMode).apply();
             }
+            messageFilter = preferences.getBoolean("messageFilter", false);
+            messageFilterMode = preferences.getInt("messageFilterMode", 0);
             premiumGiftsStickerPack = preferences.getString("premiumGiftsStickerPack", null);
             lastUpdatedPremiumGiftsStickerPack = preferences.getLong("lastUpdatedPremiumGiftsStickerPack", 0);
 

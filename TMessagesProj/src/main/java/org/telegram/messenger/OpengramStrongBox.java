@@ -29,6 +29,7 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
     private static final String ANDROID_KEYSTORE = "AndroidKeyStore";
     private static final String E2E_ALIAS = "opengram_force_e2e_chats";
     private static final String GHOST_ALIAS_PREFIX = "opengram_ghost_";
+    private static final String FILTER_ALIAS_PREFIX = "opengram_filter_";
     private static final int GCM_TAG_BITS = 128;
     private static final Object keystoreLock = new Object();
 
@@ -45,6 +46,13 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
             throw new IllegalArgumentException("client user id required");
         }
         return new OpengramStrongBox(GHOST_ALIAS_PREFIX + clientUserId);
+    }
+
+    public static OpengramStrongBox forFilter(long clientUserId) {
+        if (clientUserId <= 0) {
+            throw new IllegalArgumentException("client user id required");
+        }
+        return new OpengramStrongBox(FILTER_ALIAS_PREFIX + clientUserId);
     }
 
     public static Probe probe() {
@@ -85,7 +93,7 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
     }
 
     public void deleteKey() {
-        if (Build.VERSION.SDK_INT < 31 || !alias.startsWith(GHOST_ALIAS_PREFIX)) {
+        if (Build.VERSION.SDK_INT < 31 || !(alias.startsWith(GHOST_ALIAS_PREFIX) || alias.startsWith(FILTER_ALIAS_PREFIX))) {
             return;
         }
         synchronized (keystoreLock) {
