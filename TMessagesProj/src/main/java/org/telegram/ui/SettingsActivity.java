@@ -641,7 +641,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         items.add(UItem.asCustomShadow(topView, 200 - 12));
 
-        items.add(UItem.asHeader(getString(R.string.GhostMode)));
         items.add(SettingCell.Factory.ofCheck(25, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.msg_stories_stealth2, getString(R.string.GhostMode), getUserConfig().ghostMode).setIconScale(0.7f));
         items.add(UItem.asShadow(null));
 
