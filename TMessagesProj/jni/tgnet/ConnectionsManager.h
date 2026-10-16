@@ -240,6 +240,7 @@ private:
     std::string currentLogPath;
     int64_t currentUserId = 0;
     bool currentUserPremium = false;
+    bool maximumDownloadRequests = false;
     bool registeredForInternalPush = false;
     bool pushConnectionEnabled = true;
     int32_t currentPerformanceClass = -1;

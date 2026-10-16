@@ -264,13 +264,8 @@ public class ConnectionsManager extends BaseController {
             mainPreferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig" + currentAccount, Activity.MODE_PRIVATE);
         }
         forceTryIpV6 = mainPreferences.getBoolean("forceTryIpV6", false);
-        boolean userPremium = false;
-        if (getUserConfig().getCurrentUser() != null) {
-            userPremium = getUserConfig().getCurrentUser().premium;
-        }
-        userPremium |= SharedConfig.premiumDownloadLimits;
         int initRevision = initConnectionRevision(deviceModel, systemVersion, appVersion, fingerprint, pushString);
-        init(initRevision, TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), userPremium, enablePushConnection);
+        init(initRevision, TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), SharedConfig.premiumDownloadLimits, enablePushConnection);
     }
 
     // tgnet resends initConnection only when this value differs from the one stored in tgnet.dat.
@@ -663,8 +658,7 @@ public class ConnectionsManager extends BaseController {
     }
 
     public void applyRaisedDownloadLimits() {
-        boolean userPremium = getUserConfig().getCurrentUser() != null && getUserConfig().getCurrentUser().premium;
-        native_setUserPremium(currentAccount, userPremium || SharedConfig.premiumDownloadLimits);
+        native_setUserPremium(currentAccount, SharedConfig.premiumDownloadLimits);
     }
 
     public void init(int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String systemLangCode, String configPath, String logPath, String regId, String cFingerprint, int timezoneOffset, long userId, boolean userPremium, boolean enablePushConnection) {

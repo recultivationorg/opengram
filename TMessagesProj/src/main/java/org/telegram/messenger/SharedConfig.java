@@ -247,6 +247,14 @@ public class SharedConfig {
     public static long forceEndToEndCutoff;
     public static int forceEndToEndSchema;
     public static boolean premiumDownloadLimits;
+    /** Native premium per-datacenter download cap (MAX_DOWNLOAD_REQUESTS_PREMIUM). */
+    public static final int MAXIMUM_DOWNLOAD_REQUESTS = 64;
+    public static final int MAXIMUM_DOWNLOAD_QUEUE_FACTOR = 4;
+
+    public static int scaledDownloadQueue(int base) {
+        int factor = premiumDownloadLimits ? MAXIMUM_DOWNLOAD_QUEUE_FACTOR : 1;
+        return Math.max(1, base) * factor;
+    }
 
     public static void setPremiumDownloadLimits(boolean enabled) {
         if (premiumDownloadLimits == enabled) {

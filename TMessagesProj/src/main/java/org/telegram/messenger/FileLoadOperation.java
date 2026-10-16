@@ -47,7 +47,6 @@ public class FileLoadOperation {
     public static volatile DispatchQueue filesQueue = new DispatchQueue("writeFileQueue");
     public static ImmutableByteArrayOutputStream filesQueueByteBuffer;
     private boolean forceSmallChunk;
-    private boolean useDownloadByteBudget;
     private int downloadConnectionsCount = 2;
     private boolean isAudioDocument;
     private boolean paceDocumentRequests;
@@ -307,6 +306,11 @@ public class FileLoadOperation {
             downloadChunkSizeBig = 1024 * 128;
             maxDownloadRequests = 4;
             maxDownloadRequestsBig = 4;
+        }
+        if (SharedConfig.premiumDownloadLimits) {
+            maxDownloadRequests = SharedConfig.MAXIMUM_DOWNLOAD_REQUESTS;
+            maxDownloadRequestsBig = maxDownloadRequests;
+            downloadChunkSizeBig = 1024 * 512;
         }
         maxDownloadRequestsAnimation = Math.max(maxDownloadRequestsAnimation, maxDownloadRequests / 2);
         maxCdnParts = (int) (FileLoader.DEFAULT_MAX_FILE_SIZE / downloadChunkSizeBig);
@@ -862,17 +866,6 @@ public class FileLoadOperation {
                 boolean bigChunk = totalBytesCount >= bigFileSizeFrom;
                 currentDownloadChunkSize = bigChunk ? downloadChunkSizeBig : downloadChunkSize;
                 currentMaxDownloadRequests = bigChunk ? maxDownloadRequestsBig : maxDownloadRequests;
-                // Keep special download paths on their existing scheduling policy.
-                // Snapshot the policy for this operation, including its connection pool.
-                useDownloadByteBudget = !MessagesController.getInstance(currentAccount).downloadImprovementKillswitch &&
-                        totalBytesCount > 0 && key == null && !encryptFile && !isAudioDocument && stream == null &&
-                        !isPreloadVideoOperation && !supportsPreloading && preloadPrefixSize == 0;
-                if (useDownloadByteBudget) {
-                    boolean premiumLimits = UserConfig.getInstance(currentAccount).isPremium() || SharedConfig.premiumDownloadLimits;
-                    downloadConnectionsCount = premiumLimits ? ConnectionsManager.DownloadConnectionsCount : 2;
-                    int byteBudget = (premiumLimits ? 16 : 2) * 1024 * 1024;
-                    currentMaxDownloadRequests = byteBudget / currentDownloadChunkSize;
-                }
             }
         }
         final boolean alreadyStarted = state != stateIdle;
@@ -2287,8 +2280,7 @@ public class FileLoadOperation {
             count = Math.max(0, currentMaxDownloadRequests - requestInfos.size());
         } else {
             if (streamPriorityStartOffset == 0 && !nextPartWasPreloaded && (!isPreloadVideoOperation || moovFound != 0) && totalBytesCount > 0) {
-                count = Math.max(0, currentMaxDownloadRequests - requestInfos.size() -
-                        (useDownloadByteBudget ? delayedRequestInfos.size() : 0));
+                count = Math.max(0, currentMaxDownloadRequests - requestInfos.size());
             }
         }
 
@@ -2414,12 +2406,6 @@ public class FileLoadOperation {
             }
 
             int flags = (isForceRequest ? ConnectionsManager.RequestFlagForceDownload : 0);
-            if (useDownloadByteBudget) {
-                flags |= ConnectionsManager.RequestFlagDownloadByteBudget;
-                if (totalBytesCount < 20 * 1024) {
-                    flags |= ConnectionsManager.RequestFlagSmallDownload;
-                }
-            }
             if (isCdn) {
                 TLRPC.TL_upload_getCdnFile req = new TLRPC.TL_upload_getCdnFile();
                 req.file_token = cdnToken;

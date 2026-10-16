@@ -20,7 +20,6 @@
 #include <string>
 #include <cinttypes>
 #include "ConnectionsManager.h"
-#include "DownloadRequestBudget.h"
 #include "FileLog.h"
 #include "EventObject.h"
 #include "MTProtoScheme.h"
@@ -679,7 +678,7 @@ void ConnectionsManager::cleanUp(bool resetKeys, int32_t datacenterId) {
         if (datacenterId == -1) {
             sessionsToDestroy.clear();
             currentUserId = 0;
-            currentUserPremium = false;
+            currentUserPremium = true;
             registeredForInternalPush = false;
         }
         saveConfig();
@@ -1505,7 +1504,7 @@ void ConnectionsManager::processServerResponse(TLObject *message, int64_t messag
                             } else if (datacenter->getDatacenterId() == currentDatacenterId || datacenter->getDatacenterId() == movingToDatacenterId) {
                                 if (request->connectionType & ConnectionTypeGeneric && currentUserId) {
                                     currentUserId = 0;
-                                    currentUserPremium = false;
+                                    currentUserPremium = true;
                                     if (delegate != nullptr) {
                                         delegate->onLogout(instanceNum);
                                     }
@@ -2009,7 +2008,8 @@ void ConnectionsManager::bindRequestToGuid(int32_t requestToken, int32_t guid) {
 
 void ConnectionsManager::setUserPremium(bool premium) {
     scheduleTask([&, premium] {
-        currentUserPremium = premium;
+        currentUserPremium = true;
+        maximumDownloadRequests = premium;
     });
 }
 
@@ -2706,16 +2706,6 @@ void ConnectionsManager::processRequestQueue(uint32_t connectionTypes, uint32_t 
         iter++;
     }
 
-    // Snapshot after retries/migrations, which can remove or requeue requests.
-    // No persistent reservations to leak on cancellation or DC changes.
-    DownloadRequestBudget downloadBudget(currentUserPremium);
-    for (const auto &request : runningRequests) {
-        if (!request->cancelled && (request->connectionType & 0xffff) == ConnectionTypeDownload) {
-            uint32_t datacenterId = request->datacenterId == DEFAULT_DATACENTER_ID ? currentDatacenterId : request->datacenterId;
-            downloadBudget.account(datacenterId, (request->requestFlags & RequestFlagSmallDownload) != 0, getDownloadSize(request.get()));
-        }
-    }
-
     Connection *genericConnection = nullptr;
     Datacenter *defaultDatacenter = getDatacenterWithId(currentDatacenterId);
     if (defaultDatacenter != nullptr) {
@@ -2875,19 +2865,10 @@ void ConnectionsManager::processRequestQueue(uint32_t connectionTypes, uint32_t 
                         DEBUG_D("skip queue, token = %d: download type: network unavailable", request->requestToken);
                     continue;
                 }
-                uint32_t bytes = getDownloadSize(request);
-                if (bytes != 0) {
-                    if (!downloadBudget.acquire(datacenterId, (request->requestFlags & RequestFlagSmallDownload) != 0, bytes)) {
-                        iter++;
-                        continue;
-                    }
-                    break;
-                }
-                // Non-opted-in requests retain the original count-based scheduling.
                 int max;
                 if (request->isCancelRequest()) {
                     max = MAX_DOWNLOAD_REQUESTS_CANCELS;
-                } else if (currentUserPremium) {
+                } else if (maximumDownloadRequests) {
                     max = MAX_DOWNLOAD_REQUESTS_PREMIUM;
                 } else {
                     max = MAX_DOWNLOAD_REQUESTS;
@@ -3695,7 +3676,8 @@ void ConnectionsManager::init(uint32_t version, int32_t layer, int32_t apiId, st
     currentDeviceTimezone = timezoneOffset;
     currentSystemLangCode = systemLangCode;
     currentUserId = userId;
-    currentUserPremium = userPremium;
+    currentUserPremium = true;
+    maximumDownloadRequests = userPremium;
     currentLogPath = logPath;
     pushConnectionEnabled = enablePushConnection;
     currentNetworkType = networkType;
