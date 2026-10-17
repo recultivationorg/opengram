@@ -9995,6 +9995,80 @@ public class MessagesStorage extends BaseController {
         }
     }
 
+    public void findVisibleDialogTail(long dialogId, int topMessage, int generation) {
+        storageQueue.postRunnable(() -> {
+            ArrayList<MessageObject> visible = null;
+            SQLiteCursor cursor = null;
+            try {
+                int upper = topMessage;
+                for (int batch = 0; batch < 8 && visible == null; batch++) {
+                    cursor = database.queryFinalized("SELECT data FROM messages_v2 WHERE uid = " + dialogId + " AND mid > 0 AND mid <= " + upper + " ORDER BY mid DESC LIMIT 40");
+                    ArrayList<MessageObject> page = new ArrayList<>();
+                    int lowest = upper;
+                    boolean any = false;
+                    while (cursor.next()) {
+                        any = true;
+                        NativeByteBuffer data = cursor.byteBufferValue(0);
+                        if (data != null) {
+                            TLRPC.Message message = TLRPC.Message.TLdeserialize(data, data.readInt32(false), false);
+                            if (message != null) {
+                                message.readAttachPath(data, getUserConfig().clientUserId);
+                                if (message.dialog_id == 0) {
+                                    message.dialog_id = dialogId;
+                                }
+                                if (message.id > 0 && message.id < lowest) {
+                                    lowest = message.id;
+                                }
+                                page.add(new MessageObject(currentAccount, message, false, false));
+                            }
+                            data.reuse();
+                        }
+                    }
+                    cursor.dispose();
+                    cursor = null;
+                    if (!any || page.isEmpty()) {
+                        visible = new ArrayList<>();
+                        break;
+                    }
+                    HashSet<Long> hiddenGroups = OpengramMessageFilter.hiddenGroups(currentAccount, dialogId, page);
+                    for (int i = 0; i < page.size(); i++) {
+                        MessageObject message = page.get(i);
+                        long groupId = message.getGroupId();
+                        if (OpengramMessageFilter.shouldHide(currentAccount, dialogId, message) || groupId != 0 && hiddenGroups.contains(groupId)) {
+                            continue;
+                        }
+                        visible = new ArrayList<>();
+                        visible.add(message);
+                        if (groupId != 0) {
+                            for (int j = 0; j < page.size(); j++) {
+                                MessageObject sibling = page.get(j);
+                                if (sibling != message && sibling.getGroupId() == groupId) {
+                                    visible.add(sibling);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    if (visible != null || lowest >= upper) {
+                        break;
+                    }
+                    upper = lowest - 1;
+                    if (upper <= 0) {
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                FileLog.e(e);
+            } finally {
+                if (cursor != null) {
+                    cursor.dispose();
+                }
+            }
+            ArrayList<MessageObject> found = visible == null ? new ArrayList<>() : visible;
+            AndroidUtilities.runOnUIThread(() -> getMessagesController().applyVisibleDialogTail(dialogId, topMessage, generation, found));
+        });
+    }
+
     public void getMessages(long dialogId, long mergeDialogId, boolean loadInfo, int count, int max_id, int offset_date, int minDate, int classGuid, int load_type, int mode, long replyMessageId, int loadIndex, boolean processMessages, boolean isTopic, Timer loaderLogger) {
         Timer.Task t1 = Timer.start(loaderLogger, "MessagesStorage.getMessages: storageQueue.postRunnable");
         storageQueue.postRunnable(() -> {

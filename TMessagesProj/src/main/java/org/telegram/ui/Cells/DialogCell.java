@@ -1241,22 +1241,34 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (dialogId == 0) {
             dialogId = currentDialogId;
         }
-        if (OpengramMessageFilter.shouldHide(currentAccount, dialogId, message)) {
-            message = null;
-            groupMessages = null;
-            return true;
-        }
-        if (groupMessages != null) {
+        boolean hidden = OpengramMessageFilter.shouldHide(currentAccount, dialogId, message);
+        if (!hidden && groupMessages != null) {
             for (int i = 0; i < groupMessages.size(); i++) {
                 MessageObject grouped = groupMessages.get(i);
                 if (grouped != null && OpengramMessageFilter.shouldHide(currentAccount, dialogId, grouped)) {
-                    message = null;
-                    groupMessages = null;
-                    return true;
+                    hidden = true;
+                    break;
                 }
             }
         }
-        return false;
+        if (!hidden) {
+            return false;
+        }
+        ArrayList<MessageObject> replacement = MessagesController.getInstance(currentAccount).visibleDialogPreview(dialogId);
+        if (replacement != null && !replacement.isEmpty()) {
+            groupMessages = replacement;
+            message = replacement.get(0);
+            if (message != null && message.messageOwner != null) {
+                lastMessageDate = message.messageOwner.date;
+                currentEditDate = message.messageOwner.edit_date;
+                lastSendState = message.messageOwner.send_state;
+            }
+            return false;
+        }
+        MessagesController.getInstance(currentAccount).ensureVisibleDialogPreview(dialogId);
+        message = null;
+        groupMessages = null;
+        return true;
     }
 
     public void buildLayout() {

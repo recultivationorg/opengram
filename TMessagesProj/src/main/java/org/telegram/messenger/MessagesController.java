@@ -175,6 +175,11 @@ public class MessagesController extends BaseController implements NotificationCe
     public ConcurrentHashMap<Long, Integer> dialogs_read_outbox_max = new ConcurrentHashMap<>(100, 1.0f, 2);
     public LongSparseArray<TLRPC.Dialog> dialogs_dict = new LongSparseArray<>();
     public LongSparseArray<ArrayList<MessageObject>> dialogMessage = new LongSparseArray<>();
+    private final LongSparseArray<ArrayList<MessageObject>> visibleDialogPreviews = new LongSparseArray<>();
+    private final LongSparseIntArray visibleDialogPreviewTops = new LongSparseIntArray();
+    private final LongSparseIntArray visibleDialogPreviewSavedDates = new LongSparseIntArray();
+    private final LongSparseIntArray visibleDialogPreviewInFlight = new LongSparseIntArray();
+    private int visibleDialogPreviewGeneration;
     public LongSparseArray<MessageObject> dialogMessagesByRandomIds = new LongSparseArray<>();
     public LongSparseIntArray deletedHistory = new LongSparseIntArray();
     public SparseArray<MessageObject> dialogMessagesByIds = new SparseArray<>();
@@ -22002,6 +22007,73 @@ public class MessagesController extends BaseController implements NotificationCe
         return false;
     }
 
+    public void clearVisibleDialogPreviews() {
+        visibleDialogPreviewGeneration++;
+        for (int i = 0; i < visibleDialogPreviewSavedDates.size(); i++) {
+            long dialogId = visibleDialogPreviewSavedDates.keyAt(i);
+            TLRPC.Dialog dialog = dialogs_dict.get(dialogId);
+            if (dialog != null) {
+                dialog.last_message_date = visibleDialogPreviewSavedDates.valueAt(i);
+            }
+        }
+        visibleDialogPreviews.clear();
+        visibleDialogPreviewTops.clear();
+        visibleDialogPreviewSavedDates.clear();
+        visibleDialogPreviewInFlight.clear();
+        sortDialogs(null);
+    }
+
+    public ArrayList<MessageObject> visibleDialogPreview(long dialogId) {
+        TLRPC.Dialog dialog = dialogs_dict.get(dialogId);
+        if (dialog == null || visibleDialogPreviewTops.indexOfKey(dialogId) < 0 || visibleDialogPreviewTops.get(dialogId) != dialog.top_message) {
+            return null;
+        }
+        return visibleDialogPreviews.get(dialogId);
+    }
+
+    public void ensureVisibleDialogPreview(long dialogId) {
+        TLRPC.Dialog dialog = dialogs_dict.get(dialogId);
+        ArrayList<MessageObject> current = dialogMessage.get(dialogId);
+        if (dialog == null || !OpengramMessageFilter.previewIsHidden(currentAccount, dialogId, current)) {
+            return;
+        }
+        if (visibleDialogPreviewTops.indexOfKey(dialogId) >= 0 && visibleDialogPreviewTops.get(dialogId) == dialog.top_message) {
+            return;
+        }
+        if (visibleDialogPreviewInFlight.indexOfKey(dialogId) >= 0 && visibleDialogPreviewInFlight.get(dialogId) == dialog.top_message) {
+            return;
+        }
+        visibleDialogPreviewInFlight.put(dialogId, dialog.top_message);
+        getMessagesStorage().findVisibleDialogTail(dialogId, dialog.top_message, visibleDialogPreviewGeneration);
+    }
+
+    public void applyVisibleDialogTail(long dialogId, int topMessage, int generation, ArrayList<MessageObject> messages) {
+        if (generation != visibleDialogPreviewGeneration) {
+            return;
+        }
+        TLRPC.Dialog dialog = dialogs_dict.get(dialogId);
+        visibleDialogPreviewInFlight.delete(dialogId);
+        if (dialog == null || dialog.top_message != topMessage) {
+            return;
+        }
+        if (!OpengramMessageFilter.previewIsHidden(currentAccount, dialogId, dialogMessage.get(dialogId))) {
+            return;
+        }
+        if (messages == null) {
+            messages = new ArrayList<>();
+        }
+        visibleDialogPreviews.put(dialogId, messages);
+        visibleDialogPreviewTops.put(dialogId, topMessage);
+        if (!messages.isEmpty() && messages.get(0) != null && messages.get(0).messageOwner != null) {
+            if (visibleDialogPreviewSavedDates.indexOfKey(dialogId) < 0) {
+                visibleDialogPreviewSavedDates.put(dialogId, dialog.last_message_date);
+            }
+            dialog.last_message_date = messages.get(0).messageOwner.date;
+            sortDialogs(null);
+        }
+        getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+    }
+
     public boolean updateInterfaceWithMessages(long dialogId, ArrayList<MessageObject> messages, int mode) {
         if (messages == null || messages.isEmpty()) {
             return false;
@@ -22015,9 +22087,13 @@ public class MessagesController extends BaseController implements NotificationCe
         long channelId = 0;
         boolean updateRating = false;
         boolean hasNotOutMessage = false;
+        HashSet<Long> hiddenGroups = OpengramMessageFilter.hiddenGroups(currentAccount, dialogId, messages);
         if (!scheduled && !quickReplies && !welcomeMessages) {
             for (int a = 0; a < messages.size(); a++) {
                 MessageObject message = messages.get(a);
+                if (message == null || OpengramMessageFilter.shouldHide(currentAccount, dialogId, message) || hiddenGroups.contains(message.getGroupId())) {
+                    continue;
+                }
                 if (lastMessage == null || (!isEncryptedChat && message.getId() > lastMessage.getId() || (isEncryptedChat || message.getId() < 0 && lastMessage.getId() < 0) && message.getId() < lastMessage.getId()) || message.messageOwner.date > lastMessage.messageOwner.date) {
                     lastMessage = message;
                     if (message.messageOwner.peer_id.channel_id != 0) {

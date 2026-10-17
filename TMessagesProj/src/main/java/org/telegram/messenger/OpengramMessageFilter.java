@@ -298,6 +298,7 @@ public final class OpengramMessageFilter {
     }
 
     private static void notifyDialogs(int account) {
+        MessagesController.getInstance(account).clearVisibleDialogPreviews();
         NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.dialogsNeedReload);
         NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.messageFilterChanged);
         NotificationsController.getInstance(account).removeFilteredPushMessages();
@@ -329,6 +330,24 @@ public final class OpengramMessageFilter {
             }
         }
         return visible == null ? messages : visible;
+    }
+
+    public static boolean previewIsHidden(int account, long dialogId, List<MessageObject> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return false;
+        }
+        HashSet<Long> groups = hiddenGroups(account, dialogId, messages);
+        for (int i = 0; i < messages.size(); i++) {
+            MessageObject message = messages.get(i);
+            if (message == null) {
+                continue;
+            }
+            long groupId = message.getGroupId();
+            if (shouldHide(account, dialogId, message) || groupId != 0 && groups.contains(groupId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static HashSet<Long> hiddenGroups(int account, long dialogId, List<MessageObject> messages) {
