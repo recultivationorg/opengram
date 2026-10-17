@@ -690,6 +690,48 @@ public class NotificationsController extends BaseController implements Notificat
         });
     }
 
+    public void removeFilteredPushMessages() {
+        notificationsQueue.postRunnable(() -> {
+            HashSet<Long> hiddenGroups = new HashSet<>();
+            for (int i = 0; i < pushMessages.size(); i++) {
+                MessageObject message = pushMessages.get(i);
+                if (message == null) {
+                    continue;
+                }
+                long groupId = message.getGroupId();
+                if (groupId != 0 && OpengramMessageFilter.shouldHide(currentAccount, message.getDialogId(), message)) {
+                    hiddenGroups.add(groupId);
+                }
+            }
+            boolean changed = false;
+            for (int i = 0; i < pushMessages.size(); i++) {
+                MessageObject message = pushMessages.get(i);
+                if (message == null) {
+                    continue;
+                }
+                long dialogId = message.getDialogId();
+                boolean hide = OpengramMessageFilter.shouldHide(currentAccount, dialogId, message) || hiddenGroups.contains(message.getGroupId());
+                if (!hide) {
+                    continue;
+                }
+                pushMessages.remove(i);
+                SparseArray<MessageObject> msgs = pushMessagesDict.get(dialogId);
+                if (msgs != null) {
+                    msgs.remove(message.getId());
+                    if (msgs.size() == 0) {
+                        pushMessagesDict.remove(dialogId);
+                    }
+                }
+                popupMessages.remove(message);
+                i--;
+                changed = true;
+            }
+            if (changed) {
+                showOrUpdateNotification(false);
+            }
+        });
+    }
+
     public void processSeenStoryReactions(long dialogId, int storyId) {
         if (dialogId != getUserConfig().getClientUserId())
             return;

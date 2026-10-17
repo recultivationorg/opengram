@@ -17671,7 +17671,7 @@ public class MessagesStorage extends BaseController {
                     }
                     int unreadReactions = dialog.unread_reactions_count;
                     if (storedReactionCounts != null && storedReactionCounts.indexOfKey(dialog.id) >= 0) {
-                        unreadReactions = OpengramGhostReads.reactionCountFromServer(storedReactionCounts.get(dialog.id), unreadReactions);
+                        unreadReactions = OpengramGhostReads.applyServerReactionCount(currentAccount, dialog.id, storedReactionCounts.get(dialog.id), unreadReactions);
                         dialog.unread_reactions_count = unreadReactions;
                     }
                     state_dialogs.bindInteger(15, unreadReactions);

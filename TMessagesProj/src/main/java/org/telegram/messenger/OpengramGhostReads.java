@@ -18,6 +18,7 @@ public final class OpengramGhostReads {
     private static boolean saveQueued;
     private static LongSparseArray<LongSparseArray<HashSet<Integer>>> readReactions;
     private static LongSparseArray<LongSparseArray<Integer>> storyReads;
+    private static LongSparseArray<LongSparseArray<Integer>> serverReactionCounts;
     private static LongSparseArray<Boolean> loadedUsers;
     private static LongSparseArray<Boolean> loadingUsers;
     private static LongSparseArray<Boolean> dirtyUsers;
@@ -39,6 +40,66 @@ public final class OpengramGhostReads {
         return Math.max(localReadId, serverReadId);
     }
 
+    public static int reactionCountAfterServer(int localCount, int serverCount, int previousServerCount) {
+        if (localCount < 0) {
+            localCount = 0;
+        }
+        if (serverCount < 0) {
+            serverCount = 0;
+        }
+        if (previousServerCount < 0) {
+            return reactionCountFromServer(localCount, serverCount);
+        }
+        int next = localCount + (serverCount - previousServerCount);
+        if (next < 0) {
+            next = 0;
+        }
+        if (next > serverCount) {
+            next = serverCount;
+        }
+        return next;
+    }
+
+    public static int applyServerReactionCount(int account, long dialogId, int localCount, int serverCount) {
+        if (!UserConfig.isGhostMode(account) || dialogId == 0) {
+            return serverCount;
+        }
+        long clientUserId = clientUserId(account);
+        if (clientUserId == 0) {
+            return reactionCountFromServer(localCount, serverCount);
+        }
+        int previous;
+        synchronized (lock) {
+            previous = storedServerReactionCount(clientUserId, dialogId);
+            storeServerReactionCount(clientUserId, dialogId, Math.max(0, serverCount));
+        }
+        if (previous != serverCount) {
+            scheduleSave(clientUserId);
+        }
+        return reactionCountAfterServer(localCount, serverCount, previous);
+    }
+
+    public static void noteServerReactionCount(int account, long dialogId, int serverCount) {
+        if (!UserConfig.isGhostMode(account) || dialogId == 0) {
+            return;
+        }
+        long clientUserId = clientUserId(account);
+        if (clientUserId == 0) {
+            return;
+        }
+        boolean changed;
+        synchronized (lock) {
+            int previous = storedServerReactionCount(clientUserId, dialogId);
+            changed = previous != serverCount;
+            if (changed) {
+                storeServerReactionCount(clientUserId, dialogId, Math.max(0, serverCount));
+            }
+        }
+        if (changed) {
+            scheduleSave(clientUserId);
+        }
+    }
+
     static int modeForProbe(OpengramStrongBox.Probe probe) {
         if (probe == OpengramStrongBox.Probe.AVAILABLE) {
             return OpengramSnapshotFile.MODE_STRONGBOX;
@@ -57,12 +118,22 @@ public final class OpengramGhostReads {
         return "s," + dialogId + "," + maxReadId;
     }
 
+    static String serverCountLine(long dialogId, int count) {
+        return "c," + dialogId + "," + count;
+    }
+
     static Entry parse(String line) {
         if (line == null) {
             return null;
         }
         String[] parts = line.split(",", -1);
-        if (parts.length != 3 || (!"r".equals(parts[0]) && !"s".equals(parts[0]))) {
+        if (parts.length != 3) {
+            return null;
+        }
+        boolean reaction = "r".equals(parts[0]);
+        boolean story = "s".equals(parts[0]);
+        boolean serverCount = "c".equals(parts[0]);
+        if (!reaction && !story && !serverCount) {
             return null;
         }
         try {
@@ -71,13 +142,13 @@ public final class OpengramGhostReads {
             if (dialogId == 0 || last < 0 || last > Integer.MAX_VALUE) {
                 return null;
             }
-            if ("r".equals(parts[0])) {
+            if (reaction) {
                 if (last <= 0) {
                     return null;
                 }
-                return new Entry(true, dialogId, (int) last);
+                return new Entry(true, false, dialogId, (int) last);
             }
-            return new Entry(false, dialogId, (int) last);
+            return new Entry(false, serverCount, dialogId, (int) last);
         } catch (NumberFormatException e) {
             return null;
         }
@@ -276,6 +347,9 @@ public final class OpengramGhostReads {
             if (storyReads != null) {
                 storyReads.remove(clientUserId);
             }
+            if (serverReactionCounts != null) {
+                serverReactionCounts.remove(clientUserId);
+            }
             if (loadedUsers != null) {
                 loadedUsers.remove(clientUserId);
             }
@@ -314,7 +388,17 @@ public final class OpengramGhostReads {
     }
 
     private static void drainSaves() {
-        saveDirty();
+        for (int pass = 0; pass < 4; pass++) {
+            saveDirty();
+            boolean more;
+            synchronized (lock) {
+                more = dirtyUsers != null && dirtyUsers.size() > 0;
+                if (!more) {
+                    saveQueued = false;
+                    return;
+                }
+            }
+        }
         synchronized (lock) {
             saveQueued = false;
         }
@@ -510,10 +594,10 @@ public final class OpengramGhostReads {
             return OpengramSnapshotFile.read(file, OpengramSnapshotFile.MODE_PLAINTEXT, null);
         }
         OpengramSnapshotFile.ReadResult sealed = OpengramSnapshotFile.read(file, OpengramSnapshotFile.MODE_STRONGBOX, sealer);
-        if (probe == OpengramStrongBox.Probe.ERROR || sealed.status != OpengramSnapshotFile.Status.MODE_MISMATCH) {
-            return sealed;
+        if (sealed.status == OpengramSnapshotFile.Status.MODE_MISMATCH) {
+            return OpengramSnapshotFile.read(file, OpengramSnapshotFile.MODE_PLAINTEXT, null);
         }
-        return OpengramSnapshotFile.read(file, OpengramSnapshotFile.MODE_PLAINTEXT, null);
+        return sealed;
     }
 
     private static boolean owns(OpengramSnapshotFile.Record record, long clientUserId) {
@@ -531,6 +615,11 @@ public final class OpengramGhostReads {
             }
             if (entry.reaction) {
                 messages(clientUserId, entry.dialogId).add(entry.value);
+            } else if (entry.serverCount) {
+                LongSparseArray<Integer> counts = serverCounts(clientUserId);
+                if (counts.get(entry.dialogId) == null) {
+                    counts.put(entry.dialogId, entry.value);
+                }
             } else {
                 LongSparseArray<Integer> dialogs = stories(clientUserId);
                 Integer previous = dialogs.get(entry.dialogId);
@@ -548,6 +637,15 @@ public final class OpengramGhostReads {
                     if (messageId != null && messageId > 0) {
                         lines.add(reactionLine(dialogId, messageId));
                     }
+                }
+            }
+        }
+        LongSparseArray<Integer> serverCounts = serverReactionCounts == null ? null : serverReactionCounts.get(clientUserId);
+        if (serverCounts != null) {
+            for (int d = 0; d < serverCounts.size(); d++) {
+                Integer count = serverCounts.valueAt(d);
+                if (count != null && count >= 0) {
+                    lines.add(serverCountLine(serverCounts.keyAt(d), count));
                 }
             }
         }
@@ -674,14 +772,48 @@ public final class OpengramGhostReads {
 
     static final class Entry {
         final boolean reaction;
+        final boolean serverCount;
         final long dialogId;
         final int value;
 
         Entry(boolean reaction, long dialogId, int value) {
+            this(reaction, false, dialogId, value);
+        }
+
+        Entry(boolean reaction, boolean serverCount, long dialogId, int value) {
             this.reaction = reaction;
+            this.serverCount = serverCount;
             this.dialogId = dialogId;
             this.value = value;
         }
+    }
+
+    private static int storedServerReactionCount(long clientUserId, long dialogId) {
+        if (serverReactionCounts == null) {
+            return -1;
+        }
+        LongSparseArray<Integer> counts = serverReactionCounts.get(clientUserId);
+        if (counts == null) {
+            return -1;
+        }
+        Integer value = counts.get(dialogId);
+        return value == null ? -1 : value;
+    }
+
+    private static void storeServerReactionCount(long clientUserId, long dialogId, int count) {
+        serverCounts(clientUserId).put(dialogId, count);
+    }
+
+    private static LongSparseArray<Integer> serverCounts(long clientUserId) {
+        if (serverReactionCounts == null) {
+            serverReactionCounts = new LongSparseArray<>();
+        }
+        LongSparseArray<Integer> counts = serverReactionCounts.get(clientUserId);
+        if (counts == null) {
+            counts = new LongSparseArray<>();
+            serverReactionCounts.put(clientUserId, counts);
+        }
+        return counts;
     }
 
     public interface StoryFloor {

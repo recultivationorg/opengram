@@ -31,6 +31,14 @@ public class OpengramGhostReadsTest {
     }
 
     @Test
+    public void newServerReactionsAreAddedToTheLocalCount() {
+        assertEquals(3, OpengramGhostReads.reactionCountAfterServer(0, 8, 5));
+        assertEquals(0, OpengramGhostReads.reactionCountAfterServer(0, 5, 5));
+        assertEquals(1, OpengramGhostReads.reactionCountAfterServer(2, 4, 5));
+        assertEquals(1, OpengramGhostReads.reactionCountAfterServer(1, 6, -1));
+    }
+
+    @Test
     public void storyReadIdKeepsTheFurtherLocalRead() {
         assertEquals(40, OpengramGhostReads.storyReadId(40, 12));
         assertEquals(40, OpengramGhostReads.storyReadId(12, 40));
@@ -65,7 +73,14 @@ public class OpengramGhostReadsTest {
 
         assertNull(OpengramGhostReads.parse("5:9"));
         assertNull(OpengramGhostReads.parse("r,1,50,-9,77"));
-        assertNull(OpengramGhostReads.parse("r,1,2"));
+        OpengramGhostReads.Entry count = OpengramGhostReads.parse("c,-9,4");
+        assertEquals(false, count.reaction);
+        assertEquals(true, count.serverCount);
+        assertEquals(4, count.value);
+        OpengramGhostReads.Entry shortReaction = OpengramGhostReads.parse("r,1,2");
+        assertEquals(true, shortReaction.reaction);
+        assertEquals(1L, shortReaction.dialogId);
+        assertEquals(2, shortReaction.value);
         assertNull(OpengramGhostReads.parse(null));
     }
 

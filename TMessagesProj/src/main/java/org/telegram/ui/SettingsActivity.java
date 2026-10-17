@@ -913,6 +913,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                         getUserConfig().ghostMode = true;
                         getUserConfig().saveConfig(false);
                         OpengramGhostReads.onEnabled(currentAccount);
+                        getMessagesController().goOfflineForGhost();
                         listView.adapter.update(true);
                     });
                     builder.setNegativeButton(getString(R.string.Cancel), (dialogInterface, i) -> listView.adapter.update(true));

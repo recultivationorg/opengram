@@ -8,6 +8,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -113,6 +114,16 @@ public final class OpengramMessageFilter {
             }
         }
         return false;
+    }
+
+    public static boolean messageMatches(MessageObject message, Collection<String> keywords) {
+        if (message == null) {
+            return false;
+        }
+        if (matchesText(message.messageText, keywords)) {
+            return true;
+        }
+        return message.messageOwner != null && matchesText(message.messageOwner.message, keywords);
     }
 
     public static boolean appliesToDialog(boolean encrypted, boolean broadcastChannel, boolean bot) {
@@ -288,6 +299,8 @@ public final class OpengramMessageFilter {
 
     private static void notifyDialogs(int account) {
         NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.dialogsNeedReload);
+        NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.messageFilterChanged);
+        NotificationsController.getInstance(account).removeFilteredPushMessages();
     }
 
     public static ArrayList<MessageObject> withoutHidden(int account, long dialogId, ArrayList<MessageObject> messages) {
@@ -298,10 +311,11 @@ public final class OpengramMessageFilter {
         if (keywords.isEmpty() || !appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId), isBotChat(account, dialogId))) {
             return messages;
         }
+        HashSet<Long> hiddenGroups = hiddenGroups(messages, keywords);
         ArrayList<MessageObject> visible = null;
         for (int i = 0; i < messages.size(); i++) {
             MessageObject message = messages.get(i);
-            if (message != null && matchesText(message.messageText, keywords)) {
+            if (message != null && (messageMatches(message, keywords) || hiddenGroups.contains(message.getGroupId()))) {
                 if (visible == null) {
                     visible = new ArrayList<>(Math.max(0, messages.size() - 1));
                     for (int j = 0; j < i; j++) {
@@ -315,6 +329,14 @@ public final class OpengramMessageFilter {
             }
         }
         return visible == null ? messages : visible;
+    }
+
+    public static HashSet<Long> hiddenGroups(int account, long dialogId, List<MessageObject> messages) {
+        List<String> keywords = keywordsForHide(account);
+        if (keywords.isEmpty() || messages == null || !appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId), isBotChat(account, dialogId))) {
+            return new HashSet<>();
+        }
+        return hiddenGroups(messages, keywords);
     }
 
     public static boolean shouldHide(int account, long dialogId, MessageObject message) {
@@ -332,7 +354,22 @@ public final class OpengramMessageFilter {
         if (!appliesToDialog(DialogObject.isEncryptedDialog(id), isBroadcastChannel(account, id), isBotChat(account, id))) {
             return false;
         }
-        return matchesText(message.messageText, keywords);
+        return messageMatches(message, keywords);
+    }
+
+    private static HashSet<Long> hiddenGroups(List<MessageObject> messages, List<String> keywords) {
+        HashSet<Long> groups = new HashSet<>();
+        for (int i = 0; i < messages.size(); i++) {
+            MessageObject message = messages.get(i);
+            if (message == null) {
+                continue;
+            }
+            long groupId = message.getGroupId();
+            if (groupId != 0 && messageMatches(message, keywords)) {
+                groups.add(groupId);
+            }
+        }
+        return groups;
     }
 
     private static List<String> keywordsForHide(int account) {

@@ -2928,6 +2928,7 @@ public class ChatActivity extends BaseFragment implements
             .add(NotificationCenter.updatedChatRanks)
             .add(NotificationCenter.premiumFloodWaitReceived)
             .add(NotificationCenter.messagesDidLoad)
+            .add(NotificationCenter.messageFilterChanged)
             .add(NotificationCenter.loadingMessagesFailed)
             .add(NotificationCenter.didUpdateConnectionState)
             .add(NotificationCenter.updateInterfaces)
@@ -3216,6 +3217,25 @@ public class ChatActivity extends BaseFragment implements
             hashtagSearchEmptyView.showProgress(true);
             firstLoadMessages();
         }
+    }
+
+    private int filteredEmptyLoads;
+    private int filteredEmptyFromId;
+
+    private void reloadHistoryForFilter() {
+        if (chatMode == MODE_SEARCH || chatMode == MODE_PINNED || chatMode == MODE_SCHEDULED || chatMode == MODE_QUICK_REPLIES) {
+            return;
+        }
+        if (currentEncryptedChat != null) {
+            return;
+        }
+        if (!ChatObject.isChannelAndNotMegaGroup(currentChat) && (currentUser == null || !currentUser.bot)) {
+            return;
+        }
+        resetForReload();
+        int count = initialMessagesSize > 0 ? initialMessagesSize : 30;
+        waitingForLoad.add(lastLoadIndex);
+        getMessagesController().loadMessages(dialog_id, mergeDialogId, false, count, 0, 0, true, 0, classGuid, 0, 0, chatMode, threadMessageId, replyMaxReadId, lastLoadIndex++, isTopic);
     }
 
     public void resetForReload() {
@@ -20537,6 +20557,10 @@ public class ChatActivity extends BaseFragment implements
 
     @Override
     public void didReceivedNotification(int id, int account, final Object... args) {
+        if (id == NotificationCenter.messageFilterChanged) {
+            reloadHistoryForFilter();
+            return;
+        }
         if (id == NotificationCenter.messagesDidLoad) {
             didReceivedNotification_messagesDidLoad(id, account, args);
         } else {
@@ -21035,9 +21059,12 @@ public class ChatActivity extends BaseFragment implements
                 dropPhotoAction = action;
             }
         }
+        HashSet<Long> filteredGroups = OpengramMessageFilter.hiddenGroups(currentAccount, dialog_id, messArr);
+        int filteredOut = 0;
         for (int a = 0; a < messArr.size(); a++) {
             MessageObject obj = messArr.get(a);
-            if (obj != null && obj.messageOwner != null && OpengramMessageFilter.shouldHide(currentAccount, dialog_id, obj)) {
+            if (obj != null && obj.messageOwner != null && (OpengramMessageFilter.shouldHide(currentAccount, dialog_id, obj) || filteredGroups.contains(obj.getGroupId()))) {
+                filteredOut++;
                 int messageId = obj.getId();
                 if (!MessageObject.isEphemeralMessageId(messageId)) {
                     if (messageId > 0) {
@@ -21726,6 +21753,25 @@ public class ChatActivity extends BaseFragment implements
             showFloatingTopicView(false);
         }
         addSponsoredMessages(!isFirstLoading);
+        if (filteredOut > 0 && newRowsCount == 0 && messArr.size() > 0 && filteredOut == messArr.size() && filteredEmptyLoads < 40) {
+            boolean reached = load_type == 1 ? forwardEndReached[loadIndex] : endReached[loadIndex];
+            int fromId = load_type == 1 ? minMessageId[loadIndex] : maxMessageId[loadIndex];
+            if (!reached && fromId != 0 && fromId != Integer.MAX_VALUE && fromId != Integer.MIN_VALUE && fromId != filteredEmptyFromId) {
+                filteredEmptyLoads++;
+                filteredEmptyFromId = fromId;
+                int nextType = load_type == 1 ? 1 : 0;
+                waitingForLoad.add(lastLoadIndex);
+                if (nextType == 1) {
+                    loadingForward = true;
+                } else {
+                    loading = true;
+                }
+                getMessagesController().loadMessages(dialog_id, mergeDialogId, false, count, fromId, 0, true, 0, classGuid, nextType, 0, chatMode, threadMessageId, replyMaxReadId, lastLoadIndex++, isTopic);
+            }
+        } else if (newRowsCount > 0) {
+            filteredEmptyLoads = 0;
+            filteredEmptyFromId = 0;
+        }
         checkScrollForLoad(false);
 
         if (postponedScroll && !fakePostponedScroll) {

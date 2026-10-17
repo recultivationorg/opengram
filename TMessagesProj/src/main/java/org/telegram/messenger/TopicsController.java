@@ -930,7 +930,7 @@ public class TopicsController extends BaseController {
                 }
             } else {
                 if (UserConfig.isGhostMode(currentAccount)) {
-                    count = OpengramGhostReads.reactionCountFromServer(topic.unread_reactions_count, count);
+                    count = OpengramGhostReads.applyServerReactionCount(currentAccount, dialogId, topic.unread_reactions_count, count);
                 }
                 topic.unread_reactions_count = count;
             }

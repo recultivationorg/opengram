@@ -10584,7 +10584,9 @@ public class MessagesController extends BaseController implements NotificationCe
         int currentServerTime = getConnectionsManager().getCurrentTime();
         if (Math.abs(System.currentTimeMillis() - lastViewsCheckTime) >= 5000) {
             lastViewsCheckTime = System.currentTimeMillis();
-            if (channelViewsToSend.size() != 0) {
+            if (UserConfig.isGhostMode(currentAccount)) {
+                channelViewsToSend.clear();
+            } else if (channelViewsToSend.size() != 0) {
                 for (int a = 0; a < channelViewsToSend.size(); a++) {
                     long key = channelViewsToSend.keyAt(a);
                     TLRPC.TL_messages_getMessagesViews req = new TLRPC.TL_messages_getMessagesViews();
@@ -13613,6 +13615,9 @@ public class MessagesController extends BaseController implements NotificationCe
                         added = true;
                         dialogs_dict.put(key, value);
                         dialogMessage.put(key, newMsgs);
+                        if (loadType != DIALOGS_LOAD_TYPE_CACHE) {
+                            OpengramGhostReads.noteServerReactionCount(currentAccount, value.id, value.unread_reactions_count);
+                        }
                         if (newMsgs != null) {
                             for (int i = 0; i < newMsgs.size(); ++i) {
                                 MessageObject newMsg = newMsgs.get(i);
@@ -13629,7 +13634,7 @@ public class MessagesController extends BaseController implements NotificationCe
                         }
                     } else {
                         if (UserConfig.isGhostMode(currentAccount) && loadType != DIALOGS_LOAD_TYPE_CACHE) {
-                            value.unread_reactions_count = OpengramGhostReads.reactionCountFromServer(currentDialog.unread_reactions_count, value.unread_reactions_count);
+                            value.unread_reactions_count = OpengramGhostReads.applyServerReactionCount(currentAccount, value.id, currentDialog.unread_reactions_count, value.unread_reactions_count);
                         }
                         if (loadType != DIALOGS_LOAD_TYPE_CACHE) {
                             currentDialog.notify_settings = value.notify_settings;
@@ -14161,6 +14166,9 @@ public class MessagesController extends BaseController implements NotificationCe
                         nextDialogsCacheOffset.put(value.folder_id, offset);
                         dialogs_dict.put(key, value);
                         dialogMessage.put(key, newMsgs);
+                        if (!fromCache) {
+                            OpengramGhostReads.noteServerReactionCount(currentAccount, value.id, value.unread_reactions_count);
+                        }
                         if (newMsgs == null || newMsgs.size() <= 0) {
                             if (fromCache) {
                                 checkLastDialogMessage(value, null, 0);
@@ -14191,7 +14199,7 @@ public class MessagesController extends BaseController implements NotificationCe
                             FileLog.d("processDialogsUpdate dialog not null");
                         }
                         if (UserConfig.isGhostMode(currentAccount) && !fromCache) {
-                            value.unread_reactions_count = OpengramGhostReads.reactionCountFromServer(currentDialog.unread_reactions_count, value.unread_reactions_count);
+                            value.unread_reactions_count = OpengramGhostReads.applyServerReactionCount(currentAccount, value.id, currentDialog.unread_reactions_count, value.unread_reactions_count);
                         }
                         currentDialog.unread_count = value.unread_count;
                         if (currentDialog.unread_mentions_count != value.unread_mentions_count) {
@@ -14335,8 +14343,26 @@ public class MessagesController extends BaseController implements NotificationCe
         return maxDate;
     }
 
+    public void goOfflineForGhost() {
+        Utilities.stageQueue.postRunnable(() -> {
+            if (!UserConfig.isGhostMode(currentAccount)) {
+                return;
+            }
+            if (statusRequest != 0) {
+                getConnectionsManager().cancelRequest(statusRequest, true);
+                statusRequest = 0;
+            }
+            channelViewsToSend.clear();
+            statusSettingState = 2;
+            offlineSent = true;
+            TL_account.updateStatus req = new TL_account.updateStatus();
+            req.offline = true;
+            statusRequest = getConnectionsManager().sendRequest(req, (response, error) -> statusRequest = 0);
+        });
+    }
+
     public void addToViewsQueue(MessageObject messageObject) {
-        if (messageObject == null) return;
+        if (messageObject == null || UserConfig.isGhostMode(currentAccount)) return;
         Utilities.stageQueue.postRunnable(() -> {
             long peer = messageObject.getDialogId();
             int id = messageObject.getId();
@@ -21477,7 +21503,7 @@ public class MessagesController extends BaseController implements NotificationCe
                                 }
                                 return;
                             }
-                            int nextCount = UserConfig.isGhostMode(currentAccount) ? OpengramGhostReads.reactionCountFromServer(dialog.unread_reactions_count, count) : count;
+                            int nextCount = UserConfig.isGhostMode(currentAccount) ? OpengramGhostReads.applyServerReactionCount(currentAccount, dialogId, dialog.unread_reactions_count, count) : count;
                             dialog.unread_reactions_count = nextCount;
                             getMessagesStorage().updateUnreadReactionsCount(dialogId, topicId, nextCount);
                             getNotificationCenter().postNotificationName(NotificationCenter.dialogsUnreadReactionsCounterChanged, dialogId, topicId, nextCount, newUnreadMessages);
