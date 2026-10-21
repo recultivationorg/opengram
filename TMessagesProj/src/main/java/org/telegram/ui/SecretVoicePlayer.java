@@ -674,13 +674,13 @@ public class SecretVoicePlayer extends Dialog {
             saveButton = onceActionButton(context, LocaleController.getString(isRound ? R.string.SaveToGallery : R.string.SaveToDownloads));
             saveButton.setOnClickListener(v -> {
                 saveOnce();
-                closeAction = null;
+                this.closeAction = null;
                 dismiss();
             });
             actions.addView(saveButton, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 6, 0));
             closeButton = onceActionButton(context, LocaleController.getString(R.string.ExpireOnce));
             closeButton.setOnClickListener(v -> {
-                closeAction = this::expireOnce;
+                this.closeAction = this::expireOnce;
                 dismiss();
             });
             actions.addView(closeButton, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 6, 0, 0, 0));
