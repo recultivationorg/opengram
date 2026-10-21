@@ -35,6 +35,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.core.graphics.Insets;
@@ -63,6 +64,7 @@ import org.telegram.ui.Components.AnimatedFloat;
 import org.telegram.ui.Components.AudioVisualizerDrawable;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.EarListener;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.ScaleStateListAnimator;
 import org.telegram.ui.Components.SeekBarWaveform;
@@ -96,6 +98,7 @@ public class SecretVoicePlayer extends Dialog {
 
     private HintView2 hintView;
     private TextView closeButton;
+    private TextView saveButton;
 
     private EarListener earListener;
 
@@ -660,21 +663,33 @@ public class SecretVoicePlayer extends Dialog {
             containerView.removeView(closeButton);
             closeButton = null;
         }
-        closeButton = new TextView(context);
-        closeButton.setTextColor(0xFFFFFFFF);
-        closeButton.setTypeface(AndroidUtilities.bold());
-        if (Theme.isCurrentThemeDark()) {
-            closeButton.setBackground(Theme.createSimpleSelectorRoundRectDrawable(64, 0x20ffffff, 0x33ffffff));
-        } else {
-            closeButton.setBackground(Theme.createSimpleSelectorRoundRectDrawable(64, 0x2e000000, 0x44000000));
+        if (saveButton != null) {
+            containerView.removeView(saveButton);
+            saveButton = null;
         }
-        closeButton.setPadding(dp(12), dp(6), dp(12), dp(6));
-        ScaleStateListAnimator.apply(closeButton);
-        closeButton.setText(LocaleController.getString(isOut ? R.string.VoiceOnceClose : R.string.VoiceOnceDeleteClose));
-        closeButton.setOnClickListener(v -> {
-            dismiss();
-        });
-        containerView.addView(closeButton, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER, 0, 0, 0, 18));
+        LinearLayout actions = new LinearLayout(context);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        if (!isOut) {
+            saveButton = onceActionButton(context, LocaleController.getString(isRound ? R.string.SaveToGallery : R.string.SaveToDownloads));
+            saveButton.setOnClickListener(v -> {
+                saveOnce();
+                closeAction = null;
+                dismiss();
+            });
+            actions.addView(saveButton, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 6, 0));
+            closeButton = onceActionButton(context, LocaleController.getString(R.string.ExpireOnce));
+            closeButton.setOnClickListener(v -> {
+                closeAction = this::expireOnce;
+                dismiss();
+            });
+            actions.addView(closeButton, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 6, 0, 0, 0));
+        } else {
+            closeButton = onceActionButton(context, LocaleController.getString(R.string.VoiceOnceClose));
+            closeButton.setOnClickListener(v -> dismiss());
+            actions.addView(closeButton, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
+        }
+        containerView.addView(actions, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER, 0, 0, 0, 18));
 
         if (!isOut && myCell != null && myCell.getMessageObject() != null && myCell.getMessageObject().messageOwner != null) {
             myCell.getMessageObject().messageOwner.media_unread = false;
@@ -729,6 +744,71 @@ public class SecretVoicePlayer extends Dialog {
     }
 
     private boolean dismissing = false;
+
+    private TextView onceActionButton(Context context, String text) {
+        TextView button = new TextView(context);
+        button.setTextColor(0xFFFFFFFF);
+        button.setTypeface(AndroidUtilities.bold());
+        if (Theme.isCurrentThemeDark()) {
+            button.setBackground(Theme.createSimpleSelectorRoundRectDrawable(64, 0x20ffffff, 0x33ffffff));
+        } else {
+            button.setBackground(Theme.createSimpleSelectorRoundRectDrawable(64, 0x2e000000, 0x44000000));
+        }
+        button.setPadding(dp(12), dp(6), dp(12), dp(6));
+        ScaleStateListAnimator.apply(button);
+        button.setText(text);
+        return button;
+    }
+
+    private File onceMediaFile() {
+        if (messageObject == null) {
+            return null;
+        }
+        File file = null;
+        if (messageObject.getDocument() != null) {
+            file = FileLoader.getInstance(messageObject.currentAccount).getPathToAttach(messageObject.getDocument());
+        }
+        if (file != null && !file.exists()) {
+            file = new File(file.getPath() + ".enc");
+        }
+        if (file == null || !file.exists()) {
+            file = FileLoader.getInstance(messageObject.currentAccount).getPathToMessage(messageObject.messageOwner);
+            if (file != null && !file.exists()) {
+                file = new File(file.getPath() + ".enc");
+            }
+        }
+        if ((file == null || !file.exists()) && messageObject.messageOwner.attachPath != null) {
+            file = new File(messageObject.messageOwner.attachPath);
+        }
+        return file != null && file.exists() ? file : null;
+    }
+
+    private void saveOnce() {
+        File file = onceMediaFile();
+        if (file == null) {
+            return;
+        }
+        if (file.getName().endsWith(".enc")) {
+            MediaController.saveEncryptedFileToGallery(file, isRound ? 1 : 2);
+        } else {
+            MediaController.saveFile(file.getAbsolutePath(), getContext(), isRound ? 1 : 2, null, null, null, false);
+        }
+        BulletinFactory.of(containerView, resourcesProvider).createDownloadBulletin(isRound ? BulletinFactory.FileType.VIDEO : BulletinFactory.FileType.AUDIO).show();
+    }
+
+    private void expireOnce() {
+        if (messageObject == null) {
+            return;
+        }
+        messageObject.forceExpired = true;
+        int account = messageObject.currentAccount;
+        long dialogId = messageObject.getDialogId();
+        long taskId = MessagesController.getInstance(account).createDeleteShowOnceTask(dialogId, messageObject.getId());
+        MessagesController.getInstance(account).doDeleteShowOnceTask(taskId, dialogId, messageObject.getId());
+        if (cell != null) {
+            cell.invalidate();
+        }
+    }
 
     private AlertDialog backDialog;
     @Override
@@ -849,6 +929,9 @@ public class SecretVoicePlayer extends Dialog {
             if (closeButton != null) {
                 closeButton.setAlpha(openProgress);
             }
+            if (saveButton != null) {
+                saveButton.setAlpha(openProgress);
+            }
             if (!isRound && myCell != null && myCell.getSeekBarWaveform() != null) {
                 myCell.getSeekBarWaveform().setExplosionRate((open ? CubicBezierInterpolator.EASE_OUT : CubicBezierInterpolator.EASE_IN).getInterpolation(Utilities.clamp(openProgress * 1.25f, 1f, 0f)));
             }
@@ -862,6 +945,9 @@ public class SecretVoicePlayer extends Dialog {
                 updateTranslation();
                 if (closeButton != null) {
                     closeButton.setAlpha(openProgress);
+                }
+                if (saveButton != null) {
+                    saveButton.setAlpha(openProgress);
                 }
                 if (isRound) {
                     myCell.invalidate();

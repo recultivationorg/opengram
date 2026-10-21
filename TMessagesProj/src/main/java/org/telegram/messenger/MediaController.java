@@ -89,6 +89,7 @@ import org.telegram.messenger.chromecast.ChromecastFileServer;
 import org.telegram.messenger.chromecast.ChromecastMedia;
 import org.telegram.messenger.chromecast.ChromecastMediaVariations;
 import org.telegram.messenger.video.MediaCodecVideoConvertor;
+import org.telegram.messenger.secretmedia.EncryptedFileInputStream;
 import org.telegram.messenger.voip.VoIPService;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.InputSerializedData;
@@ -5474,7 +5475,7 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
 
             AlertDialog progressDialog = null;
             final boolean[] finished = new boolean[1];
-            if (context != null && type != 0) {
+            if (showProgress && context != null && type != 0) {
                 try {
                     final AlertDialog dialog = new AlertDialog(context, AlertDialog.ALERT_TYPE_LOADING);
                     dialog.setMessage(LocaleController.getString(R.string.Loading));
@@ -5791,6 +5792,87 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 "</rdf:RDF>" +
                 "</x:xmpmeta>" +
                 "<?xpacket end=\"w\"?>";
+    }
+
+    public static void saveEncryptedFileToGallery(File encryptedFile, int type) {
+        if (encryptedFile == null || !encryptedFile.getName().endsWith(".enc")) {
+            return;
+        }
+        File keyFile = new File(FileLoader.getInternalCacheDir(), encryptedFile.getName() + ".key");
+        if (!keyFile.exists()) {
+            return;
+        }
+        String plainName = encryptedFile.getName().substring(0, encryptedFile.getName().length() - 4);
+        String extension = FileLoader.getFileExtension(new File(plainName));
+        new Thread(() -> {
+            EncryptedFileInputStream input = null;
+            try {
+                input = new EncryptedFileInputStream(encryptedFile, keyFile);
+                saveStreamInternal(type, input, extension);
+            } catch (Exception e) {
+                FileLog.e(e);
+            } finally {
+                if (input != null) {
+                    try {
+                        input.close();
+                    } catch (Exception e) {
+                        FileLog.e(e);
+                    }
+                }
+            }
+        }).start();
+    }
+
+    private static Uri saveStreamInternal(int type, java.io.InputStream input, String extension) {
+        try {
+            String mimeType = null;
+            if (extension != null) {
+                mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+            }
+            int selectedType = type;
+            if ((type == 0 || type == 1) && mimeType != null) {
+                if (mimeType.startsWith("image")) {
+                    selectedType = 0;
+                }
+                if (mimeType.startsWith("video")) {
+                    selectedType = 1;
+                }
+            }
+            ContentValues contentValues = new ContentValues();
+            Uri uriToInsert;
+            String filename;
+            if (selectedType == 0) {
+                filename = AndroidUtilities.generateFileName(0, extension);
+                uriToInsert = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+                contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, new File(Environment.DIRECTORY_PICTURES, "Telegram") + File.separator);
+                contentValues.put(MediaStore.Images.Media.DISPLAY_NAME, filename);
+            } else if (selectedType == 1) {
+                filename = AndroidUtilities.generateFileName(1, extension);
+                uriToInsert = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+                contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, new File(Environment.DIRECTORY_MOVIES, "Telegram") + File.separator);
+                contentValues.put(MediaStore.Video.Media.DISPLAY_NAME, filename);
+            } else if (selectedType == 2) {
+                if (mimeType == null) {
+                    mimeType = "audio/ogg";
+                }
+                filename = "AUD_" + System.currentTimeMillis() + "." + (extension == null || extension.length() == 0 ? "ogg" : extension);
+                uriToInsert = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+                contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, new File(Environment.DIRECTORY_DOWNLOADS, "Telegram") + File.separator);
+                contentValues.put(MediaStore.Downloads.DISPLAY_NAME, filename);
+            } else {
+                return null;
+            }
+            contentValues.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+            Uri dstUri = ApplicationLoader.applicationContext.getContentResolver().insert(uriToInsert, contentValues);
+            if (dstUri != null) {
+                OutputStream outputStream = ApplicationLoader.applicationContext.getContentResolver().openOutputStream(dstUri);
+                AndroidUtilities.copyFile(input, outputStream);
+            }
+            return dstUri;
+        } catch (Exception e) {
+            FileLog.e(e);
+            return null;
+        }
     }
 
     private static Uri saveFileInternal(int type, File sourceFile, String filename) {

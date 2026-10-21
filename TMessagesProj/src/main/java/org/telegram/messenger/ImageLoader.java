@@ -2232,7 +2232,12 @@ public class ImageLoader {
                                     }
                                 }
                                 if (SaveToGallerySettingsHelper.needSave(flag, meta, messageObject, currentAccount)) {
-                                    AndroidUtilities.addMediaToGallery(finalFile.toString());
+                                    if (finalFile.getName().endsWith(".enc")) {
+                                        int galleryType = location.endsWith(".mp4") ? 1 : 0;
+                                        MediaController.saveEncryptedFileToGallery(finalFile, galleryType);
+                                    } else {
+                                        AndroidUtilities.addMediaToGallery(finalFile.toString());
+                                    }
                                 }
                             }
                         }

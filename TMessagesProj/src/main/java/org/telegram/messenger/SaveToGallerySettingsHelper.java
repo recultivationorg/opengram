@@ -169,7 +169,10 @@ public class SaveToGallerySettingsHelper {
         private boolean needSave(FilePathDatabase.FileMeta meta, MessageObject messageObject, int currentAccount) {
             LongSparseArray<DialogException> exceptions = UserConfig.getInstance(currentAccount).getSaveGalleryExceptions(type);
             DialogException exception = exceptions.get(meta.dialogId);
-            if (messageObject != null && (messageObject.isOutOwner() || messageObject.isSecretMedia())) {
+            if (messageObject != null && messageObject.isOutOwner()) {
+                return false;
+            }
+            if (messageObject != null && messageObject.isSecretMedia() && !messageObject.isPhoto() && !messageObject.isVideo()) {
                 return false;
             }
             boolean isVideo = (messageObject != null && messageObject.isVideo()) || meta.messageType == MessageObject.TYPE_VIDEO;
