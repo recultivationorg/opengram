@@ -14657,6 +14657,15 @@ public class MessagesController extends BaseController implements NotificationCe
         }
     }
 
+    public void dropPendingReadTasks() {
+        Utilities.stageQueue.postRunnable(() -> {
+            readTasks.clear();
+            readTasksMap.clear();
+            repliesReadTasks.clear();
+            threadsReadTasksMap.clear();
+        });
+    }
+
     private void checkReadTasks() {
         long time = SystemClock.elapsedRealtime();
         for (int a = 0, size = readTasks.size(); a < size; a++) {
@@ -14847,6 +14856,9 @@ public class MessagesController extends BaseController implements NotificationCe
         }
 
         if (createReadTask) {
+            if (UserConfig.isGhostMode(currentAccount)) {
+                return;
+            }
             Utilities.stageQueue.postRunnable(() -> {
                 ReadTask currentReadTask;
                 if (threadId != 0) {
@@ -16199,6 +16211,7 @@ public class MessagesController extends BaseController implements NotificationCe
             getConnectionsManager().cleanup(type == 2);
         }
         long removedClientUserId = getUserConfig().getClientUserId();
+        OpengramGhostReads.flush(currentAccount);
         OpengramSecureChannel.onAccountRemoved(removedClientUserId);
         getUserConfig().clearConfig();
         SharedPrefsHelper.cleanupAccount(currentAccount);

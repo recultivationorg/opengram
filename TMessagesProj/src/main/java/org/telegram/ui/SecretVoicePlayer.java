@@ -760,40 +760,16 @@ public class SecretVoicePlayer extends Dialog {
         return button;
     }
 
-    private File onceMediaFile() {
-        if (messageObject == null) {
-            return null;
-        }
-        File file = null;
-        if (messageObject.getDocument() != null) {
-            file = FileLoader.getInstance(messageObject.currentAccount).getPathToAttach(messageObject.getDocument());
-        }
-        if (file != null && !file.exists()) {
-            file = new File(file.getPath() + ".enc");
-        }
-        if (file == null || !file.exists()) {
-            file = FileLoader.getInstance(messageObject.currentAccount).getPathToMessage(messageObject.messageOwner);
-            if (file != null && !file.exists()) {
-                file = new File(file.getPath() + ".enc");
-            }
-        }
-        if ((file == null || !file.exists()) && messageObject.messageOwner.attachPath != null) {
-            file = new File(messageObject.messageOwner.attachPath);
-        }
-        return file != null && file.exists() ? file : null;
-    }
-
     private void saveOnce() {
-        File file = onceMediaFile();
-        if (file == null) {
+        if (messageObject == null) {
             return;
         }
-        if (file.getName().endsWith(".enc")) {
-            MediaController.saveEncryptedFileToGallery(file, isRound ? 1 : 2);
-        } else {
-            MediaController.saveFile(file.getAbsolutePath(), getContext(), isRound ? 1 : 2, null, null, null, false);
-        }
-        BulletinFactory.of(containerView, resourcesProvider).createDownloadBulletin(isRound ? BulletinFactory.FileType.VIDEO : BulletinFactory.FileType.AUDIO).show();
+        MediaController.saveOnceMedia(messageObject, uri -> {
+            if (uri == null || containerView == null) {
+                return;
+            }
+            BulletinFactory.of(containerView, resourcesProvider).createDownloadBulletin(isRound ? BulletinFactory.FileType.VIDEO : BulletinFactory.FileType.AUDIO).show();
+        });
     }
 
     private void expireOnce() {

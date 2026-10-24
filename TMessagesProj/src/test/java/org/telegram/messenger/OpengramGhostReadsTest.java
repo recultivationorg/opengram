@@ -1,8 +1,11 @@
 package org.telegram.messenger;
 
+import android.util.LongSparseArray;
+
 import org.junit.Test;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -82,6 +85,58 @@ public class OpengramGhostReadsTest {
         assertEquals(1L, shortReaction.dialogId);
         assertEquals(2, shortReaction.value);
         assertNull(OpengramGhostReads.parse(null));
+    }
+
+    @Test
+    public void diskBaselineWinsUntilTheLedgerIsLoaded() {
+        LongSparseArray<Integer> counts = new LongSparseArray<>();
+        assertFalse(OpengramGhostReads.rememberServerCount(false, counts, 5L, 9));
+        assertNull(counts.get(5L));
+        OpengramGhostReads.applyDiskCount(counts, 5L, 4);
+        assertEquals(Integer.valueOf(4), counts.get(5L));
+        assertTrue(OpengramGhostReads.rememberServerCount(true, counts, 5L, 9));
+        assertEquals(Integer.valueOf(9), counts.get(5L));
+        OpengramGhostReads.applyDiskCount(counts, 5L, 4);
+        assertEquals(Integer.valueOf(9), counts.get(5L));
+    }
+
+    @Test
+    public void topicCountLineIsSeparateFromTheDialogBaseline() {
+        OpengramGhostReads.Entry topic = OpengramGhostReads.parse(OpengramGhostReads.topicCountLine(-3L, 8L, 2));
+        assertEquals(true, topic.topic);
+        assertEquals(false, topic.serverCount);
+        assertEquals(-3L, topic.dialogId);
+        assertEquals(8L, topic.topicId);
+        assertEquals(2, topic.value);
+        OpengramGhostReads.Entry dialog = OpengramGhostReads.parse(OpengramGhostReads.serverCountLine(-3L, 2));
+        assertEquals(false, dialog.topic);
+        assertEquals(true, dialog.serverCount);
+        assertNull(OpengramGhostReads.parse("t,1,2"));
+    }
+
+    @Test
+    public void unmarkDuringLoadDropsTheDiskReaction() {
+        HashSet<Integer> messages = new HashSet<>();
+        HashSet<Integer> tombstones = new HashSet<>();
+        tombstones.add(7);
+        OpengramGhostReads.applyReactionLine(messages, tombstones, 7);
+        OpengramGhostReads.applyReactionLine(messages, tombstones, 8);
+        assertFalse(messages.contains(7));
+        assertTrue(messages.contains(8));
+    }
+
+    @Test
+    public void missingLedgerFileIsCreated() throws Exception {
+        File file = File.createTempFile("opengram-ghost", ".bin");
+        assertTrue(file.delete());
+        Set<String> lines = new LinkedHashSet<>();
+        lines.add(OpengramGhostReads.reactionLine(4L, 9));
+        assertTrue(OpengramGhostReads.ensureLedgerFile(file, OpengramSnapshotFile.MODE_PLAINTEXT, 50L, lines, null));
+        assertTrue(file.exists());
+        OpengramSnapshotFile.ReadResult read = OpengramSnapshotFile.read(file, OpengramSnapshotFile.MODE_PLAINTEXT, null);
+        assertEquals(OpengramSnapshotFile.Status.OK, read.status);
+        assertTrue(read.record.peers.contains(OpengramGhostReads.reactionLine(4L, 9)));
+        file.delete();
     }
 
     @Test

@@ -19,6 +19,9 @@ public final class OpengramGhostReads {
     private static LongSparseArray<LongSparseArray<HashSet<Integer>>> readReactions;
     private static LongSparseArray<LongSparseArray<Integer>> storyReads;
     private static LongSparseArray<LongSparseArray<Integer>> serverReactionCounts;
+    private static LongSparseArray<LongSparseArray<LongSparseArray<Integer>>> topicReactionCounts;
+    private static LongSparseArray<LongSparseArray<HashSet<Integer>>> reactionTombstones;
+    private static LongSparseArray<Integer> failedSaveCounts;
     private static LongSparseArray<Boolean> loadedUsers;
     private static LongSparseArray<Boolean> loadingUsers;
     private static LongSparseArray<Boolean> dirtyUsers;
@@ -69,11 +72,42 @@ public final class OpengramGhostReads {
             return reactionCountFromServer(localCount, serverCount);
         }
         int previous;
+        boolean store;
         synchronized (lock) {
-            previous = storedServerReactionCount(clientUserId, dialogId);
-            storeServerReactionCount(clientUserId, dialogId, Math.max(0, serverCount));
+            store = isLoaded(clientUserId);
+            if (!store) {
+                previous = -1;
+            } else {
+                previous = storedServerReactionCount(clientUserId, dialogId);
+                rememberServerCount(true, serverCounts(clientUserId), dialogId, serverCount);
+            }
         }
-        if (previous != serverCount) {
+        if (store && previous != serverCount) {
+            scheduleSave(clientUserId);
+        }
+        return reactionCountAfterServer(localCount, serverCount, previous);
+    }
+
+    public static int applyServerTopicReactionCount(int account, long dialogId, long topicId, int localCount, int serverCount) {
+        if (!UserConfig.isGhostMode(account) || dialogId == 0 || topicId == 0) {
+            return serverCount;
+        }
+        long clientUserId = clientUserId(account);
+        if (clientUserId == 0) {
+            return reactionCountFromServer(localCount, serverCount);
+        }
+        int previous;
+        boolean store;
+        synchronized (lock) {
+            store = isLoaded(clientUserId);
+            if (!store) {
+                previous = -1;
+            } else {
+                previous = storedTopicReactionCount(clientUserId, dialogId, topicId);
+                rememberServerCount(true, topicCounts(clientUserId, dialogId), topicId, serverCount);
+            }
+        }
+        if (store && previous != serverCount) {
             scheduleSave(clientUserId);
         }
         return reactionCountAfterServer(localCount, serverCount, previous);
@@ -87,12 +121,14 @@ public final class OpengramGhostReads {
         if (clientUserId == 0) {
             return;
         }
-        boolean changed;
+        boolean changed = false;
         synchronized (lock) {
-            int previous = storedServerReactionCount(clientUserId, dialogId);
-            changed = previous != serverCount;
-            if (changed) {
-                storeServerReactionCount(clientUserId, dialogId, Math.max(0, serverCount));
+            if (isLoaded(clientUserId)) {
+                int previous = storedServerReactionCount(clientUserId, dialogId);
+                changed = previous != serverCount;
+                if (changed) {
+                    rememberServerCount(true, serverCounts(clientUserId), dialogId, serverCount);
+                }
             }
         }
         if (changed) {
@@ -122,11 +158,31 @@ public final class OpengramGhostReads {
         return "c," + dialogId + "," + count;
     }
 
+    static String topicCountLine(long dialogId, long topicId, int count) {
+        return "t," + dialogId + "," + topicId + "," + count;
+    }
+
     static Entry parse(String line) {
         if (line == null) {
             return null;
         }
         String[] parts = line.split(",", -1);
+        if (parts.length == 4) {
+            if (!"t".equals(parts[0])) {
+                return null;
+            }
+            try {
+                long dialogId = Long.parseLong(parts[1]);
+                long topicId = Long.parseLong(parts[2]);
+                long count = Long.parseLong(parts[3]);
+                if (dialogId == 0 || topicId == 0 || count < 0 || count > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return new Entry(dialogId, topicId, (int) count);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
         if (parts.length != 3) {
             return null;
         }
@@ -161,6 +217,10 @@ public final class OpengramGhostReads {
         }
         boolean added;
         synchronized (lock) {
+            HashSet<Integer> tombstones = existingTombstones(clientUserId, dialogId);
+            if (tombstones != null) {
+                tombstones.remove(messageId);
+            }
             added = messages(clientUserId, dialogId).add(messageId);
         }
         if (added) {
@@ -170,14 +230,18 @@ public final class OpengramGhostReads {
 
     public static void unmarkReaction(int account, long dialogId, int messageId) {
         long clientUserId = clientUserId(account);
-        if (clientUserId == 0) {
+        if (clientUserId == 0 || dialogId == 0 || messageId <= 0) {
             return;
         }
         boolean removed = false;
         synchronized (lock) {
+            if (!isLoaded(clientUserId)) {
+                tombstones(clientUserId, dialogId).add(messageId);
+                removed = true;
+            }
             HashSet<Integer> ids = existingMessages(clientUserId, dialogId);
-            if (ids != null) {
-                removed = ids.remove(messageId);
+            if (ids != null && ids.remove(messageId)) {
+                removed = true;
             }
         }
         if (removed) {
@@ -350,6 +414,15 @@ public final class OpengramGhostReads {
             if (serverReactionCounts != null) {
                 serverReactionCounts.remove(clientUserId);
             }
+            if (topicReactionCounts != null) {
+                topicReactionCounts.remove(clientUserId);
+            }
+            if (reactionTombstones != null) {
+                reactionTombstones.remove(clientUserId);
+            }
+            if (failedSaveCounts != null) {
+                failedSaveCounts.remove(clientUserId);
+            }
             if (loadedUsers != null) {
                 loadedUsers.remove(clientUserId);
             }
@@ -361,10 +434,20 @@ public final class OpengramGhostReads {
             }
         }
         final long uid = clientUserId;
+        final int accountAtClear = account;
+        MessagesController.getInstance(accountAtClear).dropPendingReadTasks();
         Utilities.globalQueue.postRunnable(() -> {
             deleteLegacy();
             deleteUser(uid);
         });
+    }
+
+    public static void flush(int account) {
+        long clientUserId = clientUserId(account);
+        if (clientUserId == 0 || !UserConfig.isGhostMode(account)) {
+            return;
+        }
+        saveNow(clientUserId);
     }
 
     private static void scheduleSave(long clientUserId) {
@@ -399,9 +482,20 @@ public final class OpengramGhostReads {
                 }
             }
         }
-        synchronized (lock) {
-            saveQueued = false;
-        }
+        AndroidUtilities.runOnUIThread(() -> {
+            boolean post = false;
+            synchronized (lock) {
+                if (dirtyUsers != null && dirtyUsers.size() > 0) {
+                    saveQueued = true;
+                    post = true;
+                } else {
+                    saveQueued = false;
+                }
+            }
+            if (post) {
+                Utilities.globalQueue.postRunnable(OpengramGhostReads::drainSaves);
+            }
+        }, 2000);
     }
 
     private static void readNow(long clientUserId, int generation) {
@@ -497,12 +591,14 @@ public final class OpengramGhostReads {
         synchronized (lock) {
             loaded = isLoaded(clientUserId);
         }
-        if (!loaded) {
-            rememberDirty(clientUserId);
-            return;
-        }
         File ledger = file(clientUserId);
-        if (ledger == null || !ledger.exists()) {
+        if (!loaded) {
+            if (ledger == null || ledger.exists()) {
+                rememberDirty(clientUserId);
+                return;
+            }
+        }
+        if (ledger == null) {
             rememberDirty(clientUserId);
             return;
         }
@@ -518,7 +614,12 @@ public final class OpengramGhostReads {
             capture(clientUserId, lines);
         }
         OpengramSnapshotFile.Sealer writer = mode == OpengramSnapshotFile.MODE_STRONGBOX ? sealer : null;
-        boolean wrote = OpengramSnapshotFile.write(ledger, new OpengramSnapshotFile.Record(mode, 0L, new long[] {clientUserId}, lines), writer);
+        boolean wrote;
+        if (!ledger.exists()) {
+            wrote = ensureLedgerFile(ledger, mode, clientUserId, lines, writer);
+        } else {
+            wrote = OpengramSnapshotFile.write(ledger, new OpengramSnapshotFile.Record(mode, 0L, new long[] {clientUserId}, lines), writer);
+        }
         if (generation != currentEpoch(clientUserId)) {
             deleteUser(clientUserId);
             return;
@@ -527,17 +628,30 @@ public final class OpengramGhostReads {
             failSave(clientUserId);
             return;
         }
-        failedSaves = 0;
+        synchronized (lock) {
+            if (generation == currentEpoch(clientUserId)) {
+                markLoaded(clientUserId);
+                if (failedSaveCounts != null) {
+                    failedSaveCounts.remove(clientUserId);
+                }
+            }
+        }
     }
 
-    private static int failedSaves;
-
     private static void failSave(long clientUserId) {
-        rememberDirty(clientUserId);
-        if (failedSaves >= 3) {
+        int count;
+        synchronized (lock) {
+            if (failedSaveCounts == null) {
+                failedSaveCounts = new LongSparseArray<>();
+            }
+            Integer previous = failedSaveCounts.get(clientUserId);
+            count = (previous == null ? 0 : previous) + 1;
+            failedSaveCounts.put(clientUserId, count);
+        }
+        if (count > 3) {
             return;
         }
-        failedSaves++;
+        rememberDirty(clientUserId);
         AndroidUtilities.runOnUIThread(() -> {
             boolean post = false;
             synchronized (lock) {
@@ -614,12 +728,11 @@ public final class OpengramGhostReads {
                 continue;
             }
             if (entry.reaction) {
-                messages(clientUserId, entry.dialogId).add(entry.value);
+                applyReactionLine(messages(clientUserId, entry.dialogId), existingTombstones(clientUserId, entry.dialogId), entry.value);
+            } else if (entry.topic) {
+                applyDiskCount(topicCounts(clientUserId, entry.dialogId), entry.topicId, entry.value);
             } else if (entry.serverCount) {
-                LongSparseArray<Integer> counts = serverCounts(clientUserId);
-                if (counts.get(entry.dialogId) == null) {
-                    counts.put(entry.dialogId, entry.value);
-                }
+                applyDiskCount(serverCounts(clientUserId), entry.dialogId, entry.value);
             } else {
                 LongSparseArray<Integer> dialogs = stories(clientUserId);
                 Integer previous = dialogs.get(entry.dialogId);
@@ -633,8 +746,9 @@ public final class OpengramGhostReads {
         if (reactionDialogs != null) {
             for (int d = 0; d < reactionDialogs.size(); d++) {
                 long dialogId = reactionDialogs.keyAt(d);
+                HashSet<Integer> tombstones = existingTombstones(clientUserId, dialogId);
                 for (Integer messageId : reactionDialogs.valueAt(d)) {
-                    if (messageId != null && messageId > 0) {
+                    if (messageId != null && messageId > 0 && (tombstones == null || !tombstones.contains(messageId))) {
                         lines.add(reactionLine(dialogId, messageId));
                     }
                 }
@@ -646,6 +760,22 @@ public final class OpengramGhostReads {
                 Integer count = serverCounts.valueAt(d);
                 if (count != null && count >= 0) {
                     lines.add(serverCountLine(serverCounts.keyAt(d), count));
+                }
+            }
+        }
+        LongSparseArray<LongSparseArray<Integer>> topicDialogs = topicReactionCounts == null ? null : topicReactionCounts.get(clientUserId);
+        if (topicDialogs != null) {
+            for (int d = 0; d < topicDialogs.size(); d++) {
+                long dialogId = topicDialogs.keyAt(d);
+                LongSparseArray<Integer> topics = topicDialogs.valueAt(d);
+                if (topics == null) {
+                    continue;
+                }
+                for (int t = 0; t < topics.size(); t++) {
+                    Integer count = topics.valueAt(t);
+                    if (count != null && count >= 0 && topics.keyAt(t) != 0) {
+                        lines.add(topicCountLine(dialogId, topics.keyAt(t), count));
+                    }
                 }
             }
         }
@@ -773,7 +903,9 @@ public final class OpengramGhostReads {
     static final class Entry {
         final boolean reaction;
         final boolean serverCount;
+        final boolean topic;
         final long dialogId;
+        final long topicId;
         final int value;
 
         Entry(boolean reaction, long dialogId, int value) {
@@ -783,9 +915,61 @@ public final class OpengramGhostReads {
         Entry(boolean reaction, boolean serverCount, long dialogId, int value) {
             this.reaction = reaction;
             this.serverCount = serverCount;
+            this.topic = false;
             this.dialogId = dialogId;
+            this.topicId = 0;
             this.value = value;
         }
+
+        Entry(long dialogId, long topicId, int value) {
+            this.reaction = false;
+            this.serverCount = false;
+            this.topic = true;
+            this.dialogId = dialogId;
+            this.topicId = topicId;
+            this.value = value;
+        }
+    }
+
+    static boolean rememberServerCount(boolean loaded, LongSparseArray<Integer> counts, long key, int serverCount) {
+        if (!loaded || counts == null) {
+            return false;
+        }
+        counts.put(key, Math.max(0, serverCount));
+        return true;
+    }
+
+    static void applyDiskCount(LongSparseArray<Integer> counts, long key, int diskCount) {
+        if (counts != null && counts.get(key) == null) {
+            counts.put(key, diskCount);
+        }
+    }
+
+    static void applyReactionLine(HashSet<Integer> messages, HashSet<Integer> tombstones, int messageId) {
+        if (messageId <= 0 || messages == null) {
+            return;
+        }
+        if (tombstones != null && tombstones.contains(messageId)) {
+            return;
+        }
+        messages.add(messageId);
+    }
+
+    static boolean ensureLedgerFile(File ledger, int mode, long clientUserId, Set<String> lines, OpengramSnapshotFile.Sealer sealer) {
+        if (ledger == null || clientUserId == 0) {
+            return false;
+        }
+        if (ledger.exists()) {
+            return true;
+        }
+        if (mode != OpengramSnapshotFile.MODE_STRONGBOX && mode != OpengramSnapshotFile.MODE_PLAINTEXT) {
+            return false;
+        }
+        if (mode == OpengramSnapshotFile.MODE_STRONGBOX && sealer == null) {
+            return false;
+        }
+        Set<String> peers = lines == null ? new LinkedHashSet<String>() : lines;
+        return OpengramSnapshotFile.write(ledger, new OpengramSnapshotFile.Record(mode, 0L, new long[] {clientUserId}, peers), sealer);
     }
 
     private static int storedServerReactionCount(long clientUserId, long dialogId) {
@@ -800,8 +984,20 @@ public final class OpengramGhostReads {
         return value == null ? -1 : value;
     }
 
-    private static void storeServerReactionCount(long clientUserId, long dialogId, int count) {
-        serverCounts(clientUserId).put(dialogId, count);
+    private static int storedTopicReactionCount(long clientUserId, long dialogId, long topicId) {
+        if (topicReactionCounts == null) {
+            return -1;
+        }
+        LongSparseArray<LongSparseArray<Integer>> dialogs = topicReactionCounts.get(clientUserId);
+        if (dialogs == null) {
+            return -1;
+        }
+        LongSparseArray<Integer> topics = dialogs.get(dialogId);
+        if (topics == null) {
+            return -1;
+        }
+        Integer value = topics.get(topicId);
+        return value == null ? -1 : value;
     }
 
     private static LongSparseArray<Integer> serverCounts(long clientUserId) {
@@ -814,6 +1010,51 @@ public final class OpengramGhostReads {
             serverReactionCounts.put(clientUserId, counts);
         }
         return counts;
+    }
+
+    private static LongSparseArray<Integer> topicCounts(long clientUserId, long dialogId) {
+        if (topicReactionCounts == null) {
+            topicReactionCounts = new LongSparseArray<>();
+        }
+        LongSparseArray<LongSparseArray<Integer>> dialogs = topicReactionCounts.get(clientUserId);
+        if (dialogs == null) {
+            dialogs = new LongSparseArray<>();
+            topicReactionCounts.put(clientUserId, dialogs);
+        }
+        LongSparseArray<Integer> topics = dialogs.get(dialogId);
+        if (topics == null) {
+            topics = new LongSparseArray<>();
+            dialogs.put(dialogId, topics);
+        }
+        return topics;
+    }
+
+    private static HashSet<Integer> tombstones(long clientUserId, long dialogId) {
+        if (reactionTombstones == null) {
+            reactionTombstones = new LongSparseArray<>();
+        }
+        LongSparseArray<HashSet<Integer>> dialogs = reactionTombstones.get(clientUserId);
+        if (dialogs == null) {
+            dialogs = new LongSparseArray<>();
+            reactionTombstones.put(clientUserId, dialogs);
+        }
+        HashSet<Integer> ids = dialogs.get(dialogId);
+        if (ids == null) {
+            ids = new HashSet<>();
+            dialogs.put(dialogId, ids);
+        }
+        return ids;
+    }
+
+    private static HashSet<Integer> existingTombstones(long clientUserId, long dialogId) {
+        if (reactionTombstones == null) {
+            return null;
+        }
+        LongSparseArray<HashSet<Integer>> dialogs = reactionTombstones.get(clientUserId);
+        if (dialogs == null) {
+            return null;
+        }
+        return dialogs.get(dialogId);
     }
 
     public interface StoryFloor {

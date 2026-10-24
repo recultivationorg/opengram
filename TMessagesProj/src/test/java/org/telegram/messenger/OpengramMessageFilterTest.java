@@ -92,6 +92,65 @@ public class OpengramMessageFilterTest {
     }
 
     @Test
+    public void pluralsMatchTheSameWordAndNotADifferentWord() {
+        List<String> story = OpengramMessageFilter.parseKeywords("story");
+        assertTrue(OpengramMessageFilter.matchesText("two stories", story));
+        assertTrue(OpengramMessageFilter.matchesText("a story.", story));
+        assertFalse(OpengramMessageFilter.matchesText("history", story));
+        List<String> stories = OpengramMessageFilter.parseKeywords("stories");
+        assertTrue(OpengramMessageFilter.matchesText("one story", stories));
+
+        List<String> cat = OpengramMessageFilter.parseKeywords("cat");
+        assertTrue(OpengramMessageFilter.matchesText("cats", cat));
+        assertTrue(OpengramMessageFilter.matchesText("a cat.", cat));
+        assertFalse(OpengramMessageFilter.matchesText("category", cat));
+        assertFalse(OpengramMessageFilter.matchesText("education", cat));
+        List<String> cats = OpengramMessageFilter.parseKeywords("cats");
+        assertTrue(OpengramMessageFilter.matchesText("cat", cats));
+
+        List<String> bus = OpengramMessageFilter.parseKeywords("bus");
+        assertTrue(OpengramMessageFilter.matchesText("buses", bus));
+        assertFalse(OpengramMessageFilter.matchesText("business", bus));
+        List<String> buses = OpengramMessageFilter.parseKeywords("buses");
+        assertTrue(OpengramMessageFilter.matchesText("bus", buses));
+
+        assertTrue(OpengramMessageFilter.matchesText("knives", OpengramMessageFilter.parseKeywords("knife")));
+        assertTrue(OpengramMessageFilter.matchesText("knife", OpengramMessageFilter.parseKeywords("knives")));
+        assertTrue(OpengramMessageFilter.matchesText("children", OpengramMessageFilter.parseKeywords("child")));
+        assertFalse(OpengramMessageFilter.matchesText("childhood", OpengramMessageFilter.parseKeywords("child")));
+        assertTrue(OpengramMessageFilter.matchesText("child", OpengramMessageFilter.parseKeywords("children")));
+
+        assertTrue(OpengramMessageFilter.matchesText("кот", OpengramMessageFilter.parseKeywords("кот")));
+        assertTrue(OpengramMessageFilter.matchesText("коты", OpengramMessageFilter.parseKeywords("кот")));
+        assertTrue(OpengramMessageFilter.matchesText("кот", OpengramMessageFilter.parseKeywords("коты")));
+        assertFalse(OpengramMessageFilter.matchesText("котик", OpengramMessageFilter.parseKeywords("кот")));
+        assertTrue(OpengramMessageFilter.matchesText("кошки", OpengramMessageFilter.parseKeywords("кошка")));
+        assertTrue(OpengramMessageFilter.matchesText("кошка", OpengramMessageFilter.parseKeywords("кошки")));
+        assertTrue(OpengramMessageFilter.matchesText("мамы", OpengramMessageFilter.parseKeywords("мама")));
+        assertTrue(OpengramMessageFilter.matchesText("окна", OpengramMessageFilter.parseKeywords("окно")));
+        assertTrue(OpengramMessageFilter.matchesText("окно", OpengramMessageFilter.parseKeywords("окна")));
+        assertTrue(OpengramMessageFilter.matchesText("слова", OpengramMessageFilter.parseKeywords("слово")));
+        assertFalse(OpengramMessageFilter.matchesText("славы", OpengramMessageFilter.parseKeywords("слово")));
+        assertTrue(OpengramMessageFilter.matchesText("славы", OpengramMessageFilter.parseKeywords("слава")));
+        assertFalse(OpengramMessageFilter.matchesText("слово", OpengramMessageFilter.parseKeywords("слава")));
+        assertTrue(OpengramMessageFilter.matchesText("моря", OpengramMessageFilter.parseKeywords("море")));
+        assertTrue(OpengramMessageFilter.matchesText("врачи", OpengramMessageFilter.parseKeywords("врач")));
+        assertTrue(OpengramMessageFilter.matchesText("ночи", OpengramMessageFilter.parseKeywords("ночь")));
+        assertTrue(OpengramMessageFilter.matchesText("музеи", OpengramMessageFilter.parseKeywords("музей")));
+        assertTrue(OpengramMessageFilter.matchesText("истории", OpengramMessageFilter.parseKeywords("история")));
+        assertTrue(OpengramMessageFilter.matchesText("дома", OpengramMessageFilter.parseKeywords("дом")));
+        assertFalse(OpengramMessageFilter.matchesText("домы", OpengramMessageFilter.parseKeywords("дом")));
+        assertTrue(OpengramMessageFilter.matchesText("люди", OpengramMessageFilter.parseKeywords("человек")));
+        assertTrue(OpengramMessageFilter.matchesText("ребенок", OpengramMessageFilter.parseKeywords("дети")));
+        assertTrue(OpengramMessageFilter.matchesText("ежи", OpengramMessageFilter.parseKeywords("ёж")));
+        assertTrue(OpengramMessageFilter.matchesText("листы", OpengramMessageFilter.parseKeywords("лист")));
+        assertTrue(OpengramMessageFilter.matchesText("листья", OpengramMessageFilter.parseKeywords("лист")));
+        assertFalse(OpengramMessageFilter.matchesText("иванов", OpengramMessageFilter.parseKeywords("иван")));
+        assertFalse(OpengramMessageFilter.matchesText("метра", OpengramMessageFilter.parseKeywords("метро")));
+        assertTrue(OpengramMessageFilter.matchesText("x100y", OpengramMessageFilter.parseKeywords("100")));
+    }
+
+    @Test
     public void filterAppliesToChannelsAndBotsOnly() {
         assertTrue(OpengramMessageFilter.appliesToDialog(false, true, false));
         assertTrue(OpengramMessageFilter.appliesToDialog(false, false, true));

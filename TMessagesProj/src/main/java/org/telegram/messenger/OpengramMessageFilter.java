@@ -100,20 +100,408 @@ public final class OpengramMessageFilter {
         return keywords;
     }
 
+    private static final String[][] PLURAL_PAIRS = {
+        {"child", "children"},
+        {"person", "people"},
+        {"man", "men"},
+        {"woman", "women"},
+        {"mouse", "mice"},
+        {"goose", "geese"},
+        {"tooth", "teeth"},
+        {"foot", "feet"},
+        {"ox", "oxen"},
+        {"knife", "knives"},
+        {"life", "lives"},
+        {"wife", "wives"},
+        {"wolf", "wolves"},
+        {"leaf", "leaves"},
+        {"half", "halves"},
+        {"calf", "calves"},
+        {"loaf", "loaves"},
+        {"self", "selves"},
+        {"shelf", "shelves"},
+        {"thief", "thieves"},
+        {"elf", "elves"},
+        {"sheaf", "sheaves"},
+        {"bus", "buses"}
+    };
+
+    private static final String[] UNCHANGED_WORDS = {
+        "series", "species", "news", "this", "his", "its", "plus", "thus"
+    };
+
+    private static final String[][] RUSSIAN_PAIRS = {
+        {"человек", "люди"},
+        {"ребенок", "дети"},
+        {"друг", "друзья"},
+        {"брат", "братья"},
+        {"стул", "стулья"},
+        {"сын", "сыновья"},
+        {"муж", "мужья"},
+        {"дерево", "деревья"},
+        {"перо", "перья"},
+        {"лист", "листья"},
+        {"глаз", "глаза"},
+        {"дом", "дома"},
+        {"город", "города"},
+        {"номер", "номера"},
+        {"учитель", "учителя"},
+        {"доктор", "доктора"},
+        {"профессор", "профессора"},
+        {"берег", "берега"},
+        {"лес", "леса"},
+        {"снег", "снега"},
+        {"поезд", "поезда"},
+        {"адрес", "адреса"},
+        {"директор", "директора"},
+        {"паспорт", "паспорта"},
+        {"цвет", "цвета"},
+        {"голос", "голоса"},
+        {"вечер", "вечера"},
+        {"мастер", "мастера"},
+        {"сосед", "соседи"},
+        {"черт", "черти"},
+        {"чудо", "чудеса"},
+        {"небо", "небеса"},
+        {"мать", "матери"},
+        {"дочь", "дочери"},
+        {"имя", "имена"},
+        {"время", "времена"},
+        {"племя", "племена"},
+        {"семя", "семена"},
+        {"знамя", "знамена"},
+        {"стремя", "стремена"},
+        {"пламя", "пламена"},
+        {"вымя", "вымена"},
+        {"темя", "темена"},
+        {"бремя", "бремена"}
+    };
+
+    private static final String[] RUSSIAN_INDECLINABLE = {
+        "кофе", "кафе", "метро", "пальто", "кино", "радио", "бюро", "депо", "какао", "такси", "меню", "шоссе", "ателье"
+    };
+
     public static boolean matchesText(CharSequence text, Collection<String> keywords) {
         if (text == null || text.length() == 0 || keywords == null || keywords.isEmpty()) {
             return false;
         }
-        String haystack = text.toString().toLowerCase(Locale.ROOT);
+        String haystack = foldYo(text.toString().toLowerCase(Locale.ROOT));
         for (String keyword : keywords) {
             if (keyword == null || keyword.isEmpty()) {
                 continue;
             }
-            if (haystack.contains(keyword.toLowerCase(Locale.ROOT))) {
+            if (keywordMatches(haystack, foldYo(keyword.toLowerCase(Locale.ROOT)))) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static String foldYo(String value) {
+        if (value.indexOf('ё') < 0) {
+            return value;
+        }
+        return value.replace('ё', 'е');
+    }
+
+    private static boolean keywordMatches(String haystackLower, String keywordLower) {
+        if (!lettersAndSpaces(keywordLower)) {
+            return haystackLower.contains(keywordLower);
+        }
+        ArrayList<String> words = letterWords(keywordLower);
+        if (words.isEmpty()) {
+            return haystackLower.contains(keywordLower);
+        }
+        return phraseMatches(haystackLower, words);
+    }
+
+    private static boolean lettersAndSpaces(String keyword) {
+        boolean letter = false;
+        for (int i = 0; i < keyword.length(); i++) {
+            char c = keyword.charAt(i);
+            if (c == ' ' || c == '\n' || c == '\r' || c == '\t') {
+                continue;
+            }
+            if (!Character.isLetter(c)) {
+                return false;
+            }
+            letter = true;
+        }
+        return letter;
+    }
+
+    private static ArrayList<String> letterWords(String text) {
+        ArrayList<String> words = new ArrayList<>();
+        int start = -1;
+        for (int i = 0; i <= text.length(); i++) {
+            boolean letter = i < text.length() && Character.isLetter(text.charAt(i));
+            if (letter && start < 0) {
+                start = i;
+            } else if (!letter && start >= 0) {
+                words.add(text.substring(start, i));
+                start = -1;
+            }
+        }
+        return words;
+    }
+
+    private static boolean phraseMatches(String haystack, ArrayList<String> words) {
+        for (int i = 0; i < haystack.length(); i++) {
+            if (!Character.isLetter(haystack.charAt(i))) {
+                continue;
+            }
+            if (i > 0 && Character.isLetter(haystack.charAt(i - 1))) {
+                continue;
+            }
+            if (phraseAt(haystack, i, words)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean phraseAt(String haystack, int start, ArrayList<String> words) {
+        int pos = start;
+        for (int w = 0; w < words.size(); w++) {
+            if (w > 0) {
+                if (pos >= haystack.length() || !Character.isWhitespace(haystack.charAt(pos))) {
+                    return false;
+                }
+                while (pos < haystack.length() && Character.isWhitespace(haystack.charAt(pos))) {
+                    pos++;
+                }
+            }
+            int end = pos;
+            while (end < haystack.length() && Character.isLetter(haystack.charAt(end))) {
+                end++;
+            }
+            if (end == pos) {
+                return false;
+            }
+            String found = haystack.substring(pos, end);
+            if (w == words.size() - 1) {
+                if (!sameWord(words.get(w), found)) {
+                    return false;
+                }
+            } else if (!found.equals(words.get(w))) {
+                return false;
+            }
+            pos = end;
+        }
+        return true;
+    }
+
+    private static boolean sameWord(String keywordWord, String found) {
+        if (keywordWord.equals(found)) {
+            return true;
+        }
+        if (isCyrillicWord(keywordWord)) {
+            return russianSame(keywordWord, found);
+        }
+        if (!isLatinWord(keywordWord)) {
+            return false;
+        }
+        String pair = pairOf(keywordWord);
+        if (pair != null) {
+            return pair.equals(found);
+        }
+        if (keywordWord.length() < 3 || isUnchanged(keywordWord)) {
+            return false;
+        }
+        String plural = pluralize(keywordWord);
+        if (plural != null && plural.equals(found)) {
+            return true;
+        }
+        String singular = singularize(keywordWord);
+        return singular != null && singular.equals(found);
+    }
+
+    private static boolean isLatinWord(String word) {
+        if (word.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < word.length(); i++) {
+            char c = word.charAt(i);
+            if (c < 'a' || c > 'z') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isCyrillicWord(String word) {
+        if (word.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < word.length(); i++) {
+            char c = word.charAt(i);
+            if (c < 'а' || c > 'я') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean russianSame(String keyword, String found) {
+        if (!isCyrillicWord(found)) {
+            return false;
+        }
+        if (russianPaired(keyword, found)) {
+            return true;
+        }
+        if (keyword.length() < 2 || found.length() < 2) {
+            return false;
+        }
+        String plural = russianPlural(keyword);
+        if (plural != null && plural.equals(found)) {
+            return true;
+        }
+        String other = russianPlural(found);
+        return other != null && other.equals(keyword);
+    }
+
+    private static boolean russianPaired(String a, String b) {
+        for (int i = 0; i < RUSSIAN_PAIRS.length; i++) {
+            String left = RUSSIAN_PAIRS[i][0];
+            String right = RUSSIAN_PAIRS[i][1];
+            if ((a.equals(left) && b.equals(right)) || (a.equals(right) && b.equals(left))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean russianReplacesRegular(String word) {
+        if (isRussianIndeclinable(word)) {
+            return true;
+        }
+        for (int i = 0; i < RUSSIAN_PAIRS.length; i++) {
+            if (word.equals(RUSSIAN_PAIRS[i][1])) {
+                return true;
+            }
+            if (word.equals(RUSSIAN_PAIRS[i][0]) && !"лист".equals(word)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isRussianIndeclinable(String word) {
+        for (int i = 0; i < RUSSIAN_INDECLINABLE.length; i++) {
+            if (word.equals(RUSSIAN_INDECLINABLE[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String russianPlural(String word) {
+        if (word.length() < 2 || russianReplacesRegular(word)) {
+            return null;
+        }
+        char last = word.charAt(word.length() - 1);
+        if (last == 'ы' || last == 'и') {
+            return null;
+        }
+        char prev = word.charAt(word.length() - 2);
+        String stem = word.substring(0, word.length() - 1);
+        if (last == 'а') {
+            return stem + (hushingOrVelar(prev) ? "и" : "ы");
+        }
+        if (last == 'я') {
+            return stem + "и";
+        }
+        if (last == 'о') {
+            return stem + "а";
+        }
+        if (last == 'е') {
+            return stem + (prev == 'ц' || hushingOrVelar(prev) ? "а" : "я");
+        }
+        if (last == 'ь' || last == 'й') {
+            return stem + "и";
+        }
+        if (isRussianConsonant(last)) {
+            return word + (hushingOrVelar(last) ? "и" : "ы");
+        }
+        return null;
+    }
+
+    private static boolean hushingOrVelar(char c) {
+        return c == 'г' || c == 'к' || c == 'х' || c == 'ж' || c == 'ч' || c == 'ш' || c == 'щ';
+    }
+
+    private static boolean isRussianConsonant(char c) {
+        return c == 'б' || c == 'в' || c == 'г' || c == 'д' || c == 'ж' || c == 'з'
+            || c == 'к' || c == 'л' || c == 'м' || c == 'н' || c == 'п' || c == 'р'
+            || c == 'с' || c == 'т' || c == 'ф' || c == 'х' || c == 'ц' || c == 'ч'
+            || c == 'ш' || c == 'щ';
+    }
+
+    private static String pairOf(String word) {
+        for (int i = 0; i < PLURAL_PAIRS.length; i++) {
+            if (word.equals(PLURAL_PAIRS[i][0])) {
+                return PLURAL_PAIRS[i][1];
+            }
+            if (word.equals(PLURAL_PAIRS[i][1])) {
+                return PLURAL_PAIRS[i][0];
+            }
+        }
+        return null;
+    }
+
+    private static boolean isUnchanged(String word) {
+        for (int i = 0; i < UNCHANGED_WORDS.length; i++) {
+            if (word.equals(UNCHANGED_WORDS[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean consonantY(String word) {
+        if (word.length() < 2 || word.charAt(word.length() - 1) != 'y') {
+            return false;
+        }
+        char prev = word.charAt(word.length() - 2);
+        return prev != 'a' && prev != 'e' && prev != 'i' && prev != 'o' && prev != 'u';
+    }
+
+    private static String pluralize(String word) {
+        if (consonantY(word)) {
+            return word.substring(0, word.length() - 1) + "ies";
+        }
+        if (word.endsWith("ch") || word.endsWith("sh") || word.endsWith("x") || word.endsWith("z") || word.endsWith("ss")) {
+            if (word.endsWith("es")) {
+                return null;
+            }
+            return word + "es";
+        }
+        if (word.endsWith("s")) {
+            return null;
+        }
+        return word + "s";
+    }
+
+    private static String singularize(String word) {
+        if (word.endsWith("ies") && word.length() > 4) {
+            char prev = word.charAt(word.length() - 4);
+            if (prev != 'a' && prev != 'e' && prev != 'i' && prev != 'o' && prev != 'u') {
+                return word.substring(0, word.length() - 3) + "y";
+            }
+        }
+        if (word.endsWith("es") && word.length() > 3) {
+            String stem = word.substring(0, word.length() - 2);
+            if (stem.endsWith("ss") || stem.endsWith("sh") || stem.endsWith("ch") || stem.endsWith("x") || stem.endsWith("z")) {
+                return stem;
+            }
+        }
+        if (word.endsWith("ses")) {
+            return null;
+        }
+        if (word.endsWith("s") && !word.endsWith("ss") && word.length() > 3) {
+            return word.substring(0, word.length() - 1);
+        }
+        return null;
     }
 
     public static boolean messageMatches(MessageObject message, Collection<String> keywords) {

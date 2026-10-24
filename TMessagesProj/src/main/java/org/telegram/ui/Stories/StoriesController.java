@@ -1352,9 +1352,7 @@ public class StoriesController {
             OpengramGhostReads.rememberStory(currentAccount, UserConfig.getInstance(currentAccount).getClientUserId(), dialogId, newReadId);
         }
         if (newReadId > currentReadId) {
-            if (!profile) {
-                storiesStorage.updateMaxReadId(dialogId, newReadId);
-            }
+            storiesStorage.updateMaxReadId(dialogId, newReadId);
             if (!UserConfig.isGhostMode(currentAccount) && !storyViewsAreGhost()) {
                 TL_stories.TL_stories_readStories req = new TL_stories.TL_stories_readStories();
                 req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
@@ -1517,6 +1515,7 @@ public class StoriesController {
     }
 
     public void cleanup() {
+        dialogIdToMaxReadId.clear();
         allStoriesLoaded = false;
         allHiddenStoriesLoaded = false;
         storiesReadLoaded = false;

@@ -6191,6 +6191,158 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
                 "<?xpacket end=\"w\"?>";
     }
 
+    public static void saveOnceMedia(MessageObject messageObject, Utilities.Callback<Uri> onSaved) {
+        if (messageObject == null || messageObject.messageOwner == null) {
+            return;
+        }
+        final File source = onceMediaFile(messageObject);
+        if (source == null) {
+            return;
+        }
+        final boolean round = messageObject.isRoundVideo();
+        final int type = round ? 1 : 2;
+        final String mime = round ? "video/mp4" : "audio/ogg";
+        final String displayName = round ? null : onceVoiceName(messageObject);
+        new Thread(() -> {
+            Uri uri = null;
+            File decrypted = null;
+            try {
+                File plain = source;
+                if (source.getName().endsWith(".enc")) {
+                    File keyFile = new File(FileLoader.getInternalCacheDir(), source.getName() + ".key");
+                    if (!keyFile.exists()) {
+                        return;
+                    }
+                    decrypted = File.createTempFile("once", round ? ".mp4" : voiceExtension(messageObject), FileLoader.getInternalCacheDir());
+                    try (EncryptedFileInputStream input = new EncryptedFileInputStream(source, keyFile); FileOutputStream output = new FileOutputStream(decrypted)) {
+                        if (!AndroidUtilities.copyFile(input, output)) {
+                            return;
+                        }
+                    }
+                    plain = decrypted;
+                }
+                if (Build.VERSION.SDK_INT >= 29) {
+                    uri = saveFileInternal(type, plain, displayName, mime);
+                } else {
+                    uri = saveOnceLegacy(type, plain, displayName, mime);
+                }
+            } catch (Exception e) {
+                FileLog.e(e);
+            } finally {
+                if (decrypted != null) {
+                    decrypted.delete();
+                }
+            }
+            if (uri != null && onSaved != null) {
+                final Uri saved = uri;
+                AndroidUtilities.runOnUIThread(() -> onSaved.run(saved));
+            }
+        }).start();
+    }
+
+    private static File onceMediaFile(MessageObject messageObject) {
+        File path = FileLoader.getInstance(messageObject.currentAccount).getPathToMessage(messageObject.messageOwner);
+        if (path != null && path.exists()) {
+            return path;
+        }
+        if (path != null) {
+            File encrypted = new File(path.getPath() + ".enc");
+            if (encrypted.exists()) {
+                return encrypted;
+            }
+        }
+        String attachPath = messageObject.messageOwner.attachPath;
+        if (!TextUtils.isEmpty(attachPath)) {
+            File attach = new File(attachPath);
+            if (attach.exists()) {
+                return attach;
+            }
+        }
+        return null;
+    }
+
+    private static String voiceExtension(MessageObject messageObject) {
+        TLRPC.Document document = messageObject.getDocument();
+        String mime = document != null ? document.mime_type : null;
+        String extension = FileLoader.getExtensionByMimeType(mime);
+        if (TextUtils.isEmpty(extension) && !TextUtils.isEmpty(mime)) {
+            String mapped = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime);
+            if (!TextUtils.isEmpty(mapped) && mapped.indexOf('.') < 0 && mapped.indexOf('/') < 0) {
+                extension = "." + mapped;
+            }
+        }
+        if (TextUtils.isEmpty(extension) || extension.indexOf('/') >= 0 || extension.indexOf('.') != 0) {
+            return ".ogg";
+        }
+        return extension;
+    }
+
+    private static String onceVoiceName(MessageObject messageObject) {
+        String extension = voiceExtension(messageObject);
+        String base = FileLoader.getDocumentFileName(messageObject.getDocument());
+        if (TextUtils.isEmpty(base)) {
+            base = "voice";
+        }
+        int dot = base.lastIndexOf('.');
+        if (dot > 0) {
+            String tail = base.substring(dot);
+            if (tail.equalsIgnoreCase(extension)) {
+                return base;
+            }
+            base = base.substring(0, dot);
+        }
+        return base + extension;
+    }
+
+    private static Uri saveOnceLegacy(int type, File source, String name, String mime) throws Exception {
+        File dir;
+        File dest;
+        if (type == 1) {
+            dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "Telegram");
+            dir.mkdirs();
+            dest = new File(dir, AndroidUtilities.generateFileName(1, "mp4"));
+        } else {
+            dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Telegram");
+            dir.mkdirs();
+            if (TextUtils.isEmpty(name)) {
+                name = "voice.ogg";
+            }
+            dest = uniqueDownloadName(dir, name);
+        }
+        if (!AndroidUtilities.copyFile(source, dest)) {
+            dest.delete();
+            return null;
+        }
+        if (type == 2) {
+            DownloadManager downloadManager = (DownloadManager) ApplicationLoader.applicationContext.getSystemService(Context.DOWNLOAD_SERVICE);
+            downloadManager.addCompletedDownload(dest.getName(), dest.getName(), false, mime, dest.getAbsolutePath(), dest.length(), true);
+        } else {
+            AndroidUtilities.addMediaToGallery(dest.getAbsoluteFile());
+        }
+        return Uri.fromFile(dest);
+    }
+
+    private static File uniqueDownloadName(File dir, String name) {
+        File dest = new File(dir, name);
+        if (!dest.exists()) {
+            return dest;
+        }
+        int dot = name.lastIndexOf('.');
+        for (int a = 0; a < 10; a++) {
+            String next;
+            if (dot != -1) {
+                next = name.substring(0, dot) + "(" + (a + 1) + ")" + name.substring(dot);
+            } else {
+                next = name + "(" + (a + 1) + ")";
+            }
+            dest = new File(dir, next);
+            if (!dest.exists()) {
+                break;
+            }
+        }
+        return dest;
+    }
+
     public static void saveEncryptedFileToGallery(File encryptedFile, int type) {
         if (encryptedFile == null || !encryptedFile.getName().endsWith(".enc")) {
             return;
@@ -6273,12 +6425,18 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
     }
 
     private static Uri saveFileInternal(int type, File sourceFile, String filename) {
+        return saveFileInternal(type, sourceFile, filename, null);
+    }
+
+    private static Uri saveFileInternal(int type, File sourceFile, String filename, String mimeOverride) {
         try {
             int selectedType = type;
             ContentValues contentValues = new ContentValues();
             String extension = FileLoader.getFileExtension(sourceFile);
             String mimeType = null;
-            if (extension != null) {
+            if (!TextUtils.isEmpty(mimeOverride)) {
+                mimeType = mimeOverride;
+            } else if (extension != null && extension.indexOf('.') < 0 && extension.indexOf('/') < 0 && !extension.equals(sourceFile.getName())) {
                 mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
             }
             Uri uriToInsert = null;

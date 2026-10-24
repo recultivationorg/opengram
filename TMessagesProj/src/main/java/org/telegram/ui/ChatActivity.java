@@ -33804,6 +33804,14 @@ public class ChatActivity extends BaseFragment implements
                             BulletinFactory.of(this).createDownloadBulletin(isMusicFinal ? BulletinFactory.FileType.AUDIOS : BulletinFactory.FileType.UNKNOWNS, count, themeDelegate).show();
                         }
                     });
+                } else if (selectedObject.isVoice() || selectedObject.isRoundVideo()) {
+                    final boolean round = selectedObject.isRoundVideo();
+                    MediaController.saveOnceMedia(selectedObject, uri -> {
+                        if (getParentActivity() == null || uri == null) {
+                            return;
+                        }
+                        BulletinFactory.of(this).createDownloadBulletin(round ? BulletinFactory.FileType.VIDEO : BulletinFactory.FileType.UNKNOWN, themeDelegate).show();
+                    });
                 } else if (selectedObject.isLivePhoto()) {
                     final ArrayList<MessageObject> messageObjects = new ArrayList<>();
                     messageObjects.add(selectedObject);

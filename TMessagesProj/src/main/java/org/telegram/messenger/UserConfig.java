@@ -278,6 +278,9 @@ public class UserConfig extends BaseController {
             clientUserId = user.id;
             checkPremiumSelf(oldUser, user);
         }
+        if (user != null) {
+            OpengramGhostReads.load(currentAccount);
+        }
     }
 
     private void checkPremiumSelf(TLRPC.User oldUser, TLRPC.User newUser) {
@@ -484,6 +487,7 @@ public class UserConfig extends BaseController {
     public void clearConfig() {
         getPreferences().edit().clear().apply();
 
+        ghostMode = false;
         sharingMyLocationUntil = 0;
         lastMyLocationShareTime = 0;
         currentUser = null;
