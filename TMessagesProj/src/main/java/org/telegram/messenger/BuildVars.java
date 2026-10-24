@@ -40,7 +40,7 @@ public class BuildVars {
     // Set MASK_AS_OFFICIAL_CLIENT to true to send that package, version, and certificate again.
     public static boolean MASK_AS_OFFICIAL_CLIENT = true;
     public static final String OFFICIAL_WEB_PACKAGE_ID = "org.telegram.messenger.web";
-    public static final String OFFICIAL_WEB_APP_VERSION = "13.0.2 (71759)";
+    public static final String OFFICIAL_WEB_APP_VERSION = "13.0.3 (71839)";
     public static final String OFFICIAL_WEB_CERT_SHA256 = "49C1522548EBACD46CE322B6FD47F6092BB745D0F88082145CAF35E14DCC38E1";
 
     // Forkgram GitHub build 12.10.6.0, versionCode 710609, certificate CN=23rd.
