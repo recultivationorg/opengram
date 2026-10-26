@@ -47,6 +47,7 @@ public class FileLoadOperation {
     public static volatile DispatchQueue filesQueue = new DispatchQueue("writeFileQueue");
     public static ImmutableByteArrayOutputStream filesQueueByteBuffer;
     private boolean forceSmallChunk;
+    private boolean useDownloadByteBudget;
     private int downloadConnectionsCount = 2;
     private boolean paceDocumentRequests;
     private DownloadRequestPacer downloadRequestPacer;
@@ -2302,7 +2303,8 @@ public class FileLoadOperation {
             count = Math.max(0, currentMaxDownloadRequests - requestInfos.size());
         } else {
             if (streamPriorityStartOffset == 0 && !nextPartWasPreloaded && (!isPreloadVideoOperation || moovFound != 0) && totalBytesCount > 0) {
-                count = Math.max(0, currentMaxDownloadRequests - requestInfos.size());
+                count = Math.max(0, currentMaxDownloadRequests - requestInfos.size() -
+                        (useDownloadByteBudget ? delayedRequestInfos.size() : 0));
             }
         }
 
@@ -2428,6 +2430,12 @@ public class FileLoadOperation {
             }
 
             int flags = (isForceRequest ? ConnectionsManager.RequestFlagForceDownload : 0);
+            if (useDownloadByteBudget) {
+                flags |= ConnectionsManager.RequestFlagDownloadByteBudget;
+                if (totalBytesCount < 20 * 1024) {
+                    flags |= ConnectionsManager.RequestFlagSmallDownload;
+                }
+            }
             if (isCdn) {
                 TLRPC.TL_upload_getCdnFile req = new TLRPC.TL_upload_getCdnFile();
                 req.file_token = cdnToken;

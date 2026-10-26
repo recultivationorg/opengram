@@ -44964,7 +44964,7 @@ public class TLRPC {
         public ShareTheme share_theme;
 
         // The card is not used. Its payload is still consumed so the following fields stay aligned.
-        private static void skipWalletCard(InputSerializedData stream, boolean exception) {
+        static void skipWalletCard(InputSerializedData stream, boolean exception) {
             final int constructor = stream.readInt32(exception);
             if (constructor != 0x8ed043b1) {
                 if (exception) {
@@ -45001,7 +45001,7 @@ public class TLRPC {
             stream.readInt64(exception);
         }
 
-        private static void skipWalletNft(InputSerializedData stream, boolean exception) {
+        static void skipWalletNft(InputSerializedData stream, boolean exception) {
             final int constructor = stream.readInt32(exception);
             if (constructor != 0x173dfaf3) {
                 if (exception) {

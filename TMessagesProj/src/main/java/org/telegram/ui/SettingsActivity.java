@@ -642,14 +642,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (listView.adapter != null) {
-            listView.adapter.notifyDataSetChanged();
-        }
-    }
-
     private ArrayList<Integer> accountNumbers = new ArrayList<>();
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         if (searchItem.isSearchFieldVisible2()) {
