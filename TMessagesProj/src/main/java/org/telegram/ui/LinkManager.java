@@ -53,11 +53,14 @@ import org.telegram.ui.Stories.recorder.StoryRecorder;
 import org.telegram.ui.TON.TONIntroActivity;
 import org.telegram.ui.bots.ChannelAffiliateProgramsFragment;
 import org.telegram.ui.web.WebBrowserSettings;
+import org.telegram.ui.QrShare.QrShareActivity;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class LinkManager {
 
@@ -123,6 +126,13 @@ public class LinkManager {
 
         final String first = segments.get(0);
         final String second = segments.size() > 1 ? segments.get(1) : null;
+
+        if ("getpremium".equalsIgnoreCase(first)) {
+            if (BuildVars.DISABLE_PREMIUM_PROMO) {
+                return true;
+            }
+            return handleGetPremium(uri.getQueryParameter("ref"));
+        }
 
         if ("$".equalsIgnoreCase(first))
             return handleInvoiceSlug(path.substring(1));
@@ -482,7 +492,7 @@ public class LinkManager {
             if ("scan".equalsIgnoreCase(second)) {
                 BaseFragment lastFragment = getLastFragment();
                 if (lastFragment != null) {
-                    QrActivity.openCameraScanActivity(lastFragment);
+                    QrShareActivity.openCameraScanActivity(lastFragment);
                     return true;
                 }
             }
@@ -490,7 +500,7 @@ public class LinkManager {
             if ("share".equalsIgnoreCase(second)) {
                 final Bundle args = new Bundle();
                 args.putLong("user_id", getUserConfig().getClientUserId());
-                presentFragment(new QrActivity(args) {
+                presentFragment(new QrShareActivity(args) {
                     @Override
                     public void onBecomeFullyVisible() {
                         super.onBecomeFullyVisible();
@@ -502,7 +512,7 @@ public class LinkManager {
 
             final Bundle args = new Bundle();
             args.putLong("user_id", getUserConfig().getClientUserId());
-            presentFragment(new QrActivity(args));
+            presentFragment(new QrShareActivity(args));
             return true;
         }
 
@@ -1233,6 +1243,20 @@ public class LinkManager {
         }
 
         presentFragment(new SettingsActivity());
+        return true;
+    }
+
+    private static final Pattern GET_PREMIUM_REF_PATTERN = Pattern.compile("^[a-z0-9_]{1,32}$");
+
+    private boolean handleGetPremium(String ref) {
+        String source = "tme_getpremium";
+        if (ref != null) {
+            ref = ref.toLowerCase(Locale.ROOT);
+            if (GET_PREMIUM_REF_PATTERN.matcher(ref).matches()) {
+                source += "_" + ref;
+            }
+        }
+        presentFragment(new PremiumPreviewFragment(source));
         return true;
     }
 
