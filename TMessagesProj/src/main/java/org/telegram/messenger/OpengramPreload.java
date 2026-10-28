@@ -91,6 +91,9 @@ public final class OpengramPreload {
         if (source != null && source.getParentLayout() != null) {
             return source.presentFragment(activity);
         }
-        return LaunchActivity.instance != null && LaunchActivity.instance.presentFragment(activity);
+        if (LaunchActivity.instance == null) {
+            return false;
+        }
+        return LaunchActivity.instance.presentFragment(activity, false, false);
     }
 }
