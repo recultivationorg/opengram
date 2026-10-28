@@ -922,6 +922,9 @@ public class TopicsController extends BaseController {
     public int updateReactionsUnread(long dialogId, long topicId, int count, boolean increment) {
         TLRPC.TL_forumTopic topic = findTopic(-dialogId, topicId);
         int totalCount = -1;
+        if (increment) {
+            OpengramGhostReads.shiftServerTopicReactionCount(currentAccount, dialogId, topicId, count);
+        }
         if (topic != null) {
             if (increment) {
                 topic.unread_reactions_count += count;

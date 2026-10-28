@@ -1305,6 +1305,14 @@ public class StoriesController {
                 dialogIdToMaxReadId.put(dialogId, next);
                 changed[0] = true;
             }
+            TL_stories.PeerStories stories = getStories(dialogId);
+            if (stories == null) {
+                stories = getStoriesFromFullPeer(dialogId);
+            }
+            if (stories != null && next > stories.max_read_id) {
+                stories.max_read_id = next;
+                changed[0] = true;
+            }
         });
         if (changed[0]) {
             NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.storiesUpdated);
@@ -1532,6 +1540,7 @@ public class StoriesController {
 
         loadStories();
         loadStoriesRead();
+        mergeGhostStoryReads();
     }
 
     public void pollViewsForSelfStories(long dialogId, boolean start) {

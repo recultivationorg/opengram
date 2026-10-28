@@ -465,22 +465,34 @@ public class StoriesStorage {
         if (dialogId > 0) {
             TLRPC.UserFull userFull = MessagesController.getInstance(currentAccount).getUserFull(dialogId);
             if (userFull != null && userFull.stories != null) {
-                userFull.stories.max_read_id = max_read_id;
+                userFull.stories.max_read_id = Math.max(userFull.stories.max_read_id, max_read_id);
                 storage.updateUserInfo(userFull, false);
             }
         } else {
             TLRPC.ChatFull chatFull = MessagesController.getInstance(currentAccount).getChatFull(-dialogId);
             if (chatFull != null && chatFull.stories != null) {
-                chatFull.stories.max_read_id = max_read_id;
+                chatFull.stories.max_read_id = Math.max(chatFull.stories.max_read_id, max_read_id);
                 storage.updateChatInfo(chatFull, false);
             }
         }
+        final int requestedReadId = max_read_id;
         storage.getStorageQueue().postRunnable(() -> {
             SQLiteDatabase database = storage.getDatabase();
+            SQLiteCursor cursor = null;
             try {
-                database.executeFast(String.format(Locale.US, "REPLACE INTO stories_counter VALUES(%d, 0, %d)", dialogId, max_read_id)).stepThis().dispose();
+                int stored = 0;
+                cursor = database.queryFinalized("SELECT max_read FROM stories_counter WHERE dialog_id = " + dialogId);
+                if (cursor.next()) {
+                    stored = cursor.intValue(0);
+                }
+                int next = Math.max(stored, requestedReadId);
+                database.executeFast(String.format(Locale.US, "REPLACE INTO stories_counter VALUES(%d, 0, %d)", dialogId, next)).stepThis().dispose();
             } catch (Throwable e) {
                 storage.checkSQLException(e);
+            } finally {
+                if (cursor != null) {
+                    cursor.dispose();
+                }
             }
         });
     }

@@ -1,12 +1,14 @@
 package org.telegram.messenger;
 
 import android.content.Context;
+import android.os.Handler;
 import android.util.LongSparseArray;
 
 import java.io.File;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 
 public final class OpengramGhostReads {
 
@@ -129,6 +131,68 @@ public final class OpengramGhostReads {
                 if (changed) {
                     rememberServerCount(true, serverCounts(clientUserId), dialogId, serverCount);
                 }
+            }
+        }
+        if (changed) {
+            scheduleSave(clientUserId);
+        }
+    }
+
+    public static void shiftServerReactionCount(int account, long dialogId, int delta) {
+        if (!UserConfig.isGhostMode(account) || dialogId == 0 || delta == 0) {
+            return;
+        }
+        long clientUserId = clientUserId(account);
+        if (clientUserId == 0) {
+            return;
+        }
+        boolean changed = false;
+        synchronized (lock) {
+            if (!isLoaded(clientUserId)) {
+                return;
+            }
+            int previous = storedServerReactionCount(clientUserId, dialogId);
+            if (previous < 0) {
+                return;
+            }
+            int next = previous + delta;
+            if (next < 0) {
+                next = 0;
+            }
+            changed = next != previous;
+            if (changed) {
+                rememberServerCount(true, serverCounts(clientUserId), dialogId, next);
+            }
+        }
+        if (changed) {
+            scheduleSave(clientUserId);
+        }
+    }
+
+    public static void shiftServerTopicReactionCount(int account, long dialogId, long topicId, int delta) {
+        if (!UserConfig.isGhostMode(account) || dialogId == 0 || topicId == 0 || delta == 0) {
+            return;
+        }
+        long clientUserId = clientUserId(account);
+        if (clientUserId == 0) {
+            return;
+        }
+        boolean changed = false;
+        synchronized (lock) {
+            if (!isLoaded(clientUserId)) {
+                return;
+            }
+            int previous = storedTopicReactionCount(clientUserId, dialogId, topicId);
+            if (previous < 0) {
+                return;
+            }
+            int next = previous + delta;
+            if (next < 0) {
+                next = 0;
+            }
+            changed = next != previous;
+            if (changed) {
+                rememberServerCount(true, topicCounts(clientUserId, dialogId), topicId, next);
             }
         }
         if (changed) {
@@ -447,7 +511,24 @@ public final class OpengramGhostReads {
         if (clientUserId == 0 || !UserConfig.isGhostMode(account)) {
             return;
         }
-        saveNow(clientUserId);
+        Handler handler = Utilities.globalQueue.getHandler();
+        if (handler != null && Thread.currentThread() == handler.getLooper().getThread()) {
+            saveNow(clientUserId);
+            return;
+        }
+        CountDownLatch latch = new CountDownLatch(1);
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                saveNow(clientUserId);
+            } finally {
+                latch.countDown();
+            }
+        });
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static void scheduleSave(long clientUserId) {
@@ -502,7 +583,11 @@ public final class OpengramGhostReads {
         boolean success = false;
         boolean upgrade = false;
         try {
-            if (!ghostEnabled(clientUserId) || clientUserId == 0 || generation != currentEpoch(clientUserId)) {
+            int epoch;
+            synchronized (lock) {
+                epoch = currentEpoch(clientUserId);
+            }
+            if (!ghostEnabled(clientUserId) || clientUserId == 0 || generation != epoch) {
                 return;
             }
             File ledger = file(clientUserId);
@@ -592,14 +677,19 @@ public final class OpengramGhostReads {
             loaded = isLoaded(clientUserId);
         }
         File ledger = file(clientUserId);
-        if (!loaded) {
-            if (ledger == null || ledger.exists()) {
-                rememberDirty(clientUserId);
-                return;
-            }
-        }
         if (ledger == null) {
             rememberDirty(clientUserId);
+            return;
+        }
+        if (!loaded && ledger.exists()) {
+            readNow(clientUserId, generation);
+            synchronized (lock) {
+                loaded = isLoaded(clientUserId);
+                generation = currentEpoch(clientUserId);
+            }
+        }
+        if (!loaded && ledger.exists()) {
+            failSave(clientUserId);
             return;
         }
         OpengramStrongBox sealer = OpengramStrongBox.forGhost(clientUserId);
@@ -620,7 +710,11 @@ public final class OpengramGhostReads {
         } else {
             wrote = OpengramSnapshotFile.write(ledger, new OpengramSnapshotFile.Record(mode, 0L, new long[] {clientUserId}, lines), writer);
         }
-        if (generation != currentEpoch(clientUserId)) {
+        boolean stale;
+        synchronized (lock) {
+            stale = generation != currentEpoch(clientUserId);
+        }
+        if (stale) {
             deleteUser(clientUserId);
             return;
         }
@@ -648,10 +742,8 @@ public final class OpengramGhostReads {
             count = (previous == null ? 0 : previous) + 1;
             failedSaveCounts.put(clientUserId, count);
         }
-        if (count > 3) {
-            return;
-        }
         rememberDirty(clientUserId);
+        long delay = 2000L << Math.min(Math.max(count - 1, 0), 5);
         AndroidUtilities.runOnUIThread(() -> {
             boolean post = false;
             synchronized (lock) {
@@ -663,7 +755,7 @@ public final class OpengramGhostReads {
             if (post) {
                 Utilities.globalQueue.postRunnable(OpengramGhostReads::drainSaves);
             }
-        }, 2000);
+        }, delay);
     }
 
     private static void rememberDirty(long clientUserId) {
@@ -704,14 +796,10 @@ public final class OpengramGhostReads {
         if (file == null) {
             return null;
         }
-        if (probe == OpengramStrongBox.Probe.UNSUPPORTED) {
+        if (probe == OpengramStrongBox.Probe.UNSUPPORTED || sealer == null || !sealer.keyPresent()) {
             return OpengramSnapshotFile.read(file, OpengramSnapshotFile.MODE_PLAINTEXT, null);
         }
-        OpengramSnapshotFile.ReadResult sealed = OpengramSnapshotFile.read(file, OpengramSnapshotFile.MODE_STRONGBOX, sealer);
-        if (sealed.status == OpengramSnapshotFile.Status.MODE_MISMATCH) {
-            return OpengramSnapshotFile.read(file, OpengramSnapshotFile.MODE_PLAINTEXT, null);
-        }
-        return sealed;
+        return OpengramSnapshotFile.read(file, OpengramSnapshotFile.MODE_STRONGBOX, sealer);
     }
 
     private static boolean owns(OpengramSnapshotFile.Record record, long clientUserId) {
@@ -958,9 +1046,6 @@ public final class OpengramGhostReads {
     static boolean ensureLedgerFile(File ledger, int mode, long clientUserId, Set<String> lines, OpengramSnapshotFile.Sealer sealer) {
         if (ledger == null || clientUserId == 0) {
             return false;
-        }
-        if (ledger.exists()) {
-            return true;
         }
         if (mode != OpengramSnapshotFile.MODE_STRONGBOX && mode != OpengramSnapshotFile.MODE_PLAINTEXT) {
             return false;

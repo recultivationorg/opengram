@@ -13633,7 +13633,7 @@ public class MessagesController extends BaseController implements NotificationCe
                         dialogs_dict.put(key, value);
                         dialogMessage.put(key, newMsgs);
                         if (loadType != DIALOGS_LOAD_TYPE_CACHE) {
-                            OpengramGhostReads.noteServerReactionCount(currentAccount, value.id, value.unread_reactions_count);
+                            value.unread_reactions_count = OpengramGhostReads.applyServerReactionCount(currentAccount, value.id, value.unread_reactions_count, value.unread_reactions_count);
                         }
                         if (newMsgs != null) {
                             for (int i = 0; i < newMsgs.size(); ++i) {
@@ -14184,7 +14184,7 @@ public class MessagesController extends BaseController implements NotificationCe
                         dialogs_dict.put(key, value);
                         dialogMessage.put(key, newMsgs);
                         if (!fromCache) {
-                            OpengramGhostReads.noteServerReactionCount(currentAccount, value.id, value.unread_reactions_count);
+                            value.unread_reactions_count = OpengramGhostReads.applyServerReactionCount(currentAccount, value.id, value.unread_reactions_count, value.unread_reactions_count);
                         }
                         if (newMsgs == null || newMsgs.size() <= 0) {
                             if (fromCache) {
@@ -21582,10 +21582,12 @@ public class MessagesController extends BaseController implements NotificationCe
                 if (topicId == 0) {
                     TLRPC.Dialog dialog = dialogs_dict.get(dialogId);
                     if (dialog == null) {
+                        OpengramGhostReads.shiftServerReactionCount(currentAccount, dialogId, finalNewUnreadCount);
                         getMessagesStorage().updateDialogUnreadReactions(dialogId, 0, finalNewUnreadCount, true);
                         return;
                     }
                     dialog.unread_reactions_count += finalNewUnreadCount;
+                    OpengramGhostReads.shiftServerReactionCount(currentAccount, dialogId, finalNewUnreadCount);
                     if (dialog.unread_reactions_count < 0) {
                         dialog.unread_reactions_count = 0;
                     }

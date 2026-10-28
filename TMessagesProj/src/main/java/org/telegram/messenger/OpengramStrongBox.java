@@ -76,6 +76,18 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
         }
     }
 
+    public boolean keyPresent() {
+        if (Build.VERSION.SDK_INT < 31 || !hasFeature()) {
+            return false;
+        }
+        try {
+            return loadExisting() != null;
+        } catch (Exception e) {
+            FileLog.e(e);
+            return true;
+        }
+    }
+
     public Probe inspect() {
         if (Build.VERSION.SDK_INT < 31 || !hasFeature()) {
             return Probe.UNSUPPORTED;
