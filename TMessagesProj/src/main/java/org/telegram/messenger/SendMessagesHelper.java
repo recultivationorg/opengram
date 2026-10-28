@@ -3475,6 +3475,9 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         if (messageObject == null || rich == null || messageObject.messageOwner == null) {
             return 0;
         }
+        if (OpengramOutboundGuard.reject(currentAccount, messageObject.getDialogId())) {
+            return 0;
+        }
         if (messageObject.isEditing() && messageObject.messageOwner.reqId != 0) {
             getConnectionsManager().cancelRequest(messageObject.messageOwner.reqId, true);
             messageObject.messageOwner.reqId = 0;

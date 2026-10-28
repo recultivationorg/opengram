@@ -376,6 +376,9 @@ public class LocationController extends BaseController implements NotificationCe
                         }
                     }
                 }
+                if (!OpengramSecurePolicy.allowsCloudTransport(OpengramSecureChannel.evaluate(currentAccount, info.did))) {
+                    continue;
+                }
                 TLRPC.TL_messages_editMessage req = new TLRPC.TL_messages_editMessage();
                 req.peer = getMessagesController().getInputPeer(info.did);
                 req.id = info.mid;
@@ -716,6 +719,19 @@ public class LocationController extends BaseController implements NotificationCe
             final SharingLocationInfo info = sharingLocationsMap.get(did);
             sharingLocationsMap.remove(did);
             if (info != null) {
+                if (OpengramOutboundGuard.reject(currentAccount, info.did)) {
+                    sharingLocations.remove(info);
+                    saveSharingLocation(info, 1);
+                    AndroidUtilities.runOnUIThread(() -> {
+                        sharingLocationsUI.remove(info);
+                        sharingLocationsMapUI.remove(info.did);
+                        if (sharingLocationsUI.isEmpty()) {
+                            stopService();
+                        }
+                        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.liveLocationsChanged);
+                    });
+                    return;
+                }
                 TLRPC.TL_messages_editMessage req = new TLRPC.TL_messages_editMessage();
                 req.peer = getMessagesController().getInputPeer(info.did);
                 req.id = info.mid;
@@ -764,6 +780,9 @@ public class LocationController extends BaseController implements NotificationCe
         Utilities.stageQueue.postRunnable(() -> {
             for (int a = 0; a < sharingLocations.size(); a++) {
                 SharingLocationInfo info = sharingLocations.get(a);
+                if (!OpengramSecurePolicy.allowsCloudTransport(OpengramSecureChannel.evaluate(currentAccount, info.did))) {
+                    continue;
+                }
                 TLRPC.TL_messages_editMessage req = new TLRPC.TL_messages_editMessage();
                 req.peer = getMessagesController().getInputPeer(info.did);
                 req.id = info.mid;

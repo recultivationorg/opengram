@@ -112,6 +112,24 @@ public class OpengramSecurePolicyTest {
     }
 
     @Test
+    public void incomingDialogDuringCaptureStaysClosed() {
+        OpengramSecurePolicy.Input input = base();
+        input.phase = OpengramSecurePolicy.Phase.CAPTURING;
+        input.snapshotReadable = false;
+        input.incomingCloudDialog = true;
+        assertEquals(OpengramSecurePolicy.Decision.POLICY_NOT_READY, OpengramSecurePolicy.evaluate(input));
+    }
+
+    @Test
+    public void loadedDialogOutsideBaselineRequiresSecretChat() {
+        OpengramSecurePolicy.Input input = base();
+        input.incomingCloudDialog = false;
+        input.peerUserId = 99L;
+        input.baselinePeers.add(OpengramSecurePolicy.peerKey(10L, 1L));
+        assertEquals(OpengramSecurePolicy.Decision.REQUIRE_SECRET_CHAT, OpengramSecurePolicy.evaluate(input));
+    }
+
+    @Test
     public void incomingCloudChatIsAllowedByDefault() {
         OpengramSecurePolicy.Input input = base();
         input.incomingCloudDialog = true;

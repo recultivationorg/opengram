@@ -20,10 +20,7 @@ public final class OpengramPreload {
         if (existing == null) {
             return false;
         }
-        android.os.Bundle args = new android.os.Bundle();
-        args.putInt("enc_id", existing.id);
-        present(new ChatActivity(args));
-        return true;
+        return presentSecretChat(fragment, account, existing.id);
     }
 
     public static boolean shouldPromptSecretChat(int account, long userId) {
@@ -44,10 +41,15 @@ public final class OpengramPreload {
         if (activity == null) {
             activity = LaunchActivity.instance;
         }
-        beginSecretChat(activity, fragment.getCurrentAccount(), user);
+        TLRPC.EncryptedChat existing = findSecretChat(fragment.getCurrentAccount(), user.id);
+        if (existing != null) {
+            presentSecretChat(fragment, fragment.getCurrentAccount(), existing.id);
+            return;
+        }
+        beginSecretChat(fragment, activity, fragment.getCurrentAccount(), user);
     }
 
-    private static void beginSecretChat(Activity activity, int account, TLRPC.User user) {
+    private static void beginSecretChat(ChatActivity source, Activity activity, int account, TLRPC.User user) {
         if (activity == null || user == null) {
             return;
         }
@@ -63,9 +65,7 @@ public final class OpengramPreload {
                 return;
             }
             center.removeObserver(holder[0], NotificationCenter.encryptedChatCreated);
-            android.os.Bundle bundle = new android.os.Bundle();
-            bundle.putInt("enc_id", chat.id);
-            AndroidUtilities.runOnUIThread(() -> present(new ChatActivity(bundle)));
+            AndroidUtilities.runOnUIThread(() -> presentSecretChat(source, account, chat.id));
         };
         center.addObserver(holder[0], NotificationCenter.encryptedChatCreated);
         SecretChatHelper.getInstance(account).startSecretChat(activity, user, () -> center.removeObserver(holder[0], NotificationCenter.encryptedChatCreated));
@@ -83,9 +83,14 @@ public final class OpengramPreload {
         return chat;
     }
 
-    private static void present(ChatActivity activity) {
-        if (LaunchActivity.instance != null) {
-            LaunchActivity.instance.presentFragment(activity);
+    private static boolean presentSecretChat(ChatActivity source, int account, int encId) {
+        android.os.Bundle args = new android.os.Bundle();
+        args.putInt("enc_id", encId);
+        ChatActivity activity = new ChatActivity(args);
+        activity.setCurrentAccount(account);
+        if (source != null && source.getParentLayout() != null) {
+            return source.presentFragment(activity);
         }
+        return LaunchActivity.instance != null && LaunchActivity.instance.presentFragment(activity);
     }
 }

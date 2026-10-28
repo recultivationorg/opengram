@@ -89,9 +89,6 @@ public final class OpengramSecurePolicy {
         if (input.forceAll) {
             return Decision.REQUIRE_SECRET_CHAT;
         }
-        if (input.incomingCloudDialog) {
-            return Decision.ALLOW;
-        }
         if (input.phase != Phase.ACTIVE) {
             return Decision.POLICY_NOT_READY;
         }
@@ -102,6 +99,9 @@ public final class OpengramSecurePolicy {
             return Decision.POLICY_NOT_READY;
         }
         if (input.baselinePeers != null && input.baselinePeers.contains(peerKey(input.clientUserId, input.peerUserId))) {
+            return Decision.ALLOW;
+        }
+        if (input.incomingCloudDialog) {
             return Decision.ALLOW;
         }
         return Decision.REQUIRE_SECRET_CHAT;

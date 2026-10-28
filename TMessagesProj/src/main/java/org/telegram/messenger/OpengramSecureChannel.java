@@ -25,6 +25,7 @@ public final class OpengramSecureChannel {
     private static boolean memoryLoaded;
     private static boolean snapshotReadable;
     private static boolean modeMismatch;
+    private static int captureGeneration;
 
     private OpengramSecureChannel() {
     }
@@ -164,6 +165,10 @@ public final class OpengramSecureChannel {
     }
 
     private static void captureAll(boolean append) {
+        final int generation;
+        synchronized (lock) {
+            generation = ++captureGeneration;
+        }
         ArrayList<Integer> accounts = new ArrayList<>();
         for (int account = 0; account < UserConfig.MAX_ACCOUNT_COUNT; account++) {
             if (UserConfig.getInstance(account).isClientActivated()) {
@@ -172,6 +177,9 @@ public final class OpengramSecureChannel {
         }
         if (accounts.isEmpty()) {
             synchronized (lock) {
+                if (generation != captureGeneration) {
+                    return;
+                }
                 SharedConfig.forceEndToEndPhase = OpengramSecurePolicy.Phase.ERROR.ordinal();
                 SharedConfig.saveConfig();
             }
@@ -185,7 +193,12 @@ public final class OpengramSecureChannel {
             long clientUserId = UserConfig.getInstance(account).getClientUserId();
             MessagesStorage.getInstance(account).loadPositiveDialogIds(ids -> AndroidUtilities.runOnUIThread(() -> {
                 synchronized (lock) {
-                    if (ids == null || clientUserId == 0) {
+                    if (generation != captureGeneration) {
+                        return;
+                    }
+                    if (UserConfig.getInstance(account).getClientUserId() != clientUserId) {
+                        failed[0] = true;
+                    } else if (ids == null || clientUserId == 0) {
                         failed[0] = true;
                     } else {
                         accountsFound.add(clientUserId);
@@ -239,7 +252,10 @@ public final class OpengramSecureChannel {
     private static void finishAccountCapture(int account, long clientUserId, ArrayList<Long> ids) {
         synchronized (lock) {
             captureInFlight.remove(account);
-            if (phase() == OpengramSecurePolicy.Phase.DISABLED) {
+            if (UserConfig.getInstance(account).getClientUserId() != clientUserId) {
+                return;
+            }
+            if (phase() != OpengramSecurePolicy.Phase.CAPTURING && phase() != OpengramSecurePolicy.Phase.ACTIVE) {
                 return;
             }
             if (ids == null || clientUserId == 0) {
@@ -255,8 +271,7 @@ public final class OpengramSecureChannel {
             if (!writeCurrent(SharedConfig.forceEndToEndCutoff)) {
                 SharedConfig.forceEndToEndPhase = OpengramSecurePolicy.Phase.ERROR.ordinal();
                 snapshotReadable = false;
-            } else if (phase() != OpengramSecurePolicy.Phase.CAPTURING) {
-                SharedConfig.forceEndToEndPhase = OpengramSecurePolicy.Phase.ACTIVE.ordinal();
+            } else {
                 snapshotReadable = true;
                 modeMismatch = false;
             }
@@ -315,13 +330,28 @@ public final class OpengramSecureChannel {
             input.clientUserId = UserConfig.getInstance(account).getClientUserId();
             input.peerUserId = dialogId;
             input.kind = peerKind(account, dialogId, input.clientUserId);
-            input.incomingCloudDialog = dialogId > 0 && MessagesController.getInstance(account).dialogs_dict.get(dialogId) != null;
+            input.incomingCloudDialog = incomingFromPeer(account, dialogId, input.clientUserId);
             input.snapshotReadable = snapshotReadable;
             input.modeMismatch = modeMismatch;
             input.capturedAccounts = new HashSet<>(capturedAccounts);
             input.baselinePeers = new HashSet<>(baselinePeers);
         }
         return input;
+    }
+
+    private static boolean incomingFromPeer(int account, long dialogId, long clientUserId) {
+        if (dialogId <= 0 || clientUserId == 0) {
+            return false;
+        }
+        if (baselinePeers.contains(OpengramSecurePolicy.peerKey(clientUserId, dialogId))) {
+            return false;
+        }
+        java.util.ArrayList<MessageObject> messages = MessagesController.getInstance(account).dialogMessage.get(dialogId);
+        if (messages == null || messages.isEmpty()) {
+            return false;
+        }
+        MessageObject top = messages.get(0);
+        return top != null && top.getDialogId() == dialogId && !top.isOutOwner();
     }
 
     static OpengramSecurePolicy.PeerKind peerKind(int account, long dialogId, long clientUserId) {
