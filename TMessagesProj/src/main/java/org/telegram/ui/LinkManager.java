@@ -181,6 +181,13 @@ public class LinkManager {
         final String first = segments.get(0);
         final String second = segments.size() > 1 ? segments.get(1) : null;
 
+        if ("getpremium".equalsIgnoreCase(first)) {
+            if (BuildVars.DISABLE_PREMIUM_PROMO) {
+                return true;
+            }
+            return handleGetPremium(uri.getQueryParameter("ref"));
+        }
+
         if ("newbot".equalsIgnoreCase(first))
             return handleNewBot(uri.getQueryParameter("manager"), uri.getQueryParameter("username"), uri.getQueryParameter("name"));
 
