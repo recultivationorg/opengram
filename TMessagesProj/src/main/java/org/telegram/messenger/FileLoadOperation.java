@@ -880,7 +880,11 @@ public class FileLoadOperation {
                 currentMaxDownloadRequests = maxDownloadRequestsAnimation;
             } else {
                 boolean bigChunk = totalBytesCount >= bigFileSizeFrom;
-                currentDownloadChunkSize = bigChunk ? downloadChunkSizeBig : downloadChunkSize;
+                int regularChunk = downloadChunkSize;
+                if ((SharedConfig.premiumDownloadLimits || UserConfig.getInstance(currentAccount).isPremium()) && !bigChunk) {
+                    regularChunk = Math.max(regularChunk, 256 * 1024);
+                }
+                currentDownloadChunkSize = bigChunk ? downloadChunkSizeBig : regularChunk;
                 currentMaxDownloadRequests = bigChunk ? maxDownloadRequestsBig : maxDownloadRequests;
                 updateDownloadByteBudget();
             }

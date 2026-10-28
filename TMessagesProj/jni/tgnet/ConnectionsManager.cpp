@@ -2008,7 +2008,7 @@ void ConnectionsManager::bindRequestToGuid(int32_t requestToken, int32_t guid) {
 
 void ConnectionsManager::setUserPremium(bool premium) {
     scheduleTask([&, premium] {
-        currentUserPremium = true;
+        currentUserPremium = premium;
         maximumDownloadRequests = premium;
     });
 }

@@ -743,6 +743,9 @@ public class SharedConfig {
 
             configLoaded = true;
         }
+        for (int account = 0; account < UserConfig.MAX_ACCOUNT_COUNT; account++) {
+            ConnectionsManager.getInstance(account).applyRaisedDownloadLimits();
+        }
     }
 
     public static int buildVersion() {

@@ -658,7 +658,8 @@ public class ConnectionsManager extends BaseController {
     }
 
     public void applyRaisedDownloadLimits() {
-        native_setUserPremium(currentAccount, SharedConfig.premiumDownloadLimits);
+        boolean raised = SharedConfig.premiumDownloadLimits || UserConfig.getInstance(currentAccount).isPremium();
+        native_setUserPremium(currentAccount, raised);
     }
 
     public void init(int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String systemLangCode, String configPath, String logPath, String regId, String cFingerprint, int timezoneOffset, long userId, boolean userPremium, boolean enablePushConnection) {
