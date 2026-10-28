@@ -3231,7 +3231,7 @@ public class ChatActivity extends BaseFragment implements
         if (currentEncryptedChat != null) {
             return;
         }
-        if (!ChatObject.isChannelAndNotMegaGroup(currentChat) && (currentUser == null || !currentUser.bot)) {
+        if ((currentChat == null || !currentChat.broadcast) && (currentUser == null || !currentUser.bot)) {
             return;
         }
         resetForReload();

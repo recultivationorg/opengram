@@ -692,44 +692,49 @@ public class NotificationsController extends BaseController implements Notificat
 
     public void removeFilteredPushMessages() {
         notificationsQueue.postRunnable(() -> {
-            HashSet<Long> hiddenGroups = new HashSet<>();
-            for (int i = 0; i < pushMessages.size(); i++) {
-                MessageObject message = pushMessages.get(i);
-                if (message == null) {
-                    continue;
-                }
-                long groupId = message.getGroupId();
-                if (groupId != 0 && OpengramMessageFilter.shouldHide(currentAccount, message.getDialogId(), message)) {
-                    hiddenGroups.add(groupId);
-                }
-            }
-            boolean changed = false;
-            for (int i = 0; i < pushMessages.size(); i++) {
-                MessageObject message = pushMessages.get(i);
-                if (message == null) {
-                    continue;
-                }
-                long dialogId = message.getDialogId();
-                boolean hide = OpengramMessageFilter.shouldHide(currentAccount, dialogId, message) || hiddenGroups.contains(message.getGroupId());
-                if (!hide) {
-                    continue;
-                }
-                pushMessages.remove(i);
-                SparseArray<MessageObject> msgs = pushMessagesDict.get(dialogId);
-                if (msgs != null) {
-                    msgs.remove(message.getId());
-                    if (msgs.size() == 0) {
-                        pushMessagesDict.remove(dialogId);
-                    }
-                }
-                popupMessages.remove(message);
-                i--;
-                changed = true;
-            }
-            if (changed) {
+            if (dropFilteredPushes()) {
                 showOrUpdateNotification(false);
             }
         });
+    }
+
+    private boolean dropFilteredPushes() {
+        HashSet<Long> hiddenGroups = new HashSet<>();
+        for (int i = 0; i < pushMessages.size(); i++) {
+            MessageObject message = pushMessages.get(i);
+            if (message == null) {
+                continue;
+            }
+            long groupId = message.getGroupId();
+            if (groupId != 0 && OpengramMessageFilter.shouldHide(currentAccount, message.getDialogId(), message)) {
+                hiddenGroups.add(groupId);
+            }
+        }
+        boolean changed = false;
+        for (int i = 0; i < pushMessages.size(); i++) {
+            MessageObject message = pushMessages.get(i);
+            if (message == null) {
+                continue;
+            }
+            long dialogId = message.getDialogId();
+            boolean hide = OpengramMessageFilter.shouldHide(currentAccount, dialogId, message) || hiddenGroups.contains(message.getGroupId());
+            if (!hide) {
+                continue;
+            }
+            pushMessages.remove(i);
+            SparseArray<MessageObject> msgs = pushMessagesDict.get(dialogId);
+            if (msgs != null) {
+                msgs.remove(message.getId());
+                if (msgs.size() == 0) {
+                    pushMessagesDict.remove(dialogId);
+                }
+            }
+            popupMessages.remove(message);
+            delayedPushMessages.remove(message);
+            i--;
+            changed = true;
+        }
+        return changed;
     }
 
     public void processSeenStoryReactions(long dialogId, int storyId) {
@@ -1056,6 +1061,7 @@ public class NotificationsController extends BaseController implements Notificat
                 }
             }
             if (updated) {
+                dropFilteredPushes();
                 showOrUpdateNotification(false);
             }
         });
@@ -1067,9 +1073,17 @@ public class NotificationsController extends BaseController implements Notificat
         }
 
         if (messageObjects != null) {
+            HashSet<Long> hiddenGroups = null;
             for (int i = 0; i < messageObjects.size(); ++i) {
                 final MessageObject messageObject = messageObjects.get(i);
                 if (messageObject != null && messageObject.messageOwner != null && OpengramMessageFilter.shouldHide(currentAccount, messageObject.getDialogId(), messageObject)) {
+                    long groupId = messageObject.getGroupId();
+                    if (groupId != 0) {
+                        if (hiddenGroups == null) {
+                            hiddenGroups = new HashSet<>();
+                        }
+                        hiddenGroups.add(groupId);
+                    }
                     messageObjects.remove(i);
                     i--;
                     continue;
@@ -1092,6 +1106,15 @@ public class NotificationsController extends BaseController implements Notificat
                         i--;
                     } else {
                         VoIPGroupNotification.hide(ApplicationLoader.applicationContext, currentAccount, messageObject.getId());
+                    }
+                }
+            }
+            if (hiddenGroups != null) {
+                for (int i = 0; i < messageObjects.size(); ++i) {
+                    MessageObject messageObject = messageObjects.get(i);
+                    if (messageObject != null && hiddenGroups.contains(messageObject.getGroupId())) {
+                        messageObjects.remove(i);
+                        i--;
                     }
                 }
             }

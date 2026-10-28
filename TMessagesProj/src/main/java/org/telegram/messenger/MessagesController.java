@@ -1563,6 +1563,7 @@ public class MessagesController extends BaseController implements NotificationCe
         ImageLoader.getInstance();
         getMessagesStorage();
         OpengramGhostReads.load(currentAccount);
+        OpengramMessageFilter.preload(currentAccount);
         getLocationController();
         AndroidUtilities.runOnUIThread(() -> {
             MessagesController messagesController = getMessagesController();

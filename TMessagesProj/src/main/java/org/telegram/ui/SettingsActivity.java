@@ -513,7 +513,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     private CharSequence messageFilterSubtitle() {
-        if (OpengramMessageFilter.phase(currentAccount) != OpengramMessageFilter.Phase.READY) {
+        OpengramMessageFilter.Phase phase = OpengramMessageFilter.phase(currentAccount);
+        if (phase == OpengramMessageFilter.Phase.ERROR) {
+            return getString(R.string.MessageFilterError);
+        }
+        if (phase != OpengramMessageFilter.Phase.READY) {
             return getString(R.string.MessageFilterOff);
         }
         return LocaleController.formatPluralString("MessageFilterKeywords", OpengramMessageFilter.keywordCount(currentAccount));

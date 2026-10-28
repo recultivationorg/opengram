@@ -52,6 +52,7 @@ public final class OpengramMessageFilter {
         long clientUserId;
         int mode;
         final ArrayList<String> keywords = new ArrayList<>();
+        final ArrayList<String> folded = new ArrayList<>();
 
         void clear() {
             loaded = false;
@@ -59,6 +60,7 @@ public final class OpengramMessageFilter {
             clientUserId = 0;
             mode = 0;
             keywords.clear();
+            folded.clear();
         }
 
         void fail(long clientUserId, int mode) {
@@ -67,6 +69,24 @@ public final class OpengramMessageFilter {
             this.clientUserId = clientUserId;
             this.mode = mode;
             keywords.clear();
+            folded.clear();
+        }
+
+        void replaceKeywords(Collection<String> next) {
+            keywords.clear();
+            folded.clear();
+            if (next == null) {
+                return;
+            }
+            for (String keyword : next) {
+                if (keyword == null) {
+                    continue;
+                }
+                keywords.add(keyword);
+                if (!keyword.isEmpty()) {
+                    folded.add(foldYo(keyword.toLowerCase(Locale.ROOT)));
+                }
+            }
         }
     }
 
@@ -309,7 +329,7 @@ public final class OpengramMessageFilter {
             return false;
         }
         String plural = pluralize(keywordWord);
-        if (plural != null && plural.equals(found)) {
+        if (plural != null && !isUnchanged(plural) && plural.equals(found)) {
             return true;
         }
         String singular = singularize(keywordWord);
@@ -476,6 +496,9 @@ public final class OpengramMessageFilter {
             }
             return word + "es";
         }
+        if (word.endsWith("s") && !word.endsWith("ss")) {
+            return word + "es";
+        }
         if (word.endsWith("s")) {
             return null;
         }
@@ -491,12 +514,9 @@ public final class OpengramMessageFilter {
         }
         if (word.endsWith("es") && word.length() > 3) {
             String stem = word.substring(0, word.length() - 2);
-            if (stem.endsWith("ss") || stem.endsWith("sh") || stem.endsWith("ch") || stem.endsWith("x") || stem.endsWith("z")) {
+            if (stem.endsWith("ss") || stem.endsWith("sh") || stem.endsWith("ch") || stem.endsWith("x") || stem.endsWith("z") || endsWithSingleS(stem)) {
                 return stem;
             }
-        }
-        if (word.endsWith("ses")) {
-            return null;
         }
         if (word.endsWith("s") && !word.endsWith("ss") && word.length() > 3) {
             return word.substring(0, word.length() - 1);
@@ -504,14 +524,78 @@ public final class OpengramMessageFilter {
         return null;
     }
 
-    public static boolean messageMatches(MessageObject message, Collection<String> keywords) {
-        if (message == null) {
+    private static boolean endsWithSingleS(String word) {
+        if (word.length() < 2 || !word.endsWith("s") || word.endsWith("ss")) {
             return false;
         }
-        if (matchesText(message.messageText, keywords)) {
+        char prev = word.charAt(word.length() - 2);
+        return prev == 'a' || prev == 'e' || prev == 'i' || prev == 'o' || prev == 'u';
+    }
+
+    public static boolean messageMatches(MessageObject message, Collection<String> keywords) {
+        if (message == null || keywords == null || keywords.isEmpty()) {
+            return false;
+        }
+        ArrayList<String> folded = new ArrayList<>(keywords.size());
+        for (String keyword : keywords) {
+            if (keyword == null || keyword.isEmpty()) {
+                continue;
+            }
+            folded.add(foldYo(keyword.toLowerCase(Locale.ROOT)));
+        }
+        return messageMatchesPrepared(message, folded);
+    }
+
+    private static boolean messageMatchesPrepared(MessageObject message, List<String> keywords) {
+        if (message == null || keywords == null || keywords.isEmpty()) {
+            return false;
+        }
+        TLRPC.Message owner = message.messageOwner;
+        if (owner == null) {
+            return matchesPrepared(message.messageText, keywords);
+        }
+        boolean labeledMedia = owner.media != null && !(owner.media instanceof TLRPC.TL_messageMediaEmpty);
+        if (!labeledMedia && matchesPrepared(message.messageText, keywords)) {
             return true;
         }
-        return message.messageOwner != null && matchesText(message.messageOwner.message, keywords);
+        if (matchesPrepared(owner.message, keywords)) {
+            return true;
+        }
+        if (owner.media instanceof TLRPC.TL_messageMediaPoll) {
+            TLRPC.TL_messageMediaPoll pollMedia = (TLRPC.TL_messageMediaPoll) owner.media;
+            if (pollMedia.poll != null) {
+                if (pollMedia.poll.question != null && matchesPrepared(pollMedia.poll.question.text, keywords)) {
+                    return true;
+                }
+                ArrayList<TLRPC.PollAnswer> answers = pollMedia.poll.answers;
+                if (answers != null) {
+                    for (int i = 0; i < answers.size(); i++) {
+                        TLRPC.PollAnswer answer = answers.get(i);
+                        if (answer != null && answer.text != null && matchesPrepared(answer.text.text, keywords)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            if (pollMedia.results != null && matchesPrepared(pollMedia.results.solution, keywords)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesPrepared(CharSequence text, List<String> foldedKeywords) {
+        if (text == null || text.length() == 0 || foldedKeywords == null || foldedKeywords.isEmpty()) {
+            return false;
+        }
+        String haystack = foldYo(text.toString().toLowerCase(Locale.ROOT));
+        for (int i = 0; i < foldedKeywords.size(); i++) {
+            String keyword = foldedKeywords.get(i);
+            if (keyword != null && keywordMatches(haystack, keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean appliesToDialog(boolean encrypted, boolean broadcastChannel, boolean bot) {
@@ -632,7 +716,7 @@ public final class OpengramMessageFilter {
             state.error = false;
             state.clientUserId = clientUserId;
             state.mode = mode;
-            state.keywords.clear();
+            state.replaceKeywords(Collections.<String>emptyList());
         }
         notifyDialogs(account);
         return true;
@@ -678,8 +762,7 @@ public final class OpengramMessageFilter {
             state.error = false;
             state.clientUserId = clientUserId;
             state.mode = mode;
-            state.keywords.clear();
-            state.keywords.addAll(keywords);
+            state.replaceKeywords(keywords);
         }
         notifyDialogs(account);
         return true;
@@ -697,14 +780,14 @@ public final class OpengramMessageFilter {
             return messages;
         }
         List<String> keywords = keywordsForHide(account);
-        if (keywords.isEmpty() || !appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId), isBotChat(account, dialogId))) {
+        if (keywords.isEmpty() || !appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId, null), isBotChat(account, dialogId))) {
             return messages;
         }
         HashSet<Long> hiddenGroups = hiddenGroups(messages, keywords);
         ArrayList<MessageObject> visible = null;
         for (int i = 0; i < messages.size(); i++) {
             MessageObject message = messages.get(i);
-            if (message != null && (messageMatches(message, keywords) || hiddenGroups.contains(message.getGroupId()))) {
+            if (message != null && (messageMatchesPrepared(message, keywords) || hiddenGroups.contains(message.getGroupId()))) {
                 if (visible == null) {
                     visible = new ArrayList<>(Math.max(0, messages.size() - 1));
                     for (int j = 0; j < i; j++) {
@@ -740,7 +823,7 @@ public final class OpengramMessageFilter {
 
     public static HashSet<Long> hiddenGroups(int account, long dialogId, List<MessageObject> messages) {
         List<String> keywords = keywordsForHide(account);
-        if (keywords.isEmpty() || messages == null || !appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId), isBotChat(account, dialogId))) {
+        if (keywords.isEmpty() || messages == null || !appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId, null), isBotChat(account, dialogId))) {
             return new HashSet<>();
         }
         return hiddenGroups(messages, keywords);
@@ -758,10 +841,16 @@ public final class OpengramMessageFilter {
         if (id == 0 && message.messageOwner != null) {
             id = message.getDialogId();
         }
-        if (!appliesToDialog(DialogObject.isEncryptedDialog(id), isBroadcastChannel(account, id), isBotChat(account, id))) {
+        boolean encrypted = DialogObject.isEncryptedDialog(id);
+        boolean userDialog = !encrypted && DialogObject.isUserDialog(id);
+        TLRPC.User user = userDialog ? MessagesController.getInstance(account).getUser(id) : null;
+        if (holdUntilUserLoaded(true, userDialog, user)) {
+            return true;
+        }
+        if (!appliesToDialog(encrypted, isBroadcastChannel(account, id, message), user != null && user.bot)) {
             return false;
         }
-        return messageMatches(message, keywords);
+        return messageMatchesPrepared(message, keywords);
     }
 
     private static HashSet<Long> hiddenGroups(List<MessageObject> messages, List<String> keywords) {
@@ -772,7 +861,7 @@ public final class OpengramMessageFilter {
                 continue;
             }
             long groupId = message.getGroupId();
-            if (groupId != 0 && messageMatches(message, keywords)) {
+            if (groupId != 0 && messageMatchesPrepared(message, keywords)) {
                 groups.add(groupId);
             }
         }
@@ -784,20 +873,42 @@ public final class OpengramMessageFilter {
             return Collections.emptyList();
         }
         synchronized (lock) {
-            return new ArrayList<>(stateLocked(account).keywords);
+            return new ArrayList<>(stateLocked(account).folded);
         }
     }
 
-    private static boolean isBroadcastChannel(int account, long dialogId) {
+    public static void preload(int account) {
+        if (!validAccount(account)) {
+            return;
+        }
+        Utilities.globalQueue.postRunnable(() -> {
+            synchronized (lock) {
+                ensureLoadedLocked(account);
+            }
+        });
+    }
+
+    static boolean missingChatIsChannel(TLRPC.Chat chat, boolean localChannel, boolean localSupergroup) {
+        if (chat != null) {
+            return chat.broadcast;
+        }
+        return localChannel && !localSupergroup;
+    }
+
+    static boolean holdUntilUserLoaded(boolean filterOn, boolean userDialog, TLRPC.User user) {
+        return filterOn && userDialog && user == null;
+    }
+
+    private static boolean isBroadcastChannel(int account, long dialogId, MessageObject message) {
         if (!DialogObject.isChatDialog(dialogId)) {
             return false;
         }
         TLRPC.Chat chat = MessagesController.getInstance(account).getChat(-dialogId);
-        return ChatObject.isChannelAndNotMegaGroup(chat);
+        return missingChatIsChannel(chat, message != null && message.localChannel, message != null && message.localSupergroup);
     }
 
     private static boolean isBotChat(int account, long dialogId) {
-        if (!DialogObject.isUserDialog(dialogId)) {
+        if (!DialogObject.isUserDialog(dialogId) || DialogObject.isEncryptedDialog(dialogId)) {
             return false;
         }
         TLRPC.User user = MessagesController.getInstance(account).getUser(dialogId);
@@ -830,8 +941,7 @@ public final class OpengramMessageFilter {
         state.error = false;
         state.clientUserId = clientUserId;
         state.mode = mode;
-        state.keywords.clear();
-        state.keywords.addAll(snapshot.keywords);
+        state.replaceKeywords(snapshot.keywords);
     }
 
     private static boolean validAccount(int account) {

@@ -1,6 +1,7 @@
 package org.telegram.messenger;
 
 import org.junit.Test;
+import org.telegram.tgnet.TLRPC;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -148,6 +149,25 @@ public class OpengramMessageFilterTest {
         assertFalse(OpengramMessageFilter.matchesText("иванов", OpengramMessageFilter.parseKeywords("иван")));
         assertFalse(OpengramMessageFilter.matchesText("метра", OpengramMessageFilter.parseKeywords("метро")));
         assertTrue(OpengramMessageFilter.matchesText("x100y", OpengramMessageFilter.parseKeywords("100")));
+        assertFalse(OpengramMessageFilter.matchesText("news", OpengramMessageFilter.parseKeywords("new")));
+        assertFalse(OpengramMessageFilter.matchesText("new", OpengramMessageFilter.parseKeywords("news")));
+        assertTrue(OpengramMessageFilter.matchesText("horses", OpengramMessageFilter.parseKeywords("horse")));
+        assertTrue(OpengramMessageFilter.matchesText("horse", OpengramMessageFilter.parseKeywords("horses")));
+        assertTrue(OpengramMessageFilter.matchesText("gases", OpengramMessageFilter.parseKeywords("gas")));
+        assertTrue(OpengramMessageFilter.matchesText("gas", OpengramMessageFilter.parseKeywords("gases")));
+    }
+
+    @Test
+    public void missingChatWithLocalChannelIsAChannel() {
+        assertTrue(OpengramMessageFilter.missingChatIsChannel(null, true, false));
+        assertFalse(OpengramMessageFilter.missingChatIsChannel(null, true, true));
+        assertFalse(OpengramMessageFilter.missingChatIsChannel(null, false, false));
+        TLRPC.Chat community = new TLRPC.Chat();
+        community.broadcast = false;
+        assertFalse(OpengramMessageFilter.missingChatIsChannel(community, true, false));
+        TLRPC.Chat channel = new TLRPC.Chat();
+        channel.broadcast = true;
+        assertTrue(OpengramMessageFilter.missingChatIsChannel(channel, false, false));
     }
 
     @Test
