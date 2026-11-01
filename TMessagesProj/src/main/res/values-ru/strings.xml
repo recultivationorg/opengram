@@ -263,4 +263,32 @@
     <string name="RemindTodayAt">\'Отправить сегодня в\' HH:mm</string>
     <string name="RemindDayAt">\'Отправить\' d MMM \'в\' HH:mm</string>
     <string name="RemindDayYearAt">\'Напомнить\' d MMM yyyy \'в\' HH:mm</string>
+    <!--opengram reload-->
+    <string name="OpengramReload">Opengram Reload</string>
+    <string name="OpengramReloadInfo">Opengram Reload позволяет сохранить данные сессии в зашифрованный файл и восстановить их в другой установке. Это можно использовать для резервных копий, одной сессии на нескольких устройствах и других задач.</string>
+    <string name="OpengramReloadExport">Экспорт сессии</string>
+    <string name="OpengramReloadExportUnavailable">У этого аккаунта нет ключа сессии для экспорта.</string>
+    <string name="OpengramReloadWordsTitle">Запишите эти 12 слов</string>
+    <string name="OpengramReloadWordsInfo">Это Ваша фраза восстановления. Храните её в надёжном месте (например, на бумаге в сейфе или в менеджере паролей вроде KeepassXC/KeepassDX). Если злоумышленник получит и фразу, и файл, экспортированная сессия для Вас потеряна.</string>
+    <string name="OpengramReloadWroteThemDown">Я записал их</string>
+    <string name="OpengramReloadConfirmTitle">Подтвердите парольную фразу</string>
+    <string name="OpengramReloadConfirmInfo">Введите запрошенные слова из фразы восстановления, которую Вы только что сохранили.</string>
+    <string name="OpengramReloadWordN">Слово %1$d</string>
+    <string name="OpengramReloadContinue">Продолжить</string>
+    <string name="OpengramReloadSave">Сохранить файл сессии</string>
+    <string name="OpengramReloadSaveInfo">Файл зашифрован. Храните его вместе с 12 словами и отдельно от всего остального с этого устройства.</string>
+    <string name="OpengramReloadSaveFailed">Не удалось сохранить файл сессии.</string>
+    <string name="OpengramReloadImportInfo">Выберите файл сессии и введите парольную фразу из 12 слов, которой он зашифрован.</string>
+    <string name="OpengramReloadChooseFile">Выбрать файл</string>
+    <string name="OpengramReloadFileSelected">Файл выбран</string>
+    <string name="OpengramReloadPassphraseHint">двенадцать слов</string>
+    <string name="OpengramReloadImportAction">Загрузить сессию</string>
+    <string name="OpengramReloadImportFailed">Не удалось открыть этот файл с этой парольной фразой.</string>
+    <string name="OpengramReloadRollbackFailed">Импортированная сессия всё ещё хранится на этом устройстве. Повторите загрузку, прежде чем использовать этот файл.</string>
+    <string name="OpengramReloadAccountInUse">Этот аккаунт уже авторизован на этом устройстве.</string>
+    <string name="OpengramReloadSlotBusy">Выйдите из этого слота входа, прежде чем загружать сессию.</string>
+    <string name="AccDescrOpengramReload">Импортировать сессию Opengram</string>
+    <string name="OpengramReloadPasscodeRequired">Перед экспортом сессии установите пароль устройства или биометрию.</string>
+    <string name="OpengramReloadPasscodeTitle">Подтвердите экспорт</string>
+    <string name="OpengramReloadPasscodeMessage">Этот файл сам открывает доступ к аккаунту. Любой, у кого есть файл и 12 слов, может войти в этот аккаунт.</string>
 </resources>
