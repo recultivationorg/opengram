@@ -3339,14 +3339,14 @@
     <string name="MessageFilterStorageError">Secure storage for the keyword list failed. Nothing was written in plaintext.</string>
     <string name="MessageFilterStrongBoxWarning">This device has no Android StrongBox. The keyword list saved for this option is a potential information leak.</string>
     <string name="OpengramReload">Opengram Reload</string>
-    <string name="OpengramReloadInfo">Saves this account into an encrypted file. Another Opengram install can open that file with the 12-word passphrase.</string>
+    <string name="OpengramReloadInfo">Opengram Reload allows you to save your session data into an encrypted file and restore it in a different installation. You can use this for backups, sharing one session across devices, and more.</string>
     <string name="OpengramReloadExport">Export session</string>
     <string name="OpengramReloadExportUnavailable">This account has no session key to export.</string>
     <string name="OpengramReloadWordsTitle">Write down these 12 words</string>
-    <string name="OpengramReloadWordsInfo">These words encrypt the session file. They are not stored on this device. Anyone with the file and the words can enter this account.</string>
+    <string name="OpengramReloadWordsInfo">This is your recovery phrase. Make sure to store them in a secure location (i. e. on paper in a safe or in a password manager like KeepassXC/KeepassDX). Attacker having both recovery phrase and the file means game-over for the exported session.</string>
     <string name="OpengramReloadWroteThemDown">I wrote them down</string>
     <string name="OpengramReloadConfirmTitle">Confirm the passphrase</string>
-    <string name="OpengramReloadConfirmInfo">Enter the requested words from the passphrase you just wrote down.</string>
+    <string name="OpengramReloadConfirmInfo">Enter the requested words from the recovery phrase you\'ve just saved.</string>
     <string name="OpengramReloadWordN">Word %1$d</string>
     <string name="OpengramReloadContinue">Continue</string>
     <string name="OpengramReloadSave">Save session file</string>
@@ -3362,7 +3362,7 @@
     <string name="OpengramReloadAccountInUse">This account is already signed in on this device.</string>
     <string name="OpengramReloadSlotBusy">Sign out of this login slot before loading a session.</string>
     <string name="AccDescrOpengramReload">Import an Opengram session</string>
-    <string name="OpengramReloadPasscodeRequired">Set an app passcode before exporting a session.</string>
+    <string name="OpengramReloadPasscodeRequired">Set a device passcode or biometrics before exporting a session.</string>
     <string name="OpengramReloadPasscodeTitle">Confirm export</string>
     <string name="OpengramReloadPasscodeMessage">This file is a bearer session. Anyone with it and the 12 words can enter this account.</string>
     <string name="ExpireOnce">Expire</string>

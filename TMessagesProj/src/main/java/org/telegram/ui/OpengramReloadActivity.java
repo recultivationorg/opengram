@@ -4,7 +4,7 @@ import static org.telegram.messenger.LocaleController.formatString;
 import static org.telegram.messenger.LocaleController.getString;
 
 import android.app.Activity;
-import android.app.Dialog;
+import android.app.KeyguardManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -17,17 +17,21 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.FragmentActivity;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.OpengramReloadCrypto;
 import org.telegram.messenger.OpengramReloadWords;
 import org.telegram.messenger.R;
-import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
@@ -38,8 +42,8 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.EditTextBoldCursor;
-import org.telegram.ui.Components.PasscodeView;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 import java.io.OutputStream;
 import java.security.SecureRandom;
@@ -50,6 +54,7 @@ public class OpengramReloadActivity extends BaseFragment {
     private static final int REQUEST_SAVE = 40;
 
     private final OpengramReloadWindow secure = new OpengramReloadWindow();
+    private OpengramReloadChrome chrome;
     private ScrollView scrollView;
     private byte[] authKey;
     private byte[] userBlob;
@@ -59,7 +64,7 @@ public class OpengramReloadActivity extends BaseFragment {
     private OpengramReloadWords.Phrase words;
     private int[] quiz;
     private EditTextBoldCursor[] quizFields;
-    private TextView quizButton;
+    private ButtonWithCounterView quizButton;
     private int exportOp;
     private int exportGeneration;
     private boolean exporting;
@@ -80,9 +85,10 @@ public class OpengramReloadActivity extends BaseFragment {
                 }
             }
         });
+        chrome = new OpengramReloadChrome(context);
         scrollView = new ScrollView(context);
         scrollView.setFillViewport(true);
-        scrollView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+        scrollView.addView(chrome.page, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
         showIntro();
         secure.acquire(getParentActivity());
         return fragmentView = scrollView;
@@ -143,48 +149,75 @@ public class OpengramReloadActivity extends BaseFragment {
 
     private void showIntro() {
         actionBar.setTitle(getString(R.string.OpengramReload));
-        LinearLayout column = column();
-        column.addView(body(getString(R.string.OpengramReloadInfo)));
-        column.addView(button(getString(R.string.OpengramReloadExport), v -> confirmExport()));
-        swap(column);
+        LinearLayout column = chrome.column(true);
+        LinearLayout card = chrome.card();
+        card.addView(chrome.body(getString(R.string.OpengramReloadInfo)));
+        column.addView(card);
+        column.addView(chrome.button(getString(R.string.OpengramReloadExport), v -> confirmExport()));
+        chrome.show(column, true);
     }
 
     private void confirmExport() {
-        if (getParentActivity() == null || exporting || confirming) {
+        Activity activity = getParentActivity();
+        if (activity == null || exporting || confirming) {
             return;
         }
-        if (SharedConfig.passcodeHash.length() == 0) {
+        if (!(activity instanceof FragmentActivity) || !deviceCredentialAvailable(activity)) {
             showNotice(getString(R.string.OpengramReloadPasscodeRequired));
             return;
         }
         confirming = true;
-        final Dialog dialog = new Dialog(getParentActivity(), R.style.TransparentDialog);
-        final PasscodeView passcodeView = new PasscodeView(getParentActivity(), getString(R.string.OpengramReloadPasscodeTitle), getString(R.string.OpengramReloadPasscodeMessage)) {
+        BiometricPrompt prompt = new BiometricPrompt((FragmentActivity) activity, ContextCompat.getMainExecutor(activity), new BiometricPrompt.AuthenticationCallback() {
             @Override
-            protected boolean isAppLock() {
-                return false;
+            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                confirming = false;
+                if (errorCode == BiometricPrompt.ERROR_USER_CANCELED || errorCode == BiometricPrompt.ERROR_CANCELED || errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                    return;
+                }
+                if (errString.length() > 0) {
+                    showNotice(errString.toString());
+                }
             }
 
             @Override
-            protected void onHidden() {
-                super.onHidden();
+            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
                 confirming = false;
-                dialog.dismiss();
+                startExport();
             }
-        };
-        passcodeView.setDelegate(view -> startExport());
-        FrameLayout frame = new FrameLayout(getParentActivity());
-        frame.addView(passcodeView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-        dialog.setContentView(frame);
-        dialog.setOnKeyListener((d, keyCode, event) -> {
-            if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.getAction() == android.view.KeyEvent.ACTION_UP) {
-                passcodeView.dismiss();
-                return true;
-            }
-            return false;
         });
-        dialog.show();
-        passcodeView.onShow(true, false);
+        BiometricPrompt.PromptInfo.Builder builder = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle(getString(R.string.OpengramReloadPasscodeTitle))
+                .setDescription(getString(R.string.OpengramReloadPasscodeMessage));
+        if (Build.VERSION.SDK_INT >= 30) {
+            builder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
+        } else {
+            allowDeviceCredential(builder);
+        }
+        try {
+            prompt.authenticate(builder.build());
+        } catch (Exception e) {
+            confirming = false;
+            showNotice(getString(R.string.OpengramReloadPasscodeRequired));
+        }
+    }
+
+    private boolean deviceCredentialAvailable(Activity activity) {
+        KeyguardManager keyguard = (KeyguardManager) activity.getSystemService(Context.KEYGUARD_SERVICE);
+        if (keyguard == null || !keyguard.isDeviceSecure()) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT < 30) {
+            return true;
+        }
+        BiometricManager manager = BiometricManager.from(activity);
+        int biometric = manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+        int credential = manager.canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL);
+        return biometric == BiometricManager.BIOMETRIC_SUCCESS || credential == BiometricManager.BIOMETRIC_SUCCESS;
+    }
+
+    @SuppressWarnings("deprecation")
+    private void allowDeviceCredential(BiometricPrompt.PromptInfo.Builder builder) {
+        builder.setDeviceCredentialAllowed(true);
     }
 
     private void startExport() {
@@ -238,24 +271,27 @@ public class OpengramReloadActivity extends BaseFragment {
 
     private void showWords() {
         actionBar.setTitle(getString(R.string.OpengramReloadWordsTitle));
-        LinearLayout column = column();
-        column.addView(body(getString(R.string.OpengramReloadWordsInfo)));
+        LinearLayout column = chrome.column(false);
+        LinearLayout card = chrome.card();
+        card.addView(chrome.body(getString(R.string.OpengramReloadWordsInfo)));
         for (int i = 0; i < OpengramReloadWords.WORD_COUNT; i++) {
             TextView word = new TextView(getContext());
             word.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             word.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            word.setGravity(Gravity.CENTER_HORIZONTAL);
             word.setText((i + 1) + ".  " + words.word(i));
             word.setTextIsSelectable(false);
             word.setLongClickable(false);
             word.setOnLongClickListener(v -> true);
-            column.addView(word, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 0f, 0f, 8f));
+            card.addView(word, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, i == 0 ? 12f : 0f, 0f, 8f));
         }
-        column.addView(button(getString(R.string.Copy), v -> copyWords()));
-        column.addView(button(getString(R.string.OpengramReloadWroteThemDown), v -> {
+        column.addView(card);
+        column.addView(chrome.button(getString(R.string.Copy), v -> copyWords()));
+        column.addView(chrome.button(getString(R.string.OpengramReloadWroteThemDown), v -> {
             clearClipboard();
             showQuiz();
         }));
-        swap(column);
+        chrome.show(column, false);
     }
 
     private void copyWords() {
@@ -312,8 +348,9 @@ public class OpengramReloadActivity extends BaseFragment {
         actionBar.setTitle(getString(R.string.OpengramReloadConfirmTitle));
         quiz = OpengramReloadWords.quizPositions(new SecureRandom());
         quizFields = new EditTextBoldCursor[quiz.length];
-        LinearLayout column = column();
-        column.addView(body(getString(R.string.OpengramReloadConfirmInfo)));
+        LinearLayout column = chrome.column(false);
+        LinearLayout card = chrome.card();
+        card.addView(chrome.body(getString(R.string.OpengramReloadConfirmInfo)));
         TextWatcher watcher = new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -332,26 +369,29 @@ public class OpengramReloadActivity extends BaseFragment {
             TextView label = new TextView(getContext());
             label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             label.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            label.setGravity(Gravity.CENTER_HORIZONTAL);
             label.setText(formatString(R.string.OpengramReloadWordN, quiz[i] + 1));
-            column.addView(label, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, i == 0 ? 0f : 12f, 0f, 4f));
+            card.addView(label, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, i == 0 ? 12f : 12f, 0f, 4f));
             EditTextBoldCursor field = new EditTextBoldCursor(getContext());
             field.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
             field.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             field.setHintTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteHintText));
-            field.setBackground(Theme.createEditTextDrawable(getContext(), false));
+            field.setGravity(Gravity.CENTER_HORIZONTAL);
+            chrome.roundField(field);
             field.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
             field.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI);
             field.setSingleLine(true);
             field.setTextIsSelectable(false);
             field.addTextChangedListener(watcher);
             quizFields[i] = field;
-            column.addView(field, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 0f, 0f, 0f));
+            card.addView(field, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 0f, 0f, 0f));
         }
-        quizButton = button(getString(R.string.OpengramReloadContinue), v -> confirmQuiz());
+        column.addView(card);
+        quizButton = chrome.button(getString(R.string.OpengramReloadContinue), v -> confirmQuiz());
         quizButton.setEnabled(false);
         quizButton.setAlpha(0.5f);
         column.addView(quizButton);
-        swap(column);
+        chrome.show(column, false);
     }
 
     private void refreshQuizButton() {
@@ -414,10 +454,12 @@ public class OpengramReloadActivity extends BaseFragment {
 
     private void showSave() {
         actionBar.setTitle(getString(R.string.OpengramReload));
-        LinearLayout column = column();
-        column.addView(body(getString(R.string.OpengramReloadSaveInfo)));
-        column.addView(button(getString(R.string.OpengramReloadSave), v -> openSavePicker()));
-        swap(column);
+        LinearLayout column = chrome.column(true);
+        LinearLayout card = chrome.card();
+        card.addView(chrome.body(getString(R.string.OpengramReloadSaveInfo)));
+        column.addView(card);
+        column.addView(chrome.button(getString(R.string.OpengramReloadSave), v -> openSavePicker()));
+        chrome.show(column, true);
     }
 
     private void openSavePicker() {
@@ -429,43 +471,6 @@ public class OpengramReloadActivity extends BaseFragment {
         intent.setType("application/octet-stream");
         intent.putExtra(Intent.EXTRA_TITLE, "opengram-reload.bin");
         startActivityForResult(intent, REQUEST_SAVE);
-    }
-
-    private LinearLayout column() {
-        LinearLayout column = new LinearLayout(getContext());
-        column.setOrientation(LinearLayout.VERTICAL);
-        int pad = AndroidUtilities.dp(20);
-        column.setPadding(pad, pad, pad, pad);
-        return column;
-    }
-
-    private TextView body(String text) {
-        TextView view = new TextView(getContext());
-        view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-        view.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-        view.setText(text);
-        view.setLineSpacing(AndroidUtilities.dp(2), 1f);
-        LinearLayout.LayoutParams params = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 0f, 0f, 16f);
-        view.setLayoutParams(params);
-        return view;
-    }
-
-    private TextView button(String text, View.OnClickListener listener) {
-        TextView view = new TextView(getContext());
-        view.setText(text);
-        view.setGravity(Gravity.CENTER);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-        view.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
-        view.setBackground(Theme.AdaptiveRipple.filledRectByKey(Theme.key_featuredStickers_addButton, 8));
-        view.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(12), AndroidUtilities.dp(16), AndroidUtilities.dp(12));
-        view.setOnClickListener(listener);
-        view.setLayoutParams(LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 12f, 0f, 0f));
-        return view;
-    }
-
-    private void swap(LinearLayout column) {
-        scrollView.removeAllViews();
-        scrollView.addView(column, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
     }
 
     private void showNotice(String message) {

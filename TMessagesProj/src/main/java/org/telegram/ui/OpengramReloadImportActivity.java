@@ -16,7 +16,6 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
@@ -35,6 +34,7 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.EditTextBoldCursor;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -45,8 +45,8 @@ public class OpengramReloadImportActivity extends BaseFragment {
     private static final int REQUEST_OPEN = 41;
 
     private final OpengramReloadWindow secure = new OpengramReloadWindow();
-    private TextView fileButton;
-    private TextView loadButton;
+    private ButtonWithCounterView fileButton;
+    private ButtonWithCounterView loadButton;
     private EditTextBoldCursor passphraseField;
     private Uri fileUri;
     private AlertDialog progress;
@@ -72,41 +72,35 @@ public class OpengramReloadImportActivity extends BaseFragment {
             }
         });
 
+        OpengramReloadChrome chrome = new OpengramReloadChrome(context);
         ScrollView scrollView = new ScrollView(context);
         scrollView.setFillViewport(true);
-        scrollView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-        LinearLayout column = new LinearLayout(context);
-        column.setOrientation(LinearLayout.VERTICAL);
-        int pad = AndroidUtilities.dp(20);
-        column.setPadding(pad, pad, pad, pad);
+        scrollView.addView(chrome.page, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
 
-        TextView info = new TextView(context);
-        info.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-        info.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-        info.setText(getString(R.string.OpengramReloadImportInfo));
-        info.setLineSpacing(AndroidUtilities.dp(2), 1f);
-        column.addView(info, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 0f, 0f, 16f));
-
-        fileButton = actionButton(getString(R.string.OpengramReloadChooseFile), v -> openPicker());
-        column.addView(fileButton);
+        LinearLayout column = chrome.column(true);
+        LinearLayout card = chrome.card();
+        card.addView(chrome.body(getString(R.string.OpengramReloadImportInfo)));
 
         passphraseField = new EditTextBoldCursor(context);
         passphraseField.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
         passphraseField.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         passphraseField.setHintTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteHintText));
         passphraseField.setHint(getString(R.string.OpengramReloadPassphraseHint));
-        passphraseField.setBackground(Theme.createEditTextDrawable(context, false));
+        chrome.roundField(passphraseField);
         passphraseField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
         passphraseField.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         passphraseField.setSingleLine(false);
         passphraseField.setMinLines(3);
         passphraseField.setMaxLines(6);
-        passphraseField.setGravity(Gravity.TOP | (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT));
-        column.addView(passphraseField, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 16f, 0f, 0f));
+        passphraseField.setGravity(Gravity.CENTER_HORIZONTAL);
+        card.addView(passphraseField, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 16f, 0f, 0f));
+        column.addView(card);
 
-        loadButton = actionButton(getString(R.string.OpengramReloadImportAction), v -> load());
+        fileButton = chrome.button(getString(R.string.OpengramReloadChooseFile), v -> openPicker());
+        column.addView(fileButton);
+        loadButton = chrome.button(getString(R.string.OpengramReloadImportAction), v -> load());
         column.addView(loadButton);
-        scrollView.addView(column, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
+        chrome.show(column, true);
         secure.acquire(getParentActivity());
         return fragmentView = scrollView;
     }
@@ -479,19 +473,6 @@ public class OpengramReloadImportActivity extends BaseFragment {
             }
         }
         return getString(R.string.OpengramReloadFileSelected);
-    }
-
-    private TextView actionButton(String text, android.view.View.OnClickListener listener) {
-        TextView view = new TextView(getContext());
-        view.setText(text);
-        view.setGravity(Gravity.CENTER);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-        view.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
-        view.setBackground(Theme.AdaptiveRipple.filledRectByKey(Theme.key_featuredStickers_addButton, 8));
-        view.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(12), AndroidUtilities.dp(16), AndroidUtilities.dp(12));
-        view.setOnClickListener(listener);
-        view.setLayoutParams(LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0f, 12f, 0f, 0f));
-        return view;
     }
 
     private void showNotice(String message) {

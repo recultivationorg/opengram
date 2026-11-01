@@ -577,6 +577,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 marginLayoutParams = (MarginLayoutParams) proxyButtonView.getLayoutParams();
                 marginLayoutParams.topMargin = AndroidUtilities.dp(16) + statusBarHeight;
 
+                if (reloadButtonView != null) {
+                    marginLayoutParams = (MarginLayoutParams) reloadButtonView.getLayoutParams();
+                    marginLayoutParams.topMargin = AndroidUtilities.dp(16) + statusBarHeight;
+                }
+
                 marginLayoutParams = (MarginLayoutParams) radialProgressView.getLayoutParams();
                 marginLayoutParams.topMargin = AndroidUtilities.dp(16) + statusBarHeight;
 
@@ -1678,7 +1683,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         params.gravity = Gravity.RIGHT | Gravity.TOP;
         params.width = AndroidUtilities.dp(32);
         params.height = AndroidUtilities.dp(32);
-        params.topMargin = AndroidUtilities.dp(16);
+        params.topMargin = AndroidUtilities.dp(16) + (AndroidUtilities.isTablet() ? 0 : AndroidUtilities.statusBarHeight);
         params.rightMargin = AndroidUtilities.dp(proxyShown ? 56 : 16);
         reloadButtonView.setLayoutParams(params);
     }
