@@ -549,6 +549,8 @@ static void deliverReload(const std::shared_ptr<ReloadOp> &op, bool ok, int32_t 
     if (clazz != nullptr) {
         jmethodID method = env->GetMethodID(clazz, "onComplete", "(ZI[B)V");
         if (method != nullptr) {
+            // The callback owns this byte[]. It may retain the key for a later
+            // thread, so the array is not cleared after the call returns.
             env->CallVoidMethod(op->callback, method, ok ? JNI_TRUE : JNI_FALSE, (jint) dcId, key);
         }
         if (env->ExceptionCheck()) {
@@ -557,11 +559,6 @@ static void deliverReload(const std::shared_ptr<ReloadOp> &op, bool ok, int32_t 
         env->DeleteLocalRef(clazz);
     }
     if (key != nullptr) {
-        jbyte *bytes = env->GetByteArrayElements(key, nullptr);
-        if (bytes != nullptr) {
-            OPENSSL_cleanse(bytes, 256);
-            env->ReleaseByteArrayElements(key, bytes, 0);
-        }
         env->DeleteLocalRef(key);
     }
     env->DeleteGlobalRef(op->callback);
@@ -580,18 +577,35 @@ static bool reloadCancelled(const std::shared_ptr<ReloadOp> &op) {
     return op->cancelled.load();
 }
 
-void ConnectionsManager::rollbackStagedKey() {
-    Datacenter *datacenter = getDatacenterWithId(currentDatacenterId);
-    if (datacenter != nullptr) {
-        datacenter->suspendConnections(true);
-        datacenter->clearAuthKey(HandshakeTypeAll);
+bool ConnectionsManager::rollbackStagedKey() {
+    if (reloadRolledBack) {
+        return true;
     }
+    if (!reloadConfigHold && !reloadDcSaved) {
+        return false;
+    }
+    uint32_t stagedDc = reloadStagedDc != 0 ? reloadStagedDc : currentDatacenterId;
+    uint32_t rememberedCurrent = currentDatacenterId;
+    Datacenter *datacenter = getDatacenterWithId(stagedDc);
+    if (datacenter == nullptr) {
+        return false;
+    }
+    datacenter->suspendConnections(true);
+    datacenter->clearAuthKey(HandshakeTypeAll);
     if (reloadDcSaved) {
         currentDatacenterId = reloadPreviousDc;
     }
+    bool saved = saveConfig(true);
+    if (!saved) {
+        currentDatacenterId = rememberedCurrent;
+        return false;
+    }
     reloadDcSaved = false;
     reloadConfigHold = false;
-    saveConfig(true);
+    reloadCommitDurable = false;
+    reloadRolledBack = true;
+    reloadStagedDc = 0;
+    return true;
 }
 
 int ConnectionsManager::beginReload(int kind, int32_t dcId, const uint8_t *key256, jobject callback) {
@@ -660,6 +674,9 @@ int ConnectionsManager::beginReload(int kind, int32_t dcId, const uint8_t *key25
                 reloadDcSaved = true;
             }
             reloadConfigHold = true;
+            reloadCommitDurable = false;
+            reloadRolledBack = false;
+            reloadStagedDc = (uint32_t) op->dcId;
             bool installed = datacenter->installPermanentAuthKey(local);
             OPENSSL_cleanse(local, sizeof(local));
             if (!installed || reloadCancelled(op)) {
@@ -689,8 +706,22 @@ int ConnectionsManager::beginReload(int kind, int32_t dcId, const uint8_t *key25
             }
             reloadConfigHold = false;
             reloadDcSaved = false;
+            reloadCommitDurable = true;
+            reloadRolledBack = false;
+            reloadStagedDc = 0;
             forgetReload(op);
             deliverReload(op, true, (int32_t) currentDatacenterId, nullptr);
+            return;
+        }
+        if (reloadRolledBack || (!reloadConfigHold && !reloadDcSaved && !reloadCommitDurable)) {
+            forgetReload(op);
+            deliverReload(op, true, 0, nullptr);
+            return;
+        }
+        if (reloadConfigHold || reloadDcSaved) {
+            bool saved = rollbackStagedKey();
+            forgetReload(op);
+            deliverReload(op, saved, 0, nullptr);
             return;
         }
         bool cleared = false;
@@ -703,14 +734,13 @@ int ConnectionsManager::beginReload(int kind, int32_t dcId, const uint8_t *key25
             datacenter->clearAuthKey(HandshakeTypeAll);
             cleared = true;
         }
-        if (reloadDcSaved) {
-            currentDatacenterId = reloadPreviousDc;
+        bool saved = cleared && saveConfig(true);
+        if (saved) {
+            reloadCommitDurable = false;
+            reloadRolledBack = true;
         }
-        reloadDcSaved = false;
-        reloadConfigHold = false;
-        bool saved = saveConfig(true);
         forgetReload(op);
-        deliverReload(op, cleared && saved, 0, nullptr);
+        deliverReload(op, saved, 0, nullptr);
     });
     return op->id;
 }

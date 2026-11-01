@@ -59,21 +59,20 @@ bool Config::writeConfig(NativeByteBuffer *buffer) {
     FILE *file = fopen(configPath.c_str(), "rb");
     FILE *backup = fopen(backupPath.c_str(), "rb");
     bool error = false;
-    bool hasBackupFile = false;
     if (file != nullptr) {
         if (backup == nullptr) {
             fclose(file);
             if (rename(configPath.c_str(), backupPath.c_str()) != 0) {
                 if (LOGS_ENABLED) DEBUG_E("Config(%p) unable to rename file %s to backup file %s", this, configPath.c_str(), backupPath.c_str());
                 error = true;
-            } else {
-                hasBackupFile = true;
             }
         } else {
             fclose(file);
             fclose(backup);
             remove(configPath.c_str());
         }
+    } else if (backup != nullptr) {
+        fclose(backup);
     }
     if (error) {
         return false;
@@ -115,14 +114,16 @@ bool Config::writeConfig(NativeByteBuffer *buffer) {
         if (LOGS_ENABLED) DEBUG_E("Config(%p, %s) fclose failed", this, configPath.c_str());
         error = true;
     }
+    // The next open restores a leftover backup over the new file. The write is
+    // durable only when that backup is gone, so a rolled-back auth key cannot return.
+    if (!error && remove(backupPath.c_str()) != 0 && errno != ENOENT) {
+        if (LOGS_ENABLED) DEBUG_E("Config(%p, %s) remove backup failed, %s", this, backupPath.c_str(), strerror(errno));
+        error = true;
+    }
     if (error) {
         if (LOGS_ENABLED) DEBUG_E("Config(%p, %s) failed to write config", this, configPath.c_str());
         if (remove(configPath.c_str())) {
             if (LOGS_ENABLED) DEBUG_E("Config(%p, %s) remove config failed", this, configPath.c_str());
-        }
-    } else {
-        if (hasBackupFile && remove(backupPath.c_str())) {
-            if (LOGS_ENABLED) DEBUG_E("Config(%p, %s) remove backup failed, %s", this, backupPath.c_str(), strerror(errno));
         }
     }
     if (!error) {

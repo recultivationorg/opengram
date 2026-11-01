@@ -196,36 +196,39 @@ public class OpengramReloadActivity extends BaseFragment {
         AlertDialog progress = new AlertDialog(getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER);
         progress.show();
         final int account = currentAccount;
-        exportOp = ConnectionsManager.getInstance(account).beginCopyPermAuthKey((ok, dc, key) -> AndroidUtilities.runOnUIThread(() -> {
-            exportOp = 0;
-            dismiss(progress);
-            exporting = false;
-            TLRPC.User user = UserConfig.getInstance(account).getCurrentUser();
-            byte[] blob = user == null ? null : OpengramReloadCrypto.serializeUser(user);
-            if (generation != exportGeneration || isFinishing() || getParentActivity() == null) {
-                wipeBytes(key);
-                wipeBytes(blob);
-                return;
-            }
-            if (!ok || key == null || user == null || user.id <= 0 || dc < 1 || dc > 5) {
-                wipeBytes(key);
-                wipeBytes(blob);
-                showNotice(getString(R.string.OpengramReloadExportUnavailable));
-                return;
-            }
-            if (blob == null) {
-                wipeBytes(key);
-                showNotice(getString(R.string.OpengramReloadSaveFailed));
-                return;
-            }
-            wipe();
-            authKey = key;
-            userBlob = blob;
-            userId = user.id;
-            dcId = dc;
-            words = OpengramReloadWords.generate(new SecureRandom());
-            showWords();
-        }));
+        exportOp = ConnectionsManager.getInstance(account).beginCopyPermAuthKey((ok, dc, key) -> {
+            final byte[] owned = OpengramReloadCrypto.takeDeliveredKey(key);
+            AndroidUtilities.runOnUIThread(() -> {
+                exportOp = 0;
+                dismiss(progress);
+                exporting = false;
+                TLRPC.User user = UserConfig.getInstance(account).getCurrentUser();
+                byte[] blob = user == null ? null : OpengramReloadCrypto.serializeUser(user);
+                if (generation != exportGeneration || isFinishing() || getParentActivity() == null) {
+                    wipeBytes(owned);
+                    wipeBytes(blob);
+                    return;
+                }
+                if (!ok || owned == null || user == null || user.id <= 0 || dc < 1 || dc > 5) {
+                    wipeBytes(owned);
+                    wipeBytes(blob);
+                    showNotice(getString(R.string.OpengramReloadExportUnavailable));
+                    return;
+                }
+                if (blob == null) {
+                    wipeBytes(owned);
+                    showNotice(getString(R.string.OpengramReloadSaveFailed));
+                    return;
+                }
+                wipe();
+                authKey = owned;
+                userBlob = blob;
+                userId = user.id;
+                dcId = dc;
+                words = OpengramReloadWords.generate(new SecureRandom());
+                showWords();
+            });
+        });
         if (exportOp == 0) {
             exporting = false;
             dismiss(progress);
@@ -261,7 +264,8 @@ public class OpengramReloadActivity extends BaseFragment {
         }
         char[] passphrase = words.toPassphrase();
         try {
-            if (AndroidUtilities.addToClipboard(new String(passphrase))) {
+            // ClipboardManager accepts only a CharSequence. The service copies that text into its own process, and this screen cannot wipe the service copy in place.
+            if (AndroidUtilities.addToClipboard(new PassphraseClip(passphrase))) {
                 if (clipboardSecret != null) {
                     Arrays.fill(clipboardSecret, '\0');
                 }
@@ -286,18 +290,22 @@ public class OpengramReloadActivity extends BaseFragment {
         if (clipboardSecret == null || generation != clipboardGeneration) {
             return;
         }
-        if (Build.VERSION.SDK_INT >= 28 && ApplicationLoader.applicationContext != null) {
+        char[] secret = clipboardSecret;
+        clipboardSecret = null;
+        if (ApplicationLoader.applicationContext != null) {
             ClipboardManager manager = (ClipboardManager) ApplicationLoader.applicationContext.getSystemService(Context.CLIPBOARD_SERVICE);
             if (manager != null) {
                 ClipData clip = manager.getPrimaryClip();
                 CharSequence text = clip != null && clip.getItemCount() > 0 ? clip.getItemAt(0).getText() : null;
-                if (OpengramReloadWords.clipboardHolds(clipboardSecret, text)) {
+                int action = OpengramReloadWords.clipboardClearAction(Build.VERSION.SDK_INT, secret, text);
+                if (action == OpengramReloadWords.CLIP_CLEAR && Build.VERSION.SDK_INT >= 28) {
                     manager.clearPrimaryClip();
+                } else if (action == OpengramReloadWords.CLIP_REPLACE) {
+                    manager.setPrimaryClip(ClipData.newPlainText("", ""));
                 }
             }
         }
-        Arrays.fill(clipboardSecret, '\0');
-        clipboardSecret = null;
+        Arrays.fill(secret, '\0');
     }
 
     private void showQuiz() {
@@ -502,6 +510,34 @@ public class OpengramReloadActivity extends BaseFragment {
     private static void wipeBytes(byte[] value) {
         if (value != null) {
             Arrays.fill(value, (byte) 0);
+        }
+    }
+
+    private static final class PassphraseClip implements CharSequence {
+        private final char[] text;
+
+        private PassphraseClip(char[] text) {
+            this.text = text;
+        }
+
+        @Override
+        public int length() {
+            return text.length;
+        }
+
+        @Override
+        public char charAt(int index) {
+            return text[index];
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return new String(text, start, end - start);
+        }
+
+        @Override
+        public String toString() {
+            return new String(text);
         }
     }
 }

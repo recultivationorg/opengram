@@ -4,8 +4,8 @@ import java.util.Arrays;
 
 /**
  * Orders a reload import so the account is activated only after the staged
- * key has been checked against the server. A cancelled or stale result rolls
- * the key back and cannot activate the account.
+ * key has been checked against the server. A cancelled or failed attempt
+ * stays unfinished until its rollback has been persisted.
  */
 public final class OpengramReloadImportMachine {
 
@@ -14,6 +14,7 @@ public final class OpengramReloadImportMachine {
     public static final int VALIDATION_FAILED = 3;
     public static final int ACTIVATION_FAILED = 4;
     public static final int CANCELLED = 5;
+    public static final int ROLLBACK_FAILED = 6;
 
     public interface Done {
         void onComplete(boolean ok);
@@ -50,6 +51,8 @@ public final class OpengramReloadImportMachine {
     private int generation;
     private boolean busy;
     private boolean staged;
+    private boolean rollingBack;
+    private boolean rollbackRequired;
     private Listener listener;
     private long expectedUserId;
 
@@ -57,10 +60,16 @@ public final class OpengramReloadImportMachine {
         this.backend = backend;
     }
 
+    public boolean needsRollback() {
+        synchronized (lock) {
+            return rollbackRequired;
+        }
+    }
+
     public boolean start(int dcId, byte[] key, long expectedUserId, Listener listener) {
         final int gen;
         synchronized (lock) {
-            if (busy || key == null || key.length != 256 || expectedUserId <= 0 || listener == null) {
+            if (busy || rollingBack || rollbackRequired || key == null || key.length != 256 || expectedUserId <= 0 || listener == null) {
                 return false;
             }
             if (!backend.accountFree(expectedUserId)) {
@@ -82,44 +91,77 @@ public final class OpengramReloadImportMachine {
         return true;
     }
 
+    public boolean retryRollback(Listener listener) {
+        return requestRollback(listener, true);
+    }
+
+    public boolean recoverRollback(Listener listener) {
+        return requestRollback(listener, false);
+    }
+
     public void cancel() {
-        Listener current;
         boolean roll;
+        Listener current = null;
         synchronized (lock) {
-            if (!busy) {
+            if (!busy || rollingBack) {
                 return;
             }
             generation++;
-            busy = false;
-            roll = staged;
-            staged = false;
-            current = listener;
-            listener = null;
+            if (!staged) {
+                busy = false;
+                current = listener;
+                listener = null;
+                roll = false;
+            } else {
+                staged = false;
+                roll = true;
+            }
         }
         backend.cancelPending();
-        if (roll) {
-            backend.rollback(ok -> { });
+        if (!roll) {
+            if (current != null) {
+                current.onFailure(CANCELLED);
+            }
+            return;
         }
-        if (current != null) {
-            current.onFailure(CANCELLED);
+        beginRollback(CANCELLED);
+    }
+
+    private boolean requestRollback(Listener listener, boolean requirePending) {
+        synchronized (lock) {
+            if (busy || rollingBack || listener == null) {
+                return false;
+            }
+            if (requirePending && !rollbackRequired) {
+                return false;
+            }
+            busy = true;
+            rollingBack = true;
+            this.listener = listener;
         }
+        backend.rollback(ok -> finishRollback(0, ok));
+        return true;
     }
 
     private void onStaged(int gen, boolean ok) {
         boolean validate = false;
         boolean drop = false;
+        int reason = 0;
         synchronized (lock) {
             if (!current(gen)) {
                 drop = ok;
             } else if (!ok) {
-                fail(INSTALL_FAILED);
+                reason = INSTALL_FAILED;
+                rollingBack = true;
             } else {
                 staged = true;
                 validate = true;
             }
         }
         if (drop) {
-            backend.rollback(ignored -> { });
+            quietRollback();
+        } else if (reason != 0) {
+            beginRollback(reason);
         } else if (validate) {
             backend.validate(serverUserId -> onValidated(gen, serverUserId));
         }
@@ -127,26 +169,22 @@ public final class OpengramReloadImportMachine {
 
     private void onValidated(int gen, long serverUserId) {
         boolean commit = false;
-        boolean roll = false;
+        boolean quiet = false;
         int reason = 0;
         synchronized (lock) {
             if (!current(gen)) {
-                roll = staged;
+                quiet = staged && !rollingBack;
             } else if (serverUserId != expectedUserId) {
-                roll = true;
-                staged = false;
                 reason = VALIDATION_FAILED;
+                rollingBack = true;
             } else {
                 commit = true;
             }
         }
-        if (roll) {
-            backend.rollback(ignored -> { });
-        }
-        if (reason != 0) {
-            synchronized (lock) {
-                fail(reason);
-            }
+        if (quiet) {
+            quietRollback();
+        } else if (reason != 0) {
+            beginRollback(reason);
         } else if (commit) {
             backend.commit(ok -> onCommitted(gen, ok, serverUserId));
         }
@@ -154,32 +192,30 @@ public final class OpengramReloadImportMachine {
 
     private void onCommitted(int gen, boolean ok, long serverUserId) {
         boolean activate = false;
-        boolean roll = false;
+        boolean quiet = false;
         int reason = 0;
         synchronized (lock) {
             if (!current(gen)) {
-                roll = ok || staged;
+                quiet = (ok || staged) && !rollingBack;
             } else if (!ok) {
-                roll = true;
-                staged = false;
                 reason = INSTALL_FAILED;
+                rollingBack = true;
             } else {
                 activate = true;
             }
         }
-        if (roll && !activate) {
-            backend.rollback(ignored -> { });
+        if (quiet) {
+            quietRollback();
+            return;
         }
         if (reason != 0) {
-            synchronized (lock) {
-                fail(reason);
-            }
+            beginRollback(reason);
             return;
         }
         if (!activate) {
             return;
         }
-        boolean activated = false;
+        boolean activated;
         try {
             activated = backend.activate(serverUserId);
         } catch (Exception e) {
@@ -188,9 +224,10 @@ public final class OpengramReloadImportMachine {
         Listener success = null;
         synchronized (lock) {
             if (!activated || !current(gen)) {
-                roll = true;
-                reason = ACTIVATION_FAILED;
-                staged = false;
+                if (!rollingBack) {
+                    reason = ACTIVATION_FAILED;
+                    rollingBack = true;
+                }
             } else {
                 staged = false;
                 busy = false;
@@ -198,11 +235,8 @@ public final class OpengramReloadImportMachine {
                 listener = null;
             }
         }
-        if (roll) {
-            backend.rollback(ignored -> { });
-            synchronized (lock) {
-                fail(reason);
-            }
+        if (reason != 0) {
+            beginRollback(reason);
             return;
         }
         if (success != null) {
@@ -210,17 +244,60 @@ public final class OpengramReloadImportMachine {
         }
     }
 
-    private boolean current(int gen) {
-        return busy && gen == generation;
+    private void beginRollback(int cleanReason) {
+        synchronized (lock) {
+            rollingBack = true;
+            busy = true;
+        }
+        backend.rollback(ok -> finishRollback(cleanReason, ok));
     }
 
-    private void fail(int reason) {
-        busy = false;
-        staged = false;
-        Listener current = listener;
-        listener = null;
-        if (current != null) {
+    private void quietRollback() {
+        backend.rollback(ok -> {
+            synchronized (lock) {
+                if (busy || rollingBack) {
+                    return;
+                }
+                rollbackRequired = !ok;
+                staged = !ok;
+            }
+        });
+    }
+
+    private void finishRollback(int cleanReason, boolean ok) {
+        Listener current;
+        int reason = 0;
+        boolean recovered = false;
+        synchronized (lock) {
+            rollingBack = false;
+            busy = false;
+            if (!ok) {
+                rollbackRequired = true;
+                staged = true;
+                reason = ROLLBACK_FAILED;
+            } else {
+                rollbackRequired = false;
+                staged = false;
+                if (cleanReason == 0) {
+                    recovered = true;
+                } else {
+                    reason = cleanReason;
+                }
+            }
+            current = listener;
+            listener = null;
+        }
+        if (current == null) {
+            return;
+        }
+        if (recovered) {
+            current.onSuccess();
+        } else {
             current.onFailure(reason);
         }
+    }
+
+    private boolean current(int gen) {
+        return busy && gen == generation && !rollingBack;
     }
 }

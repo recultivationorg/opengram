@@ -97,7 +97,7 @@ private:
     void loadConfig();
     bool saveConfig();
     bool saveConfig(bool force);
-    void rollbackStagedKey();
+    bool rollbackStagedKey();
     void saveConfigInternal(NativeByteBuffer *buffer);
     void select();
     void wakeup();
@@ -146,7 +146,10 @@ private:
     bool reloadConfigHold = false;
     bool reloadConfigDirty = false;
     bool reloadDcSaved = false;
+    bool reloadCommitDurable = false;
+    bool reloadRolledBack = false;
     uint32_t reloadPreviousDc = 0;
+    uint32_t reloadStagedDc = 0;
 
     std::list<EventObject *> events;
 

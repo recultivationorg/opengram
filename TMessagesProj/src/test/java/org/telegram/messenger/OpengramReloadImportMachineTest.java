@@ -124,6 +124,99 @@ public class OpengramReloadImportMachineTest {
     }
 
     @Test
+    public void rollbackSuccessIsReportedOnlyAfterItCompletes() {
+        Fake backend = new Fake();
+        backend.serverId = 8;
+        backend.rollbackNow = false;
+        OpengramReloadImportMachine machine = new OpengramReloadImportMachine(backend);
+        Result result = new Result();
+        assertTrue(machine.start(2, key(), 7, result));
+        assertEquals(-1, result.reason);
+        assertEquals(1, backend.rollbacks);
+        assertEquals(0, backend.activates);
+        backend.fireRollback();
+        assertEquals(OpengramReloadImportMachine.VALIDATION_FAILED, result.reason);
+        assertFalse(machine.needsRollback());
+    }
+
+    @Test
+    public void rollbackPersistenceFailureIsNotACleanValidationFailure() {
+        Fake backend = new Fake();
+        backend.serverId = 8;
+        backend.rollbackOk = false;
+        OpengramReloadImportMachine machine = new OpengramReloadImportMachine(backend);
+        Result result = new Result();
+        assertTrue(machine.start(2, key(), 7, result));
+        assertEquals(OpengramReloadImportMachine.ROLLBACK_FAILED, result.reason);
+        assertFalse(result.success);
+        assertEquals(0, backend.activates);
+        assertEquals(0, backend.commits);
+        assertTrue(machine.needsRollback());
+        assertFalse(machine.start(2, key(), 7, new Result()));
+    }
+
+    @Test
+    public void retryAfterRollbackFailureAllowsAnotherImport() {
+        Fake backend = new Fake();
+        backend.activateOk = false;
+        backend.rollbackOk = false;
+        OpengramReloadImportMachine machine = new OpengramReloadImportMachine(backend);
+        Result failed = new Result();
+        assertTrue(machine.start(2, key(), 7, failed));
+        assertEquals(OpengramReloadImportMachine.ROLLBACK_FAILED, failed.reason);
+        assertFalse(failed.success);
+        backend.rollbackOk = true;
+        Result recovered = new Result();
+        assertTrue(machine.retryRollback(recovered));
+        assertTrue(recovered.success);
+        assertFalse(machine.needsRollback());
+        backend.activateOk = true;
+        Result again = new Result();
+        assertTrue(machine.start(2, key(), 7, again));
+        assertTrue(again.success);
+        assertEquals(7L, backend.activatedId);
+    }
+
+    @Test
+    public void commitFailureStaysDirtyWhenRollbackCannotPersist() {
+        Fake backend = new Fake();
+        backend.commitOk = false;
+        backend.rollbackOk = false;
+        OpengramReloadImportMachine machine = new OpengramReloadImportMachine(backend);
+        Result result = new Result();
+        assertTrue(machine.start(2, key(), 7, result));
+        assertEquals(OpengramReloadImportMachine.ROLLBACK_FAILED, result.reason);
+        assertEquals(0, backend.activates);
+        assertTrue(machine.needsRollback());
+        assertFalse(machine.retryRollback(null));
+    }
+
+    @Test
+    public void clipboardClearReplacesThePhraseBeforeApi28() {
+        char[] phrase = "abandon about".toCharArray();
+        assertEquals(OpengramReloadWords.CLIP_REPLACE, OpengramReloadWords.clipboardClearAction(23, phrase, "abandon about"));
+        assertEquals(OpengramReloadWords.CLIP_REPLACE, OpengramReloadWords.clipboardClearAction(27, phrase, "abandon about"));
+        Arrays.fill(phrase, '\0');
+    }
+
+    @Test
+    public void clipboardClearUsesThePlatformClearFromApi28() {
+        char[] phrase = "abandon about".toCharArray();
+        assertEquals(OpengramReloadWords.CLIP_CLEAR, OpengramReloadWords.clipboardClearAction(28, phrase, "abandon about"));
+        assertEquals(OpengramReloadWords.CLIP_CLEAR, OpengramReloadWords.clipboardClearAction(35, phrase, "abandon about"));
+        Arrays.fill(phrase, '\0');
+    }
+
+    @Test
+    public void clipboardClearLeavesADifferentClipAlone() {
+        char[] phrase = "abandon about".toCharArray();
+        assertEquals(OpengramReloadWords.CLIP_KEEP, OpengramReloadWords.clipboardClearAction(23, phrase, "abandon other"));
+        assertEquals(OpengramReloadWords.CLIP_KEEP, OpengramReloadWords.clipboardClearAction(28, phrase, null));
+        assertEquals(OpengramReloadWords.CLIP_KEEP, OpengramReloadWords.clipboardClearAction(27, phrase, ""));
+        Arrays.fill(phrase, '\0');
+    }
+
+    @Test
     public void clipboardClearMatchesOnlyTheCopiedPassphrase() {
         char[] phrase = "abandon about".toCharArray();
         assertTrue(OpengramReloadWords.clipboardHolds(phrase, "abandon about"));
@@ -158,8 +251,10 @@ public class OpengramReloadImportMachineTest {
         boolean stageOk = true;
         boolean commitOk = true;
         boolean activateOk = true;
+        boolean rollbackOk = true;
         boolean stageNow = true;
         boolean validateNow = true;
+        boolean rollbackNow = true;
         long serverId = 7;
         long activatedId;
         int stages;
@@ -169,6 +264,7 @@ public class OpengramReloadImportMachineTest {
         int cancels;
         OpengramReloadImportMachine.Done stageDone;
         final ArrayList<OpengramReloadImportMachine.ValidateDone> validations = new ArrayList<>();
+        final ArrayList<OpengramReloadImportMachine.Done> rollbackDones = new ArrayList<>();
 
         @Override
         public boolean accountFree(long expectedUserId) {
@@ -193,7 +289,11 @@ public class OpengramReloadImportMachineTest {
         @Override
         public void rollback(OpengramReloadImportMachine.Done done) {
             rollbacks++;
-            done.onComplete(true);
+            if (rollbackNow) {
+                done.onComplete(rollbackOk);
+                return;
+            }
+            rollbackDones.add(done);
         }
 
         @Override
@@ -222,6 +322,11 @@ public class OpengramReloadImportMachineTest {
 
         void fireValidate() {
             validations.get(validations.size() - 1).onComplete(serverId);
+        }
+
+        void fireRollback() {
+            OpengramReloadImportMachine.Done done = rollbackDones.remove(0);
+            done.onComplete(rollbackOk);
         }
     }
 }

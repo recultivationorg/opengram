@@ -75,6 +75,32 @@ public class OpengramReloadTest {
     }
 
     @Test
+    public void deliveredKeySurvivesAsyncUiDispatchAndRoundTrips() {
+        byte[] delivered = key();
+        byte[] owned = OpengramReloadCrypto.takeDeliveredKey(delivered);
+        byte[][] seen = new byte[1][];
+        Runnable posted = () -> seen[0] = owned;
+        Arrays.fill(delivered, (byte) 0);
+        posted.run();
+        assertNotNull(seen[0]);
+        assertFalse(allZero(seen[0]));
+        assertTrue(allZero(delivered));
+        assertEquals(1, seen[0][0]);
+        char[] passphrase = passphrase();
+        byte[] user = userBlob(42);
+        byte[] file = OpengramReloadCrypto.seal(2, seen[0], 42, user, passphrase, new SecureRandom());
+        assertNotNull(file);
+        OpengramReloadCrypto.Opened opened = OpengramReloadCrypto.open(file, passphrase);
+        assertNotNull(opened);
+        assertTrue(Arrays.equals(seen[0], opened.authKey));
+        assertFalse(allZero(opened.authKey));
+        opened.wipe();
+        Arrays.fill(seen[0], (byte) 0);
+        Arrays.fill(passphrase, '\0');
+        Arrays.fill(user, (byte) 0);
+    }
+
+    @Test
     public void tamperedBodyAndTruncatedFileFailClosed() {
         byte[] file = sealed();
         file[file.length - 1] ^= 0x11;
@@ -144,6 +170,14 @@ public class OpengramReloadTest {
             assertNotNull(sealed);
         }
         return sealed.clone();
+    }
+
+    private static boolean allZero(byte[] key) {
+        int acc = 0;
+        for (int i = 0; i < key.length; i++) {
+            acc |= key[i];
+        }
+        return acc == 0;
     }
 
     private static byte[] key() {

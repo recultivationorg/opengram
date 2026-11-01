@@ -3358,6 +3358,7 @@
     <string name="OpengramReloadPassphraseHint">twelve words</string>
     <string name="OpengramReloadImportAction">Load session</string>
     <string name="OpengramReloadImportFailed">This file could not be opened with that passphrase.</string>
+    <string name="OpengramReloadRollbackFailed">The imported session is still on this device. Try loading again before using this file.</string>
     <string name="OpengramReloadAccountInUse">This account is already signed in on this device.</string>
     <string name="OpengramReloadSlotBusy">Sign out of this login slot before loading a session.</string>
     <string name="AccDescrOpengramReload">Import an Opengram session</string>

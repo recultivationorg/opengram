@@ -56,6 +56,7 @@ public class OpengramReloadImportActivity extends BaseFragment {
     private boolean destroyed;
     private TLRPC.User serverUser;
     private final OpengramReloadImportMachine machine = new OpengramReloadImportMachine(new ImportBackend());
+    private static final boolean[] rollbackPending = new boolean[UserConfig.MAX_ACCOUNT_COUNT];
 
     @Override
     public View createView(Context context) {
@@ -120,7 +121,11 @@ public class OpengramReloadImportActivity extends BaseFragment {
     public void onFragmentDestroy() {
         destroyed = true;
         if (!accepted) {
-            machine.cancel();
+            if (needsRecovery()) {
+                recover(null);
+            } else {
+                machine.cancel();
+            }
         }
         if (validateToken != 0) {
             ConnectionsManager.getInstance(currentAccount).cancelRequest(validateToken, false);
@@ -151,7 +156,14 @@ public class OpengramReloadImportActivity extends BaseFragment {
     }
 
     private void load() {
-        if (getParentActivity() == null || fileUri == null || passphraseField.getText() == null || loadButton == null || !loadButton.isEnabled()) {
+        if (getParentActivity() == null || loadButton == null || !loadButton.isEnabled()) {
+            return;
+        }
+        if (needsRecovery()) {
+            recover(this::load);
+            return;
+        }
+        if (fileUri == null || passphraseField.getText() == null) {
             return;
         }
         int length = passphraseField.getText().length();
@@ -189,31 +201,94 @@ public class OpengramReloadImportActivity extends BaseFragment {
                     finishAttempt(early);
                     return;
                 }
-                boolean started = machine.start(opened.dcId, opened.authKey, opened.userId, new OpengramReloadImportMachine.Listener() {
+                final long userId = opened.userId;
+                boolean started = machine.start(opened.dcId, opened.authKey, userId, new OpengramReloadImportMachine.Listener() {
                     @Override
                     public void onSuccess() {
+                        setRollbackPending(currentAccount, false);
                         dismiss(progress);
                     }
 
                     @Override
                     public void onFailure(int reason) {
+                        setRollbackPending(currentAccount, reason == OpengramReloadImportMachine.ROLLBACK_FAILED);
                         if (destroyed) {
                             dismiss(progress);
                             return;
                         }
-                        String message = reason == OpengramReloadImportMachine.REJECTED ? rejection(currentAccount, opened.userId) : getString(R.string.OpengramReloadImportFailed);
-                        if (message == null) {
-                            message = getString(R.string.OpengramReloadImportFailed);
-                        }
-                        finishAttempt(message);
+                        finishAttempt(failureMessage(reason, userId));
                     }
                 });
                 opened.wipe();
                 if (!started) {
-                    finishAttempt(getString(R.string.OpengramReloadImportFailed));
+                    finishAttempt(needsRecovery() ? getString(R.string.OpengramReloadRollbackFailed) : getString(R.string.OpengramReloadImportFailed));
                 }
             });
         });
+    }
+
+    private boolean needsRecovery() {
+        return machine.needsRollback() || pendingRollback(currentAccount);
+    }
+
+    private void recover(Runnable next) {
+        if (loadButton != null) {
+            loadButton.setEnabled(false);
+        }
+        if (progress == null && getParentActivity() != null && !destroyed) {
+            progress = new AlertDialog(getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER);
+            progress.show();
+        }
+        OpengramReloadImportMachine.Listener listener = new OpengramReloadImportMachine.Listener() {
+            @Override
+            public void onSuccess() {
+                setRollbackPending(currentAccount, false);
+                dismiss(progress);
+                if (loadButton != null) {
+                    loadButton.setEnabled(true);
+                }
+                if (next != null && !destroyed) {
+                    next.run();
+                }
+            }
+
+            @Override
+            public void onFailure(int reason) {
+                setRollbackPending(currentAccount, true);
+                if (destroyed) {
+                    dismiss(progress);
+                    return;
+                }
+                finishAttempt(getString(R.string.OpengramReloadRollbackFailed));
+            }
+        };
+        boolean started = machine.needsRollback() ? machine.retryRollback(listener) : machine.recoverRollback(listener);
+        if (!started && !destroyed) {
+            finishAttempt(getString(R.string.OpengramReloadRollbackFailed));
+        }
+    }
+
+    private String failureMessage(int reason, long userId) {
+        if (reason == OpengramReloadImportMachine.ROLLBACK_FAILED) {
+            return getString(R.string.OpengramReloadRollbackFailed);
+        }
+        if (reason == OpengramReloadImportMachine.REJECTED) {
+            String message = rejection(currentAccount, userId);
+            if (message != null) {
+                return message;
+            }
+        }
+        return getString(R.string.OpengramReloadImportFailed);
+    }
+
+    private static boolean pendingRollback(int account) {
+        return account >= 0 && account < rollbackPending.length && rollbackPending[account];
+    }
+
+    private static void setRollbackPending(int account, boolean pending) {
+        if (account >= 0 && account < rollbackPending.length) {
+            rollbackPending[account] = pending;
+        }
     }
 
     private void finishAttempt(String message) {
@@ -432,8 +507,13 @@ public class OpengramReloadImportActivity extends BaseFragment {
 
     private void dismiss(AlertDialog dialog) {
         try {
-            dialog.dismiss();
+            if (dialog != null) {
+                dialog.dismiss();
+            }
         } catch (Exception ignored) {
+        }
+        if (dialog == progress) {
+            progress = null;
         }
     }
 

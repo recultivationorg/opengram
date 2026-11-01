@@ -18,6 +18,9 @@ public final class OpengramReloadWords {
 
     public static final int WORD_COUNT = 12;
     public static final int QUIZ_COUNT = 4;
+    public static final int CLIP_KEEP = 0;
+    public static final int CLIP_CLEAR = 1;
+    public static final int CLIP_REPLACE = 2;
     static final int ENTROPY_BYTES = 16;
 
     private static final String[] WORDLIST = {
@@ -653,6 +656,16 @@ public final class OpengramReloadWords {
             return null;
         }
         return phrase(indexes);
+    }
+
+    public static int clipboardClearAction(int sdkInt, char[] expected, CharSequence current) {
+        if (!clipboardHolds(expected, current)) {
+            return CLIP_KEEP;
+        }
+        if (sdkInt >= 28) {
+            return CLIP_CLEAR;
+        }
+        return CLIP_REPLACE;
     }
 
     public static boolean clipboardHolds(char[] expected, CharSequence current) {

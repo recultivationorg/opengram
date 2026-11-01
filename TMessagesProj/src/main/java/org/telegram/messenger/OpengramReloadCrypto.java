@@ -103,6 +103,15 @@ public final class OpengramReloadCrypto {
         }
     }
 
+    public static byte[] takeDeliveredKey(byte[] delivered) {
+        if (delivered == null) {
+            return null;
+        }
+        byte[] owned = delivered.length == AUTH_KEY_LENGTH ? Arrays.copyOf(delivered, delivered.length) : null;
+        Arrays.fill(delivered, (byte) 0);
+        return owned;
+    }
+
     public static byte[] seal(int dcId, byte[] authKey, long userId, byte[] userBlob, char[] passphrase, SecureRandom random) {
         if (dcId < 1 || dcId > 5 || userId <= 0 || passphrase == null || passphrase.length == 0 || random == null) {
             return null;
