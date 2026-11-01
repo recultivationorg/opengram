@@ -8,6 +8,8 @@
 #include "tgnet/FileLog.h"
 #include "tgnet/Handshake.h"
 #include <openssl/rand.h>
+#include <openssl/crypto.h>
+#include <cstring>
 #include <openssl/sha.h>
 #include <openssl/bn.h>
 #include <openssl/pem.h>
@@ -96,6 +98,45 @@ jint getCurrentDatacenterId(JNIEnv *env, jclass c, jint instanceNum) {
 
 jlong getCurrentAuthKeyId(JNIEnv *env, jclass c, jint instanceNum) {
     return ConnectionsManager::getInstance(instanceNum).getCurrentAuthKeyId();
+}
+
+jint beginReload(JNIEnv *env, jclass c, jint instanceNum, jint kind, jint dcId, jbyteArray key, jobject callback) {
+    if (instanceNum < 0 || instanceNum >= MAX_ACCOUNT_COUNT || callback == nullptr) {
+        return 0;
+    }
+    uint8_t local[256];
+    const uint8_t *keyPtr = nullptr;
+    if (key != nullptr) {
+        if (env->GetArrayLength(key) != 256) {
+            return 0;
+        }
+        jbyte *bytes = env->GetByteArrayElements(key, nullptr);
+        if (bytes == nullptr) {
+            return 0;
+        }
+        memcpy(local, bytes, 256);
+        memset(bytes, 0, 256);
+        env->ReleaseByteArrayElements(key, bytes, 0);
+        keyPtr = local;
+    }
+    jobject global = env->NewGlobalRef(callback);
+    if (global == nullptr) {
+        OPENSSL_cleanse(local, sizeof(local));
+        return 0;
+    }
+    int op = ConnectionsManager::getInstance(instanceNum).beginReload(kind, dcId, keyPtr, global);
+    OPENSSL_cleanse(local, sizeof(local));
+    if (op == 0) {
+        env->DeleteGlobalRef(global);
+    }
+    return op;
+}
+
+void cancelReload(JNIEnv *env, jclass c, jint instanceNum, jint opId) {
+    if (instanceNum < 0 || instanceNum >= MAX_ACCOUNT_COUNT || opId == 0) {
+        return;
+    }
+    ConnectionsManager::getInstance(instanceNum).cancelReload(opId);
 }
 
 jint isTestBackend(JNIEnv *env, jclass c, jint instanceNum) {
@@ -529,6 +570,8 @@ static JNINativeMethod ConnectionsManagerMethods[] = {
         {"native_getCurrentPingTime", "(I)I", (void *) getCurrentPingTime},
         {"native_getCurrentDatacenterId", "(I)I", (void *) getCurrentDatacenterId},
         {"native_getCurrentAuthKeyId", "(I)J", (void *) getCurrentAuthKeyId},
+        {"native_beginReload", "(III[BLorg/telegram/tgnet/ConnectionsManager$ReloadCallback;)I", (void *) beginReload},
+        {"native_cancelReload", "(II)V", (void *) cancelReload},
         {"native_isTestBackend", "(I)I", (void *) isTestBackend},
         {"native_getTimeDifference", "(I)I", (void *) getTimeDifference},
         {"native_sendRequest", "(IJIIIZII)V", (void *) sendRequest},

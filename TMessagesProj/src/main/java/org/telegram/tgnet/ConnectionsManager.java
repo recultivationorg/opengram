@@ -454,7 +454,7 @@ public class ConnectionsManager extends BaseController {
                         final long delta = Math.max(0, (System.currentTimeMillis() - finalStartRequestTime) - ping_time);
                         DefaultBandwidthMeter.getSingletonInstance(ApplicationLoader.applicationContext).onTransfer(size, delta);
                     }
-                    if (!getUserConfig().isClientActivated() && error != null && error.code == 400 && Objects.equals(error.text, "CONNECTION_NOT_INITED") && connectionNotInitedRetries.add(object)) {
+                    if (!preserveAuthKeyOnInitError && !getUserConfig().isClientActivated() && error != null && error.code == 400 && Objects.equals(error.text, "CONNECTION_NOT_INITED") && connectionNotInitedRetries.add(object)) {
                         if (BuildVars.LOGS_ENABLED) {
                             FileLog.d("Cleanup keys for " + currentAccount + " because of CONNECTION_NOT_INITED");
                         }
@@ -642,6 +642,51 @@ public class ConnectionsManager extends BaseController {
 
     public void setUserId(long id) {
         native_setUserId(currentAccount, id);
+    }
+
+    public boolean preserveAuthKeyOnInitError;
+
+    public interface ReloadCallback {
+        void onComplete(boolean ok, int dcId, byte[] key);
+    }
+
+    public static final int RELOAD_COPY = 1;
+    public static final int RELOAD_STAGE = 2;
+    public static final int RELOAD_COMMIT = 3;
+    public static final int RELOAD_ROLLBACK = 4;
+
+    public int beginCopyPermAuthKey(ReloadCallback callback) {
+        if (callback == null) {
+            return 0;
+        }
+        return native_beginReload(currentAccount, RELOAD_COPY, 0, null, callback);
+    }
+
+    public int beginStagePermAuthKey(int dcId, byte[] key, ReloadCallback callback) {
+        if (callback == null || key == null || key.length != 256) {
+            return 0;
+        }
+        return native_beginReload(currentAccount, RELOAD_STAGE, dcId, key, callback);
+    }
+
+    public int beginCommitPermAuthKey(ReloadCallback callback) {
+        if (callback == null) {
+            return 0;
+        }
+        return native_beginReload(currentAccount, RELOAD_COMMIT, 0, null, callback);
+    }
+
+    public int beginRollbackPermAuthKey(ReloadCallback callback) {
+        if (callback == null) {
+            return 0;
+        }
+        return native_beginReload(currentAccount, RELOAD_ROLLBACK, 0, null, callback);
+    }
+
+    public void cancelReload(int opId) {
+        if (opId != 0) {
+            native_cancelReload(currentAccount, opId);
+        }
     }
 
     public void checkConnection() {
@@ -997,6 +1042,8 @@ public class ConnectionsManager extends BaseController {
     public static native void native_applyDatacenterAddress(int currentAccount, int datacenterId, String ipAddress, int port);
     public static native int native_getConnectionState(int currentAccount);
     public static native void native_setUserId(int currentAccount, long id);
+    private static native int native_beginReload(int currentAccount, int kind, int dcId, byte[] key, ReloadCallback callback);
+    private static native void native_cancelReload(int currentAccount, int opId);
     public static native void native_init(int currentAccount, int version, int layer, int apiId, String deviceModel, String systemVersion, String appVersion, String langCode, String systemLangCode, String configPath, String logPath, String regId, String cFingerprint, String installer, String packageId, int timezoneOffset, long userId, boolean userPremium, boolean enablePushConnection, boolean hasNetwork, int networkType, int performanceClass);
     private static native void native_setUserPremium(int currentAccount, boolean premium);
     public static native void native_setProxySettings(int currentAccount, String address, int port, String username, String password, String secret);

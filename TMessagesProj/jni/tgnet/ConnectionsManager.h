@@ -61,6 +61,8 @@ public:
     void setDelegate(ConnectiosManagerDelegate *connectiosManagerDelegate);
     ConnectionState getConnectionState();
     void setUserId(int64_t userId);
+    int beginReload(int kind, int32_t dcId, const uint8_t *key256, jobject callback);
+    void cancelReload(int opId);
     void setUserPremium(bool premium);
     void switchBackend(bool restart);
     void resumeNetwork(bool partial);
@@ -93,7 +95,9 @@ private:
 
     void initDatacenters();
     void loadConfig();
-    void saveConfig();
+    bool saveConfig();
+    bool saveConfig(bool force);
+    void rollbackStagedKey();
     void saveConfigInternal(NativeByteBuffer *buffer);
     void select();
     void wakeup();
@@ -139,6 +143,10 @@ private:
     int32_t instanceNum = 0;
     uint32_t configVersion = 5;
     Config *config = nullptr;
+    bool reloadConfigHold = false;
+    bool reloadConfigDirty = false;
+    bool reloadDcSaved = false;
+    uint32_t reloadPreviousDc = 0;
 
     std::list<EventObject *> events;
 

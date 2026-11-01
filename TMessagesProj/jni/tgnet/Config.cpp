@@ -54,7 +54,7 @@ NativeByteBuffer *Config::readConfig() {
     return buffer;
 }
 
-void Config::writeConfig(NativeByteBuffer *buffer) {
+bool Config::writeConfig(NativeByteBuffer *buffer) {
     if (LOGS_ENABLED) DEBUG_D("Config(%p, %s) start write config", this, configPath.c_str());
     FILE *file = fopen(configPath.c_str(), "rb");
     FILE *backup = fopen(backupPath.c_str(), "rb");
@@ -76,7 +76,7 @@ void Config::writeConfig(NativeByteBuffer *buffer) {
         }
     }
     if (error) {
-        return;
+        return false;
     }
     file = fopen(configPath.c_str(), "wb");
     if (chmod(configPath.c_str(), 0660)) {
@@ -84,7 +84,7 @@ void Config::writeConfig(NativeByteBuffer *buffer) {
     }
     if (file == nullptr) {
         if (LOGS_ENABLED) DEBUG_E("Config(%p, %s) unable to open file for writing", this, configPath.c_str());
-        return;
+        return false;
     }
     uint32_t size = buffer->position();
     if (fwrite(&size, sizeof(uint32_t), 1, file) == 1) {
@@ -128,4 +128,5 @@ void Config::writeConfig(NativeByteBuffer *buffer) {
     if (!error) {
         if (LOGS_ENABLED) DEBUG_D("Config(%p, %s) config write ok", this, configPath.c_str());
     }
+    return !error;
 }

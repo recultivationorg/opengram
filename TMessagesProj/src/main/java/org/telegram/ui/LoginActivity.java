@@ -129,6 +129,7 @@ import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.OpengramReloadCrypto;
 import org.telegram.messenger.PasskeysController;
 import org.telegram.messenger.PushListenerController;
 import org.telegram.messenger.R;
@@ -353,6 +354,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private RadialProgressView radialProgressView;
 
     private ImageView proxyButtonView;
+    private ImageView reloadButtonView;
     private ProxyDrawable proxyDrawable;
 
     // Open animation stuff
@@ -762,6 +764,19 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         proxyButtonView.setAlpha(0f);
         proxyButtonView.setVisibility(View.GONE);
         sizeNotifierFrameLayout.addView(proxyButtonView, LayoutHelper.createFrame(32, 32, Gravity.RIGHT | Gravity.TOP, 16, 16, 16, 16));
+        if (activityMode == MODE_LOGIN) {
+            reloadButtonView = new ImageView(context);
+            reloadButtonView.setImageResource(R.drawable.msg_download);
+            reloadButtonView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), PorterDuff.Mode.SRC_IN));
+            reloadButtonView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector)));
+            reloadButtonView.setContentDescription(getString(R.string.AccDescrOpengramReload));
+            reloadButtonView.setOnClickListener(v -> {
+                OpengramReloadImportActivity fragment = new OpengramReloadImportActivity();
+                fragment.setCurrentAccount(currentAccount);
+                presentFragment(fragment);
+            });
+            sizeNotifierFrameLayout.addView(reloadButtonView, LayoutHelper.createFrame(32, 32, Gravity.RIGHT | Gravity.TOP, 16, 16, 16, 16));
+        }
         updateProxyButton(false, true);
 
         radialProgressView = new RadialProgressView(context);
@@ -1638,12 +1653,46 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         onAuthSuccess(res, false);
     }
 
+    void completeReload(TLRPC.User serverUser) {
+        if (serverUser == null || serverUser.id == 0 || parentLayout == null) {
+            return;
+        }
+        ArrayList<BaseFragment> stack = new ArrayList<>(parentLayout.getFragmentStack());
+        for (int i = stack.size() - 1; i >= 0; i--) {
+            BaseFragment fragment = stack.get(i);
+            if (fragment == this) {
+                break;
+            }
+            fragment.removeSelfFromStack(true);
+        }
+        TLRPC.TL_auth_authorization authorization = new TLRPC.TL_auth_authorization();
+        authorization.user = serverUser;
+        onAuthSuccess(authorization, false, false);
+    }
+
+    private void placeReloadButton(boolean proxyShown) {
+        if (reloadButtonView == null) {
+            return;
+        }
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) reloadButtonView.getLayoutParams();
+        params.gravity = Gravity.RIGHT | Gravity.TOP;
+        params.width = AndroidUtilities.dp(32);
+        params.height = AndroidUtilities.dp(32);
+        params.topMargin = AndroidUtilities.dp(16);
+        params.rightMargin = AndroidUtilities.dp(proxyShown ? 56 : 16);
+        reloadButtonView.setLayoutParams(params);
+    }
+
     private boolean pendingSwitchingAccount;
 
     private void onAuthSuccess(TLRPC.TL_auth_authorization res, boolean afterSignup) {
+        onAuthSuccess(res, afterSignup, true);
+    }
+
+    private void onAuthSuccess(TLRPC.TL_auth_authorization res, boolean afterSignup, boolean clearSharedIfEmpty) {
         MessagesController.getInstance(currentAccount).cleanup();
         ConnectionsManager.getInstance(currentAccount).setUserId(res.user.id);
-        UserConfig.getInstance(currentAccount).clearConfig();
+        UserConfig.getInstance(currentAccount).clearConfig(clearSharedIfEmpty);
         MessagesController.getInstance(currentAccount).cleanup();
         UserConfig.getInstance(currentAccount).syncContacts = syncContacts;
         UserConfig.getInstance(currentAccount).setCurrentUser(res.user);
@@ -8222,6 +8271,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         proxyDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), PorterDuff.Mode.SRC_IN));
         proxyButtonView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector)));
+        if (reloadButtonView != null) {
+            reloadButtonView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), PorterDuff.Mode.SRC_IN));
+            reloadButtonView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector)));
+        }
 
         radialProgressView.setProgressColor(Theme.getColor(Theme.key_chats_actionBackground));
 
@@ -8567,6 +8620,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             showProxyButtonDelayed = null;
         }
         proxyButtonVisible = show;
+        placeReloadButton(show);
         proxyButtonView.clearAnimation();
         if (animated) {
             proxyButtonView.setVisibility(View.VISIBLE);

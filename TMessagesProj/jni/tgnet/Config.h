@@ -18,7 +18,7 @@ public:
     Config(int32_t instance, std::string fileName);
 
     NativeByteBuffer *readConfig();
-    void writeConfig(NativeByteBuffer *buffer);
+    bool writeConfig(NativeByteBuffer *buffer);
 
 private:
     int32_t instanceNum;

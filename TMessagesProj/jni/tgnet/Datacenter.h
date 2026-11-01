@@ -55,6 +55,8 @@ public:
     bool hasAuthKey(ConnectionType connectionTyoe, int32_t allowPendingKey);
     bool hasPermanentAuthKey();
     int64_t getPermanentAuthKeyId();
+    bool copyPermanentAuthKey(uint8_t *out256, int64_t *keyId);
+    bool installPermanentAuthKey(const uint8_t *key256);
     bool isExportingAuthorization();
     bool hasMediaAddress();
     void resetInitVersion();

@@ -15,6 +15,10 @@
 #include <fcntl.h>
 #include <memory.h>
 #include <openssl/rand.h>
+#include <openssl/crypto.h>
+#include <atomic>
+#include <memory>
+#include <mutex>
 #include <zlib.h>
 #include <memory>
 #include <string>
@@ -475,7 +479,15 @@ void ConnectionsManager::saveConfigInternal(NativeByteBuffer *buffer) {
     }
 }
 
-void ConnectionsManager::saveConfig() {
+bool ConnectionsManager::saveConfig() {
+    return saveConfig(false);
+}
+
+bool ConnectionsManager::saveConfig(bool force) {
+    if (reloadConfigHold && !force) {
+        reloadConfigDirty = true;
+        return true;
+    }
     if (config == nullptr) {
         config = new Config(instanceNum, "tgnet.dat");
     }
@@ -483,8 +495,237 @@ void ConnectionsManager::saveConfig() {
     saveConfigInternal(sizeCalculator);
     NativeByteBuffer *buffer = BuffersStorage::getInstance().getFreeBuffer(sizeCalculator->capacity());
     saveConfigInternal(buffer);
-    config->writeConfig(buffer);
+    bool ok = config->writeConfig(buffer);
     buffer->reuse();
+    if (ok) {
+        reloadConfigDirty = false;
+    }
+    return ok;
+}
+
+struct ReloadOp {
+    int id = 0;
+    int32_t instanceNum = 0;
+    int kind = 0;
+    int32_t dcId = 0;
+    bool hasKey = false;
+    std::atomic<bool> cancelled{false};
+    uint8_t key[256];
+    jobject callback = nullptr;
+
+    ReloadOp() {
+        memset(key, 0, sizeof(key));
+    }
+
+    ~ReloadOp() {
+        OPENSSL_cleanse(key, sizeof(key));
+    }
+};
+
+static std::mutex reloadOpsMutex;
+static std::map<int, std::shared_ptr<ReloadOp>> reloadOps;
+static std::atomic<int> nextReloadOp{1};
+
+static void deliverReload(const std::shared_ptr<ReloadOp> &op, bool ok, int32_t dcId, uint8_t *keyOrNull) {
+    if (op->callback == nullptr || javaVm == nullptr) {
+        return;
+    }
+    JNIEnv *env = jniEnv[op->instanceNum];
+    bool attached = false;
+    if (env == nullptr) {
+        if (javaVm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            return;
+        }
+        attached = true;
+    }
+    jbyteArray key = nullptr;
+    if (ok && keyOrNull != nullptr) {
+        key = env->NewByteArray(256);
+        if (key != nullptr) {
+            env->SetByteArrayRegion(key, 0, 256, reinterpret_cast<jbyte *>(keyOrNull));
+        }
+    }
+    jclass clazz = env->GetObjectClass(op->callback);
+    if (clazz != nullptr) {
+        jmethodID method = env->GetMethodID(clazz, "onComplete", "(ZI[B)V");
+        if (method != nullptr) {
+            env->CallVoidMethod(op->callback, method, ok ? JNI_TRUE : JNI_FALSE, (jint) dcId, key);
+        }
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(clazz);
+    }
+    if (key != nullptr) {
+        jbyte *bytes = env->GetByteArrayElements(key, nullptr);
+        if (bytes != nullptr) {
+            OPENSSL_cleanse(bytes, 256);
+            env->ReleaseByteArrayElements(key, bytes, 0);
+        }
+        env->DeleteLocalRef(key);
+    }
+    env->DeleteGlobalRef(op->callback);
+    op->callback = nullptr;
+    if (attached) {
+        javaVm->DetachCurrentThread();
+    }
+}
+
+static void forgetReload(const std::shared_ptr<ReloadOp> &op) {
+    std::lock_guard<std::mutex> guard(reloadOpsMutex);
+    reloadOps.erase(op->id);
+}
+
+static bool reloadCancelled(const std::shared_ptr<ReloadOp> &op) {
+    return op->cancelled.load();
+}
+
+void ConnectionsManager::rollbackStagedKey() {
+    Datacenter *datacenter = getDatacenterWithId(currentDatacenterId);
+    if (datacenter != nullptr) {
+        datacenter->suspendConnections(true);
+        datacenter->clearAuthKey(HandshakeTypeAll);
+    }
+    if (reloadDcSaved) {
+        currentDatacenterId = reloadPreviousDc;
+    }
+    reloadDcSaved = false;
+    reloadConfigHold = false;
+    saveConfig(true);
+}
+
+int ConnectionsManager::beginReload(int kind, int32_t dcId, const uint8_t *key256, jobject callback) {
+    if (callback == nullptr || kind < 1 || kind > 4) {
+        return 0;
+    }
+    if (kind == 2 && (dcId < 1 || dcId > 5)) {
+        return 0;
+    }
+    if (kind == 2 && (key256 == nullptr || isTestBackend())) {
+        return 0;
+    }
+    auto op = std::make_shared<ReloadOp>();
+    op->id = nextReloadOp.fetch_add(1);
+    op->instanceNum = instanceNum;
+    op->kind = kind;
+    op->dcId = dcId;
+    op->callback = callback;
+    if (key256 != nullptr) {
+        memcpy(op->key, key256, 256);
+        op->hasKey = true;
+    }
+    {
+        std::lock_guard<std::mutex> guard(reloadOpsMutex);
+        reloadOps[op->id] = op;
+    }
+    scheduleTask([this, op] {
+        if (reloadCancelled(op)) {
+            if (op->kind == 2 && reloadConfigHold) {
+                rollbackStagedKey();
+            }
+            forgetReload(op);
+            deliverReload(op, false, 0, nullptr);
+            return;
+        }
+        if (op->kind == 1) {
+            uint8_t local[256];
+            int32_t foundDc = 0;
+            bool copied = false;
+            Datacenter *datacenter = getDatacenterWithId(currentDatacenterId);
+            if (datacenter != nullptr && !reloadCancelled(op)) {
+                copied = datacenter->copyPermanentAuthKey(local, nullptr);
+                if (copied) {
+                    foundDc = (int32_t) datacenter->getDatacenterId();
+                }
+            }
+            bool deliver = copied && foundDc >= 1 && foundDc <= 5 && !reloadCancelled(op);
+            forgetReload(op);
+            deliverReload(op, deliver, foundDc, deliver ? local : nullptr);
+            OPENSSL_cleanse(local, sizeof(local));
+            return;
+        }
+        if (op->kind == 2) {
+            uint8_t local[256];
+            memcpy(local, op->key, 256);
+            initDatacenters();
+            Datacenter *datacenter = getDatacenterWithId((uint32_t) op->dcId);
+            if (reloadCancelled(op) || datacenter == nullptr) {
+                OPENSSL_cleanse(local, sizeof(local));
+                forgetReload(op);
+                deliverReload(op, false, 0, nullptr);
+                return;
+            }
+            if (!reloadDcSaved) {
+                reloadPreviousDc = currentDatacenterId;
+                reloadDcSaved = true;
+            }
+            reloadConfigHold = true;
+            bool installed = datacenter->installPermanentAuthKey(local);
+            OPENSSL_cleanse(local, sizeof(local));
+            if (!installed || reloadCancelled(op)) {
+                rollbackStagedKey();
+                forgetReload(op);
+                deliverReload(op, false, 0, nullptr);
+                return;
+            }
+            currentDatacenterId = (uint32_t) op->dcId;
+            forgetReload(op);
+            deliverReload(op, true, op->dcId, nullptr);
+            return;
+        }
+        if (op->kind == 3) {
+            if (reloadCancelled(op)) {
+                rollbackStagedKey();
+                forgetReload(op);
+                deliverReload(op, false, 0, nullptr);
+                return;
+            }
+            bool saved = saveConfig(true);
+            if (!saved || reloadCancelled(op)) {
+                rollbackStagedKey();
+                forgetReload(op);
+                deliverReload(op, false, 0, nullptr);
+                return;
+            }
+            reloadConfigHold = false;
+            reloadDcSaved = false;
+            forgetReload(op);
+            deliverReload(op, true, (int32_t) currentDatacenterId, nullptr);
+            return;
+        }
+        bool cleared = false;
+        Datacenter *datacenter = getDatacenterWithId((uint32_t) op->dcId);
+        if (datacenter == nullptr) {
+            datacenter = getDatacenterWithId(currentDatacenterId);
+        }
+        if (datacenter != nullptr) {
+            datacenter->suspendConnections(true);
+            datacenter->clearAuthKey(HandshakeTypeAll);
+            cleared = true;
+        }
+        if (reloadDcSaved) {
+            currentDatacenterId = reloadPreviousDc;
+        }
+        reloadDcSaved = false;
+        reloadConfigHold = false;
+        bool saved = saveConfig(true);
+        forgetReload(op);
+        deliverReload(op, cleared && saved, 0, nullptr);
+    });
+    return op->id;
+}
+
+void ConnectionsManager::cancelReload(int opId) {
+    std::shared_ptr<ReloadOp> op;
+    {
+        std::lock_guard<std::mutex> guard(reloadOpsMutex);
+        auto found = reloadOps.find(opId);
+        if (found == reloadOps.end() || found->second->instanceNum != instanceNum) {
+            return;
+        }
+        op = found->second;
+    }
+    op->cancelled.store(true);
 }
 
 inline NativeByteBuffer *decompressGZip(NativeByteBuffer *data) {

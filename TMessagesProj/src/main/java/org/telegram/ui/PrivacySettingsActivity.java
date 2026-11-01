@@ -128,6 +128,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
     private int autoDeleteMesages;
     @Keep
     private int passkeysRow;
+    private int reloadRow;
     private int sessionsDetailRow;
     private int newChatsHeaderRow;
     @Keep
@@ -494,6 +495,10 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                 } else {
                     PasskeysActivity.showLearnSheet(context, currentAccount, resourceProvider, true);
                 }
+            } else if (position == reloadRow) {
+                OpengramReloadActivity fragment = new OpengramReloadActivity();
+                fragment.setCurrentAccount(currentAccount);
+                presentFragment(fragment);
             } else if (position == passcodeRow) {
                 presentFragment(PasscodeActivity.determineOpenFragment());
             } else if (position == secretWebpageRow) {
@@ -707,6 +712,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
 
     public void updateRows(boolean notify) {
         passkeysRow = -1;
+        reloadRow = -1;
         rowCount = 0;
 
         securitySectionRow = rowCount++;
@@ -716,6 +722,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
         if (getMessagesController().config.settingsDisplayPasskeys.get() && Build.VERSION.SDK_INT >= 28 && BuildVars.SUPPORTS_PASSKEYS) {
             passkeysRow = rowCount++;
         }
+        reloadRow = rowCount++;
         if (currentPassword != null ? currentPassword.login_email_pattern != null : SharedConfig.hasEmailLogin) {
             emailLoginRow = rowCount++;
         } else {
@@ -1020,7 +1027,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
         @Override
         public boolean isEnabled(RecyclerView.ViewHolder holder) {
             int position = holder.getAdapterPosition();
-            return position == passcodeRow || position == passwordRow || position == passkeysRow || position == blockedRow || position == sessionsRow || position == secretWebpageRow || position == webSessionsRow ||
+            return position == passcodeRow || position == passwordRow || position == passkeysRow || position == reloadRow || position == blockedRow || position == sessionsRow || position == secretWebpageRow || position == webSessionsRow ||
                     position == groupsRow && !getContactsController().getLoadingPrivacyInfo(ContactsController.PRIVACY_RULES_TYPE_INVITE) ||
                     position == lastSeenRow && !getContactsController().getLoadingPrivacyInfo(ContactsController.PRIVACY_RULES_TYPE_LASTSEEN) ||
                     position == callsRow && !getContactsController().getLoadingPrivacyInfo(ContactsController.PRIVACY_RULES_TYPE_CALLS) ||
@@ -1360,6 +1367,8 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                             value = getString(R.string.PasswordOff);
                         }
                         textCell2.setTextAndValueAndIcon(getString(R.string.Passkey), value, true, R.drawable.msg2_permissions, true);
+                    } else if (position == reloadRow) {
+                        textCell2.setTextAndIcon(getString(R.string.OpengramReload), R.drawable.msg_download, true);
                     } else if (position == passcodeRow) {
                         int icon;
                         if (SharedConfig.passcodeHash.length() != 0) {
@@ -1401,7 +1410,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                 return 3;
             } else if (position == botsAndWebsitesShadowRow) {
                 return 4;
-            } else if (position == autoDeleteMesages || position == sessionsRow || position == emailLoginRow || position == passwordRow || position == passkeysRow || position == passcodeRow || position == blockedRow) {
+            } else if (position == autoDeleteMesages || position == sessionsRow || position == emailLoginRow || position == passwordRow || position == passkeysRow || position == reloadRow || position == passcodeRow || position == blockedRow) {
                 return 5;
             }
             return 0;

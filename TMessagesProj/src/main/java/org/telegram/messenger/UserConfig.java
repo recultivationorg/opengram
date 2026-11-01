@@ -485,6 +485,10 @@ public class UserConfig extends BaseController {
     }
 
     public void clearConfig() {
+        clearConfig(true);
+    }
+
+    public void clearConfig(boolean clearSharedIfEmpty) {
         getPreferences().edit().clear().apply();
 
         ghostMode = false;
@@ -529,7 +533,7 @@ public class UserConfig extends BaseController {
                 break;
             }
         }
-        if (!hasActivated) {
+        if (clearSharedIfEmpty && !hasActivated) {
             SharedConfig.clearConfig();
         }
         saveConfig(true);

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
+#include <openssl/crypto.h>
 #include <openssl/bn.h>
 #include <openssl/pem.h>
 #include <openssl/aes.h>
@@ -1582,4 +1583,43 @@ TL_help_configSimple *Datacenter::decodeSimpleConfig(NativeByteBuffer *buffer) {
     RSA_free(rsaKey);
     BIO_free(keyBio);
     return result;
+}
+
+bool Datacenter::copyPermanentAuthKey(uint8_t *out256, int64_t *keyId) {
+    if (out256 == nullptr || authKeyPerm == nullptr || authKeyPerm->bytes == nullptr || authKeyPerm->length != 256) {
+        return false;
+    }
+    memcpy(out256, authKeyPerm->bytes, 256);
+    if (keyId != nullptr) {
+        *keyId = authKeyPermId;
+    }
+    return true;
+}
+
+bool Datacenter::installPermanentAuthKey(const uint8_t *key256) {
+    if (key256 == nullptr) {
+        return false;
+    }
+    uint8_t acc = 0;
+    for (int i = 0; i < 256; i++) {
+        acc |= key256[i];
+    }
+    if (acc == 0) {
+        return false;
+    }
+    uint8_t digest[SHA_DIGEST_LENGTH];
+    SHA1(key256, 256, digest);
+    int64_t keyId = 0;
+    for (int i = 0; i < 8; i++) {
+        keyId |= ((int64_t) digest[12 + i]) << (8 * i);
+    }
+    OPENSSL_cleanse(digest, sizeof(digest));
+    suspendConnections(true);
+    clearAuthKey(HandshakeTypeAll);
+    authKeyPerm = new ByteArray((uint8_t *) key256, 256);
+    authKeyPermId = keyId;
+    if (PFS_ENABLED && !isCdnDatacenter) {
+        beginHandshake(HandshakeTypeAll, true);
+    }
+    return true;
 }
