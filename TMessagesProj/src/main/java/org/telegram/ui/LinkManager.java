@@ -790,7 +790,7 @@ public class LinkManager {
                 }), ConnectionsManager.RequestFlagFailOnServerErrors | ConnectionsManager.RequestFlagWithoutLogin));
                 return true;
             }
-            if (!TextUtils.isEmpty(third) && "passkey".equalsIgnoreCase(second) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            if (!TextUtils.isEmpty(third) && "passkey".equalsIgnoreCase(second) && BuildVars.SUPPORTS_PASSKEYS && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 init();
                 setRequestId(getConnectionsManager().sendRequestTyped(new TL_account.getPasskeys(), AndroidUtilities::runOnUIThread, (passkeys, error) -> {
                     done();
@@ -888,7 +888,7 @@ public class LinkManager {
                 scrollTo("passcodeRow");
             if ("2sv".equalsIgnoreCase(second))
                 scrollTo("passwordRow");
-            if ("passkey".equalsIgnoreCase(second))
+            if ("passkey".equalsIgnoreCase(second) && BuildVars.SUPPORTS_PASSKEYS)
                 scrollTo("passkeysRow");
             if ("auto-delete".equalsIgnoreCase(second))
                 scrollTo("autoDeleteMesages");

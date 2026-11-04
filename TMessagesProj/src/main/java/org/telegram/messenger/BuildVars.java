@@ -75,8 +75,7 @@ public class BuildVars {
     // Account entitlements stay whatever the server reports.
     public static boolean DISABLE_PREMIUM_PROMO = true;
 
-    // works only on official app ids, disable on your forks
-    public static boolean SUPPORTS_PASSKEYS = true;
+    public static boolean SUPPORTS_PASSKEYS = false;
 
     static {
         if (ApplicationLoader.applicationContext != null) {

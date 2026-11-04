@@ -196,7 +196,9 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
 
         updateRows();
         loadPasswordSettings();
-        loadPasskeys();
+        if (BuildVars.SUPPORTS_PASSKEYS) {
+            loadPasskeys();
+        }
 
         getNotificationCenter().addObserver(this, NotificationCenter.privacyRulesUpdated);
         getNotificationCenter().addObserver(this, NotificationCenter.blockedUsersDidLoad);

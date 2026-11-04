@@ -21,6 +21,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.PasskeysController;
@@ -303,6 +304,9 @@ public class PasskeysActivity extends BaseFragment {
     }
 
     public static void showLearnSheet(Context context, int currentAccount, Theme.ResourcesProvider resourcesProvider, boolean withCreateButton) {
+        if (!BuildVars.SUPPORTS_PASSKEYS) {
+            return;
+        }
         BottomSheet.Builder b = new BottomSheet.Builder(context, false, resourcesProvider);
 
         LinearLayout linearLayout = new LinearLayout(context);
