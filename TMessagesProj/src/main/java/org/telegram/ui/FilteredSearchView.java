@@ -44,6 +44,7 @@ import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.OpengramContentFilter;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
@@ -130,6 +131,10 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
     BaseFragment parentFragment;
     private boolean isLoading;
     private boolean endReached;
+    private int serverOffsetId;
+    private int serverOffsetRate;
+    private long serverOffsetDialogId;
+    private boolean serverOffsetReady;
     private int totalCount;
     private int requestIndex;
 
@@ -647,10 +652,10 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
                 if (maxDate > 0) {
                     req.max_date = (int) (maxDate / 1000);
                 }
-                if (filterAndQueryIsSame && finalQuery.equals(lastMessagesSearchString) && !messages.isEmpty()) {
-                    MessageObject lastMessage = messages.get(messages.size() - 1);
-                    req.offset_id = lastMessage.getId();
+                if (filterAndQueryIsSame && finalQuery.equals(lastMessagesSearchString) && serverOffsetReady) {
+                    req.offset_id = serverOffsetId;
                 } else {
+                    serverOffsetReady = false;
                     req.offset_id = 0;
                 }
                 request = req;
@@ -673,13 +678,12 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
                 if (maxDate > 0) {
                     req.max_date = (int) (maxDate / 1000);
                 }
-                if (filterAndQueryIsSame && finalQuery.equals(lastMessagesSearchString) && !messages.isEmpty()) {
-                    MessageObject lastMessage = messages.get(messages.size() - 1);
-                    req.offset_id = lastMessage.getId();
-                    req.offset_rate = nextSearchRate;
-                    long id = MessageObject.getPeerId(lastMessage.messageOwner.peer_id);
-                    req.offset_peer = MessagesController.getInstance(currentAccount).getInputPeer(id);
+                if (filterAndQueryIsSame && finalQuery.equals(lastMessagesSearchString) && serverOffsetReady) {
+                    req.offset_id = serverOffsetId;
+                    req.offset_rate = serverOffsetRate;
+                    req.offset_peer = MessagesController.getInstance(currentAccount).getInputPeer(serverOffsetDialogId);
                 } else {
+                    serverOffsetReady = false;
                     req.offset_rate = 0;
                     req.offset_id = 0;
                     req.offset_peer = new TLRPC.TL_inputPeerEmpty();
@@ -735,9 +739,27 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
                     }
                     totalCount = res.count;
                     currentDataQuery = finalQuery;
+                    TLRPC.Message lastPageMessage = res.messages.isEmpty() ? null : res.messages.get(res.messages.size() - 1);
+                    OpengramContentFilter.MessagePageCursor pageCursor = OpengramContentFilter.messagePageCursor(lastPageMessage == null ? 0 : lastPageMessage.id, lastPageMessage == null || lastPageMessage.peer_id == null ? 0 : MessageObject.getPeerId(lastPageMessage.peer_id), res.messages.size(), 20);
+                    boolean stuckCursor = pageCursor.hasCursor && request instanceof TLRPC.TL_messages_searchGlobal && ((TLRPC.TL_messages_searchGlobal) request).offset_id != 0 && pageCursor.offsetId == ((TLRPC.TL_messages_searchGlobal) request).offset_id;
+                    if (!stuckCursor && request instanceof TLRPC.TL_messages_search) {
+                        stuckCursor = pageCursor.hasCursor && ((TLRPC.TL_messages_search) request).offset_id != 0 && pageCursor.offsetId == ((TLRPC.TL_messages_search) request).offset_id;
+                    }
+                    if (pageCursor.hasCursor && !stuckCursor) {
+                        serverOffsetId = pageCursor.offsetId;
+                        serverOffsetDialogId = pageCursor.dialogId;
+                        serverOffsetRate = res.next_rate;
+                        serverOffsetReady = true;
+                    }
+                    endReached = pageCursor.endReached || stuckCursor;
+                    int added = 0;
                     int n = messageObjects.size();
                     for (int i = 0; i < n; i++) {
                         MessageObject messageObject = messageObjects.get(i);
+                        if (OpengramContentFilter.isHiddenChannel(currentAccount, messageObject.getDialogId())) {
+                            continue;
+                        }
+                        added++;
                         ArrayList<MessageObject> messageObjectsByDate = sectionArrays.get(messageObject.monthKey);
                         if (messageObjectsByDate == null) {
                             messageObjectsByDate = new ArrayList<>();
@@ -755,7 +777,6 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
                     if (messages.size() > totalCount) {
                         totalCount = messages.size();
                     }
-                    endReached = messages.size() >= totalCount;
 
                     if (messages.isEmpty()) {
                         if (currentSearchFilter != null) {
@@ -818,7 +839,13 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
                     if (!filterAndQueryIsSame) {
                         localTipChats.clear();
                         if (finalResultArray != null) {
-                            localTipChats.addAll(finalResultArray);
+                            for (int i = 0; i < finalResultArray.size(); i++) {
+                                Object tip = finalResultArray.get(i);
+                                if (tip instanceof TLRPC.Chat && OpengramContentFilter.isHiddenChannel(currentAccount, -((TLRPC.Chat) tip).id)) {
+                                    continue;
+                                }
+                                localTipChats.add(tip);
+                            }
                         }
                         if (finalQuery != null && finalQuery.length() >= 3 && (LocaleController.getString(R.string.SavedMessages).toLowerCase().startsWith(finalQuery) ||
                                 "saved messages".startsWith(finalQuery))) {
@@ -846,6 +873,9 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
                         }
                     }
                     firstLoading = false;
+                    if (added == 0 && !endReached && res.messages.size() > 0) {
+                        search(currentSearchDialogId, currentSearchCommunityId, currentSearchMinDate, currentSearchMaxDate, currentSearchFilter, currentIncludeFolder, lastMessagesSearchString, false);
+                    }
                     View progressView = null;
                     int progressViewPosition = -1;
                     for (int i = 0; i < n; i++) {

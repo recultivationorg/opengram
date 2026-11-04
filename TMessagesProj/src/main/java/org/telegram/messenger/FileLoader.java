@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.regex.Matcher;
@@ -628,6 +629,23 @@ public class FileLoader extends BaseController {
         if (dialogId >= 0) {
             return;
         }
+        ArrayList<String> uiNames = new ArrayList<>();
+        for (Map.Entry<String, LoadOperationUIObject> entry : loadOperationPathsUI.entrySet()) {
+            LoadOperationUIObject uiObject = entry.getValue();
+            if (uiObject == null) {
+                continue;
+            }
+            FilePathDatabase.FileMeta meta = getFileMetadataFromParent(currentAccount, uiObject.parentObject);
+            if (meta != null && meta.dialogId == dialogId) {
+                if (uiObject.loadInternalRunnable != null) {
+                    fileLoaderQueue.cancelRunnable(uiObject.loadInternalRunnable);
+                }
+                uiNames.add(entry.getKey());
+            }
+        }
+        for (int a = 0; a < uiNames.size(); a++) {
+            loadOperationPathsUI.remove(uiNames.get(a));
+        }
         fileLoaderQueue.postRunnable(() -> {
             ArrayList<FileLoadOperation> operations = new ArrayList<>();
             for (FileLoadOperation operation : loadOperationPaths.values()) {
@@ -641,7 +659,9 @@ public class FileLoader extends BaseController {
             }
             for (int a = 0; a < operations.size(); a++) {
                 FileLoadOperation operation = operations.get(a);
-                loadOperationPaths.remove(operation.getFileName());
+                String fileName = operation.getFileName();
+                loadOperationPaths.remove(fileName);
+                loadOperationPathsUI.remove(fileName);
                 FileLoaderPriorityQueue queue = operation.getQueue();
                 if (queue != null) {
                     queue.cancel(operation);
@@ -845,11 +865,12 @@ public class FileLoader extends BaseController {
     }
 
 
-    private FileLoadOperation loadFileInternal(final TLRPC.Document document, final SecureDocument secureDocument, final WebFile webDocument, TLRPC.TL_fileLocationToBeDeprecated location, final ImageLocation imageLocation, Object parentObject, final String locationExt, final long locationSize, int priority, FileLoadOperationStream stream, final long streamOffset, boolean streamPriority, final int cacheType) {
+    private boolean isHiddenChannelParent(Object parentObject) {
         FilePathDatabase.FileMeta parentMeta = getFileMetadataFromParent(currentAccount, parentObject);
-        if (parentMeta != null && OpengramContentFilter.isHiddenChannel(currentAccount, parentMeta.dialogId)) {
-            return null;
-        }
+        return parentMeta != null && OpengramContentFilter.isHiddenChannel(currentAccount, parentMeta.dialogId);
+    }
+
+    private FileLoadOperation loadFileInternal(final TLRPC.Document document, final SecureDocument secureDocument, final WebFile webDocument, TLRPC.TL_fileLocationToBeDeprecated location, final ImageLocation imageLocation, Object parentObject, final String locationExt, final long locationSize, int priority, FileLoadOperationStream stream, final long streamOffset, boolean streamPriority, final int cacheType) {
         String fileName;
         if (location != null) {
             fileName = getAttachFileName(location, locationExt);
@@ -863,6 +884,10 @@ public class FileLoader extends BaseController {
             fileName = null;
         }
         if (fileName == null || fileName.contains("" + Integer.MIN_VALUE)) {
+            return null;
+        }
+        if (isHiddenChannelParent(parentObject)) {
+            loadOperationPathsUI.remove(fileName);
             return null;
         }
         if (fileName.startsWith("0_0")) {
@@ -1182,6 +1207,9 @@ public class FileLoader extends BaseController {
     }
 
     private void loadFile(final TLRPC.Document document, final SecureDocument secureDocument, final WebFile webDocument, TLRPC.TL_fileLocationToBeDeprecated location, final ImageLocation imageLocation, final Object parentObject, final String locationExt, final long locationSize, final int priority, final int cacheType) {
+        if (isHiddenChannelParent(parentObject)) {
+            return;
+        }
         String fileName;
         if (location != null) {
             fileName = getAttachFileName(location, locationExt);
@@ -1196,6 +1224,7 @@ public class FileLoader extends BaseController {
         if (cacheType != 10 && !TextUtils.isEmpty(fileName) && !fileName.contains("" + Integer.MIN_VALUE)) {
             LoadOperationUIObject uiObject = new FileLoader.LoadOperationUIObject();
             uiObject.loadInternalRunnable = runnable;
+            uiObject.parentObject = parentObject;
             loadOperationPathsUI.put(fileName, uiObject);
         }
         fileLoaderQueue.postRunnable(runnable);
@@ -1206,6 +1235,9 @@ public class FileLoader extends BaseController {
     private static final FileLoadOperationStream pendingPlayerStream = () -> {};
 
     public void startVideoStream(TLRPC.Document document, Object parentObject) {
+        if (isHiddenChannelParent(parentObject)) {
+            return;
+        }
         fileLoaderQueue.postRunnable(() -> loadFileInternal(document, null, null, null, null, parentObject, null, 0, FileStreamLoadOperation.getStreamPrioriy(document), pendingPlayerStream, 0, false, 0));
     }
 
@@ -1214,6 +1246,9 @@ public class FileLoader extends BaseController {
     }
 
     protected FileLoadOperation loadStreamFile(final FileLoadOperationStream stream, final TLRPC.Document document, final ImageLocation location, final Object parentObject, final long offset, final boolean priority, int loadingPriority, int cacheType) {
+        if (isHiddenChannelParent(parentObject)) {
+            return null;
+        }
         final CountDownLatch semaphore = new CountDownLatch(1);
         final FileLoadOperation[] result = new FileLoadOperation[1];
         fileLoaderQueue.postRunnable(() -> {
@@ -1941,6 +1976,7 @@ public class FileLoader extends BaseController {
 
     private static class LoadOperationUIObject {
         Runnable loadInternalRunnable;
+        Object parentObject;
     }
 
     public static byte[] longToBytes(long x) {

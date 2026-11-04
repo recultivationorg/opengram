@@ -144,8 +144,12 @@ public class OpengramContentFilterActivity extends BaseFragment {
             fragment.finishFragment();
             long dialogId = dids.get(0).dialogId;
             TLRPC.Chat chat = getMessagesController().getChat(-dialogId);
-            if (chat != null && chat.broadcast && !OpengramContentFilter.addChannel(currentAccount, dialogId)) {
-                showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
+            if (chat != null && chat.broadcast) {
+                ArrayList<Long> hidden = OpengramContentFilter.hiddenChannels(currentAccount);
+                boolean full = !hidden.contains(dialogId) && hidden.size() >= OpengramContentFilter.MAX_CHANNELS;
+                if (!full && !OpengramContentFilter.addChannel(currentAccount, dialogId)) {
+                    showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
+                }
             }
             if (listView != null) {
                 listView.adapter.update(true);

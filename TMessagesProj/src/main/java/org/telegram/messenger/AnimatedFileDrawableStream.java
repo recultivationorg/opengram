@@ -62,6 +62,9 @@ public class AnimatedFileDrawableStream implements FileLoadOperationStream {
             long availableLength = 0;
             try {
                 while (availableLength == 0) {
+                    if (loadOperation == null) {
+                        return 0;
+                    }
                     long[] result = loadOperation.getDownloadedLengthFromOffset(offset, readLength);
                     availableLength = result[0];
                     if (!finishedLoadingFile && result[1] != 0) {
@@ -77,10 +80,13 @@ public class AnimatedFileDrawableStream implements FileLoadOperationStream {
                         }
                         countDownLatch = new CountDownLatch(1);
                         if (loadOperation.isPaused() || lastOffset != offset || preview) {
-                            FileLoadOperation loadOperation = FileLoader.getInstance(currentAccount).loadStreamFile(this, document, location, parentObject, offset, preview, loadingPriority);
-                            if (this.loadOperation != loadOperation) {
+                            FileLoadOperation nextOperation = FileLoader.getInstance(currentAccount).loadStreamFile(this, document, location, parentObject, offset, preview, loadingPriority);
+                            if (nextOperation == null) {
+                                return 0;
+                            }
+                            if (this.loadOperation != nextOperation) {
                                 this.loadOperation.removeStreamListener(this);
-                                this.loadOperation = loadOperation;
+                                this.loadOperation = nextOperation;
                             }
                             lastOffset = offset + availableLength;
                         }

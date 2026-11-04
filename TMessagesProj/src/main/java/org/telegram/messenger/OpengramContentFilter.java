@@ -941,12 +941,33 @@ public final class OpengramContentFilter {
             return false;
         }
         synchronized (lock) {
-            if (!stateLocked(account).channels.contains(dialogId)) {
-                return false;
-            }
+            return stateLocked(account).channels.contains(dialogId);
         }
-        TLRPC.Chat chat = MessagesController.getInstance(account).getChat(-dialogId);
-        return chat == null || chat.broadcast;
+    }
+
+    public static final class MessagePageCursor {
+        public final int offsetId;
+        public final long dialogId;
+        public final boolean hasCursor;
+        public final boolean endReached;
+
+        MessagePageCursor(int offsetId, long dialogId, boolean hasCursor, boolean endReached) {
+            this.offsetId = offsetId;
+            this.dialogId = dialogId;
+            this.hasCursor = hasCursor;
+            this.endReached = endReached;
+        }
+    }
+
+    public static MessagePageCursor messagePageCursor(int lastMessageId, long lastDialogId, int pageSize, int limit) {
+        if (pageSize <= 0) {
+            return new MessagePageCursor(0, 0L, false, true);
+        }
+        return new MessagePageCursor(lastMessageId, lastDialogId, true, pageSize < limit);
+    }
+
+    public static boolean applyChannelPts(boolean hiddenChannel) {
+        return !hiddenChannel;
     }
 
     public static ArrayList<Long> hiddenChannels(int account) {
@@ -984,6 +1005,7 @@ public final class OpengramContentFilter {
         if (!wrote) {
             return false;
         }
+        MessagesController.getInstance(account).dropHiddenChannel(dialogId);
         FileLoader.getInstance(account).cancelLoadsForDialog(dialogId);
         notifyDialogs(account);
         return true;

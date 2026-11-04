@@ -520,7 +520,15 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         if (phase != OpengramContentFilter.Phase.READY) {
             return getString(R.string.MessageFilterOff);
         }
-        return LocaleController.formatPluralString("MessageFilterKeywords", OpengramContentFilter.keywordCount(currentAccount));
+        int keywords = OpengramContentFilter.keywordCount(currentAccount);
+        int channels = OpengramContentFilter.hiddenChannels(currentAccount).size();
+        if (keywords == 0 && channels > 0) {
+            return LocaleController.formatPluralString("MessageFilterHiddenChannelsCount", channels);
+        }
+        if (channels == 0) {
+            return LocaleController.formatPluralString("MessageFilterKeywords", keywords);
+        }
+        return LocaleController.formatPluralString("MessageFilterKeywords", keywords) + ", " + LocaleController.formatPluralString("MessageFilterHiddenChannelsCount", channels);
     }
 
     @Override

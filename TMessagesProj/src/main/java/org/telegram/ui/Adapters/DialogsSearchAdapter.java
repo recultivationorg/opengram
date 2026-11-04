@@ -150,6 +150,10 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
     private int lastMessagesSearchFilterFlags;
     private String currentMessagesQuery;
     private int nextSearchRate;
+    private int messagesSearchOffsetId;
+    private long messagesSearchOffsetDialogId;
+    private boolean messagesSearchHasCursor;
+    private int forumSearchRawCount;
     private int lastSearchId;
     private int lastGlobalSearchId;
     private int lastLocalSearchId;
@@ -426,8 +430,10 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         req.q = query;
         req.filter = new TLRPC.TL_inputMessagesFilterEmpty();
         req.peer = MessagesController.getInstance(currentAccount).getInputPeer(dialogId);
-        if (query.equals(lastMessagesSearchString) && !searchForumResultMessages.isEmpty()) {
-            req.add_offset = searchForumResultMessages.size();
+        if (query.equals(lastMessagesSearchString) && forumSearchRawCount > 0) {
+            req.add_offset = forumSearchRawCount;
+        } else {
+            forumSearchRawCount = 0;
         }
         lastMessagesSearchString = query;
         final int currentReqId = ++lastForumReqId;
@@ -463,8 +469,12 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                         MessagesController.getInstance(currentAccount).putChats(res.chats, false);
                         if (req.add_offset == 0) {
                             searchForumResultMessages.clear();
+                            forumSearchRawCount = 0;
                         }
+                        OpengramContentFilter.MessagePageCursor forumCursor = OpengramContentFilter.messagePageCursor(res.messages.isEmpty() ? 0 : res.messages.get(res.messages.size() - 1).id, 0, res.messages.size(), 20);
+                        forumSearchRawCount += res.messages.size();
                         nextSearchRate = res.next_rate;
+                        int forumVisibleBefore = searchForumResultMessages.size();
                         for (int a = 0; a < res.messages.size(); a++) {
                             TLRPC.Message message = res.messages.get(a);
                             long did = MessageObject.getDialogId(message);
@@ -478,7 +488,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             searchForumResultMessages.add(messageObjects.get(a));
                         }
                         searchWas = true;
-                        localMessagesSearchEndReached = res.messages.size() != 20;
+                        localMessagesSearchEndReached = forumCursor.endReached;
                         if (searchId > 0) {
                             lastMessagesSearchId = searchId;
                             if (lastLocalSearchId != searchId) {
@@ -494,6 +504,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             delegate.runResultsEnterAnimation();
                         }
                         notifyDataSetChanged();
+                        if (searchForumResultMessages.size() == forumVisibleBefore && !localMessagesSearchEndReached && !res.messages.isEmpty()) {
+                            reqForumId = 0;
+                            searchForumMessagesInternal(query, searchId);
+                            return;
+                        }
                     }
                 }
                 reqForumId = 0;
@@ -564,13 +579,14 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         if (!query.equals(lastMessagesSearchString)) {
             forceLoadingMessages = false;
         }
-        if (query.equals(lastMessagesSearchString) && lastMessagesSearchFilterFlags == currentMessagesFilter.flags && !searchResultMessages.isEmpty() && lastMessagesSearchId == lastSearchId) {
-            MessageObject lastMessage = searchResultMessages.get(searchResultMessages.size() - 1);
-            req.offset_id = lastMessage.getId();
+        if (query.equals(lastMessagesSearchString) && lastMessagesSearchFilterFlags == currentMessagesFilter.flags && messagesSearchHasCursor && lastMessagesSearchId == lastSearchId) {
+            req.offset_id = messagesSearchOffsetId;
             req.offset_rate = nextSearchRate;
-            long id = MessageObject.getPeerId(lastMessage.messageOwner.peer_id);
-            req.offset_peer = MessagesController.getInstance(currentAccount).getInputPeer(id);
+            req.offset_peer = MessagesController.getInstance(currentAccount).getInputPeer(messagesSearchOffsetDialogId);
         } else {
+            messagesSearchHasCursor = false;
+            messagesSearchOffsetId = 0;
+            messagesSearchOffsetDialogId = 0;
             req.offset_rate = 0;
             req.offset_id = 0;
             req.offset_peer = new TLRPC.TL_inputPeerEmpty();
@@ -625,7 +641,16 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                         if (req.offset_id == 0) {
                             searchResultMessages.clear();
                         }
+                        TLRPC.Message lastPageMessage = res.messages.isEmpty() ? null : res.messages.get(res.messages.size() - 1);
+                        OpengramContentFilter.MessagePageCursor pageCursor = OpengramContentFilter.messagePageCursor(lastPageMessage == null ? 0 : lastPageMessage.id, lastPageMessage == null ? 0 : MessageObject.getDialogId(lastPageMessage), res.messages.size(), 20);
+                        boolean stuckCursor = pageCursor.hasCursor && req.offset_id != 0 && pageCursor.offsetId == req.offset_id;
+                        if (pageCursor.hasCursor && !stuckCursor) {
+                            messagesSearchOffsetId = pageCursor.offsetId;
+                            messagesSearchOffsetDialogId = pageCursor.dialogId;
+                            messagesSearchHasCursor = true;
+                        }
                         nextSearchRate = res.next_rate;
+                        int visibleBefore = searchResultMessages.size();
                         for (int a = 0; a < res.messages.size(); a++) {
                             TLRPC.Message message = res.messages.get(a);
                             long did = MessageObject.getDialogId(message);
@@ -659,7 +684,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             }
                         }
                         searchWas = true;
-                        messagesSearchEndReached = res.messages.size() != 20;
+                        messagesSearchEndReached = pageCursor.endReached || stuckCursor;
                         if (searchId > 0) {
                             lastMessagesSearchId = searchId;
                             if (lastLocalSearchId != searchId) {
@@ -681,6 +706,11 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             messagesEmptyLayout.setQuery(lastMessagesSearchString);
                         }
                         notifyDataSetChanged();
+                        if (searchResultMessages.size() == visibleBefore && !messagesSearchEndReached && !res.messages.isEmpty()) {
+                            reqId = 0;
+                            searchMessagesInternal(query, searchId);
+                            return;
+                        }
                     }
                 }
                 reqId = 0;

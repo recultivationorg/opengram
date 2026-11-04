@@ -299,6 +299,29 @@ public class OpengramContentFilterTest {
         assertEquals(length, file.length());
     }
 
+    @Test
+    public void searchCursorUsesTheLastServerMessage() {
+        OpengramContentFilter.MessagePageCursor full = OpengramContentFilter.messagePageCursor(90, -15L, 20, 20);
+        assertTrue(full.hasCursor);
+        assertEquals(90, full.offsetId);
+        assertEquals(-15L, full.dialogId);
+        assertFalse(full.endReached);
+
+        OpengramContentFilter.MessagePageCursor shortPage = OpengramContentFilter.messagePageCursor(4, -3L, 5, 20);
+        assertTrue(shortPage.hasCursor);
+        assertTrue(shortPage.endReached);
+
+        OpengramContentFilter.MessagePageCursor empty = OpengramContentFilter.messagePageCursor(0, 0L, 0, 20);
+        assertFalse(empty.hasCursor);
+        assertTrue(empty.endReached);
+    }
+
+    @Test
+    public void hiddenChannelDoesNotAdvancePts() {
+        assertFalse(OpengramContentFilter.applyChannelPts(true));
+        assertTrue(OpengramContentFilter.applyChannelPts(false));
+    }
+
     private static File temp() throws Exception {
         File file = File.createTempFile("opengram-filter", ".bin");
         file.delete();

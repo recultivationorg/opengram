@@ -18713,6 +18713,9 @@ public class MessagesStorage extends BaseController {
 
             for (int a = 0; a < searchResults.size(); a++) {
                 DialogsSearchAdapter.DialogSearchResult dialogSearchResult = searchResults.get(a);
+                if (dialogSearchResult.object instanceof TLRPC.Chat && OpengramContentFilter.isHiddenChannel(currentAccount, -((TLRPC.Chat) dialogSearchResult.object).id)) {
+                    continue;
+                }
                 resultArray.add(dialogSearchResult.object);
                 resultArrayNames.add(dialogSearchResult.name);
             }

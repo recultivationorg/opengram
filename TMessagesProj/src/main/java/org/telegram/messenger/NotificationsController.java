@@ -1600,6 +1600,9 @@ public class NotificationsController extends BaseController implements Notificat
                     if (message == null) {
                         continue;
                     }
+                    if (OpengramContentFilter.isHiddenChannel(currentAccount, MessageObject.getDialogId(message))) {
+                        continue;
+                    }
                     if (message.fwd_from != null && message.fwd_from.imported ||
                             message.action instanceof TLRPC.TL_messageActionSetMessagesTTL ||
                             message.silent && (message.action instanceof TLRPC.TL_messageActionContactSignUp || message.action instanceof TLRPC.TL_messageActionUserJoined)) {
@@ -1655,6 +1658,9 @@ public class NotificationsController extends BaseController implements Notificat
             }
             for (int a = 0; a < dialogs.size(); a++) {
                 long dialog_id = dialogs.keyAt(a);
+                if (OpengramContentFilter.isHiddenChannel(currentAccount, dialog_id)) {
+                    continue;
+                }
                 int index = settingsCache.indexOfKey(dialog_id);
                 boolean value;
                 if (index >= 0) {
@@ -1686,6 +1692,9 @@ public class NotificationsController extends BaseController implements Notificat
             if (push != null) {
                 for (int a = 0; a < push.size(); a++) {
                     MessageObject messageObject = push.get(a);
+                    if (messageObject != null && OpengramContentFilter.isHiddenChannel(currentAccount, messageObject.getDialogId())) {
+                        continue;
+                    }
                     int mid = messageObject.getId();
                     if (pushMessagesDict.indexOfKey(mid) >= 0) {
                         continue;
@@ -1763,6 +1772,9 @@ public class NotificationsController extends BaseController implements Notificat
             if (storyPushes != null) {
                 for (StoryNotification notification : storyPushes) {
                     long dialogId = notification.dialogId;
+                    if (OpengramContentFilter.isHiddenChannel(currentAccount, dialogId)) {
+                        continue;
+                    }
                     StoryNotification oldNotification = storyPushMessagesDict.get(dialogId);
                     if (oldNotification != null) {
                         oldNotification.dateByIds.putAll(notification.dateByIds);
@@ -1812,15 +1824,16 @@ public class NotificationsController extends BaseController implements Notificat
                         final ArrayList<TLRPC.Dialog> dialogs = new ArrayList<>(MessagesController.getInstance(a).allDialogs);
                         for (int i = 0, N = dialogs.size(); i < N; i++) {
                             TLRPC.Dialog dialog = dialogs.get(i);
-                            if (dialog != null && DialogObject.isChatDialog(dialog.id)) {
-                                TLRPC.Chat chat = getMessagesController().getChat(-dialog.id);
+                            if (dialog == null || OpengramContentFilter.isHiddenChannel(a, dialog.id)) {
+                                continue;
+                            }
+                            if (DialogObject.isChatDialog(dialog.id)) {
+                                TLRPC.Chat chat = MessagesController.getInstance(a).getChat(-dialog.id);
                                 if (ChatObject.isNotInChat(chat) || ChatObject.isCommunity(chat)) {
                                     continue;
                                 }
                             }
-                            if (dialog != null) {
-                                count += MessagesController.getInstance(a).getDialogUnreadCount(dialog);
-                            }
+                            count += MessagesController.getInstance(a).getDialogUnreadCount(dialog);
                         }
                     } catch (Exception e) {
                         FileLog.e(e);
@@ -1833,8 +1846,11 @@ public class NotificationsController extends BaseController implements Notificat
                     try {
                         for (int i = 0, N = MessagesController.getInstance(a).allDialogs.size(); i < N; i++) {
                             TLRPC.Dialog dialog = MessagesController.getInstance(a).allDialogs.get(i);
+                            if (dialog == null || OpengramContentFilter.isHiddenChannel(a, dialog.id)) {
+                                continue;
+                            }
                             if (DialogObject.isChatDialog(dialog.id)) {
-                                TLRPC.Chat chat = getMessagesController().getChat(-dialog.id);
+                                TLRPC.Chat chat = MessagesController.getInstance(a).getChat(-dialog.id);
                                 if (ChatObject.isNotInChat(chat) || ChatObject.isCommunity(chat)) {
                                     continue;
                                 }

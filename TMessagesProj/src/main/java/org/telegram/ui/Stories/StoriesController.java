@@ -24,6 +24,7 @@ import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DownloadController;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.OpengramContentFilter;
 import org.telegram.messenger.FileRefController;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
@@ -482,6 +483,10 @@ public class StoriesController {
                 }
             }
             if (!userStories.stories.isEmpty()) {
+                if (OpengramContentFilter.isHiddenChannel(currentAccount, dialogId)) {
+                    allStoriesMap.remove(dialogId);
+                    continue;
+                }
                 putToAllStories(dialogId, userStories);
                 for (int k = 0; k < 2; k++) {
                     ArrayList<TL_stories.PeerStories> storiesList = k == 0 ? hiddenListStories : dialogListStories;
@@ -1010,8 +1015,32 @@ public class StoriesController {
         return user != null && (user.contact || user.id == MessagesController.getInstance(currentAccount).storiesChangelogUserId);
     }
 
+    public void removeHiddenChannel(long dialogId) {
+        if (!OpengramContentFilter.isHiddenChannel(currentAccount, dialogId)) {
+            return;
+        }
+        allStoriesMap.remove(dialogId);
+        for (int i = 0; i < dialogListStories.size(); i++) {
+            if (DialogObject.getPeerDialogId(dialogListStories.get(i).peer) == dialogId) {
+                dialogListStories.remove(i);
+                break;
+            }
+        }
+        for (int i = 0; i < hiddenListStories.size(); i++) {
+            if (DialogObject.getPeerDialogId(hiddenListStories.get(i).peer) == dialogId) {
+                hiddenListStories.remove(i);
+                break;
+            }
+        }
+        NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.storiesUpdated);
+    }
+
     private void applyToList(TL_stories.PeerStories currentUserStory) {
         long dialogId = DialogObject.getPeerDialogId(currentUserStory.peer);
+        if (OpengramContentFilter.isHiddenChannel(currentAccount, dialogId)) {
+            removeHiddenChannel(dialogId);
+            return;
+        }
         TLRPC.User user = null;
         TLRPC.Chat chat = null;
         if (dialogId > 0) {
@@ -1061,7 +1090,7 @@ public class StoriesController {
     HashSet<Long> allStoriesLoading = new HashSet<>();
 
     private void loadAllStoriesForDialog(long user_id) {
-        if (allStoriesLoading.contains(user_id)) {
+        if (OpengramContentFilter.isHiddenChannel(currentAccount, user_id) || allStoriesLoading.contains(user_id)) {
             return;
         }
         allStoriesLoading.add(user_id);
