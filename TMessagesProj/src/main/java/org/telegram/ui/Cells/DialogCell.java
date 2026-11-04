@@ -76,7 +76,7 @@ import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
-import org.telegram.messenger.OpengramMessageFilter;
+import org.telegram.messenger.OpengramContentFilter;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
@@ -1241,11 +1241,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (dialogId == 0) {
             dialogId = currentDialogId;
         }
-        boolean hidden = OpengramMessageFilter.shouldHide(currentAccount, dialogId, message);
+        boolean hidden = OpengramContentFilter.shouldHide(currentAccount, dialogId, message);
         if (!hidden && groupMessages != null) {
             for (int i = 0; i < groupMessages.size(); i++) {
                 MessageObject grouped = groupMessages.get(i);
-                if (grouped != null && OpengramMessageFilter.shouldHide(currentAccount, dialogId, grouped)) {
+                if (grouped != null && OpengramContentFilter.shouldHide(currentAccount, dialogId, grouped)) {
                     hidden = true;
                     break;
                 }

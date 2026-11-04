@@ -10030,11 +10030,11 @@ public class MessagesStorage extends BaseController {
                         visible = new ArrayList<>();
                         break;
                     }
-                    HashSet<Long> hiddenGroups = OpengramMessageFilter.hiddenGroups(currentAccount, dialogId, page);
+                    HashSet<Long> hiddenGroups = OpengramContentFilter.hiddenGroups(currentAccount, dialogId, page);
                     for (int i = 0; i < page.size(); i++) {
                         MessageObject message = page.get(i);
                         long groupId = message.getGroupId();
-                        if (OpengramMessageFilter.shouldHide(currentAccount, dialogId, message) || groupId != 0 && hiddenGroups.contains(groupId)) {
+                        if (OpengramContentFilter.shouldHide(currentAccount, dialogId, message) || groupId != 0 && hiddenGroups.contains(groupId)) {
                             continue;
                         }
                         visible = new ArrayList<>();

@@ -174,7 +174,7 @@ import org.telegram.messenger.MessageSuggestionParams;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.OpengramMessageFilter;
+import org.telegram.messenger.OpengramContentFilter;
 import org.telegram.messenger.OpengramPreload;
 import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
@@ -2672,6 +2672,21 @@ public class ChatActivity extends BaseFragment implements
         scrimBlur3Factory.setLinkedDrawablesRef(glassAttachedDrawables);
     }
 
+    private void showHiddenChannelAlert() {
+        android.app.Activity activity = getParentActivity();
+        if (activity == null) {
+            activity = LaunchActivity.instance;
+        }
+        if (activity == null) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        builder.setTitle(LocaleController.getString(R.string.MessageFilter));
+        builder.setMessage(LocaleController.getString(R.string.MessageFilterHiddenLink));
+        builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
+        builder.show();
+    }
+
     private NotificationCenter.ObserversGroup observersGroup;
 
     @Override
@@ -2755,6 +2770,10 @@ public class ChatActivity extends BaseFragment implements
                 isSubscriberSuggestions = !ChatObject.canManageMonoForum(currentAccount, currentChat);
             }
             dialog_id = -chatId;
+            if (OpengramContentFilter.isHiddenChannel(currentAccount, dialog_id)) {
+                showHiddenChannelAlert();
+                return false;
+            }
             if (ChatObject.isChannel(currentChat)) {
                 if (ChatObject.isNotInChat(currentChat) && !ChatObject.isMonoForum(currentChat) && !isThreadChat() && !isInScheduleMode()) {
                     waitingForGetDifference = true;
@@ -21232,11 +21251,11 @@ public class ChatActivity extends BaseFragment implements
                 dropPhotoAction = action;
             }
         }
-        HashSet<Long> filteredGroups = OpengramMessageFilter.hiddenGroups(currentAccount, dialog_id, messArr);
+        HashSet<Long> filteredGroups = OpengramContentFilter.hiddenGroups(currentAccount, dialog_id, messArr);
         int filteredOut = 0;
         for (int a = 0; a < messArr.size(); a++) {
             MessageObject obj = messArr.get(a);
-            if (obj != null && obj.messageOwner != null && (OpengramMessageFilter.shouldHide(currentAccount, dialog_id, obj) || filteredGroups.contains(obj.getGroupId()))) {
+            if (obj != null && obj.messageOwner != null && (OpengramContentFilter.shouldHide(currentAccount, dialog_id, obj) || filteredGroups.contains(obj.getGroupId()))) {
                 filteredOut++;
                 int messageId = obj.getId();
                 if (!MessageObject.isEphemeralMessageId(messageId)) {
@@ -25597,7 +25616,7 @@ public class ChatActivity extends BaseFragment implements
         processNewMessages(arr, true);
     }
     private void processNewMessages(ArrayList<MessageObject> arr, final boolean animatedFromBottom) {
-        arr = OpengramMessageFilter.withoutHidden(currentAccount, dialog_id, arr);
+        arr = OpengramContentFilter.withoutHidden(currentAccount, dialog_id, arr);
         FileLog.d("processNewMessages " + arr.size() + " messages");
 
         final boolean isBot = UserObject.isBot(currentUser);

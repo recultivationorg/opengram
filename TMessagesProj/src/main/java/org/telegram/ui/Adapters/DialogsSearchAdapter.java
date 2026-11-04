@@ -42,6 +42,7 @@ import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.OpengramContentFilter;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
@@ -471,6 +472,9 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             if (maxId != 0 && message.id <= maxId) {
                                 continue;
                             }
+                            if (OpengramContentFilter.isHiddenChannel(currentAccount, did)) {
+                                continue;
+                            }
                             searchForumResultMessages.add(messageObjects.get(a));
                         }
                         searchWas = true;
@@ -627,6 +631,9 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             long did = MessageObject.getDialogId(message);
                             int maxId = MessagesController.getInstance(currentAccount).deletedHistory.get(did);
                             if (maxId != 0 && message.id <= maxId) {
+                                continue;
+                            }
+                            if (OpengramContentFilter.isHiddenChannel(currentAccount, did)) {
                                 continue;
                             }
                             MessageObject msg = messageObjects.get(a);
@@ -1029,6 +1036,14 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                 } else if (obj instanceof TLRPC.EncryptedChat) {
                     TLRPC.EncryptedChat chat = (TLRPC.EncryptedChat) obj;
                     MessagesController.getInstance(currentAccount).putEncryptedChat(chat, true);
+                }
+                if (OpengramContentFilter.isHiddenChannel(currentAccount, dialogId)) {
+                    result.remove(a);
+                    if (a < names.size()) {
+                        names.remove(a);
+                    }
+                    a--;
+                    continue;
                 }
 
                 if (dialogId != 0) {
@@ -2350,7 +2365,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
             filteredRecentSearchObjects.clear();
             final int count = recentSearchObjects.size();
             for (int i = 0; i < count; ++i) {
-                if (delegate != null && delegate.getSearchForumDialogId() == recentSearchObjects.get(i).did || !filter(recentSearchObjects.get(i).object)) {
+                if (delegate != null && delegate.getSearchForumDialogId() == recentSearchObjects.get(i).did || !filter(recentSearchObjects.get(i).object) || OpengramContentFilter.isHiddenChannel(currentAccount, recentSearchObjects.get(i).did)) {
                     continue;
                 }
                 filteredRecentSearchObjects.add(recentSearchObjects.get(i));
@@ -2361,7 +2376,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
         final int count = recentSearchObjects.size();
         for (int i = 0; i < count; ++i) {
             RecentSearchObject obj = recentSearchObjects.get(i);
-            if (obj == null || obj.object == null) {
+            if (obj == null || obj.object == null || OpengramContentFilter.isHiddenChannel(currentAccount, obj.did)) {
                 continue;
             }
             if (delegate != null && delegate.getSearchForumDialogId() == obj.did || !filter(recentSearchObjects.get(i).object)) {

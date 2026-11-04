@@ -624,6 +624,32 @@ public class FileLoader extends BaseController {
         }
     }
 
+    public void cancelLoadsForDialog(long dialogId) {
+        if (dialogId >= 0) {
+            return;
+        }
+        fileLoaderQueue.postRunnable(() -> {
+            ArrayList<FileLoadOperation> operations = new ArrayList<>();
+            for (FileLoadOperation operation : loadOperationPaths.values()) {
+                if (operation == null) {
+                    continue;
+                }
+                FilePathDatabase.FileMeta meta = getFileMetadataFromParent(currentAccount, operation.parentObject);
+                if (meta != null && meta.dialogId == dialogId) {
+                    operations.add(operation);
+                }
+            }
+            for (int a = 0; a < operations.size(); a++) {
+                FileLoadOperation operation = operations.get(a);
+                loadOperationPaths.remove(operation.getFileName());
+                FileLoaderPriorityQueue queue = operation.getQueue();
+                if (queue != null) {
+                    queue.cancel(operation);
+                }
+            }
+        });
+    }
+
     public void cancel(FileLoadOperation operation) {
         if (operation == null) return;
         final String fileName = operation.getFileName();
@@ -820,6 +846,10 @@ public class FileLoader extends BaseController {
 
 
     private FileLoadOperation loadFileInternal(final TLRPC.Document document, final SecureDocument secureDocument, final WebFile webDocument, TLRPC.TL_fileLocationToBeDeprecated location, final ImageLocation imageLocation, Object parentObject, final String locationExt, final long locationSize, int priority, FileLoadOperationStream stream, final long streamOffset, boolean streamPriority, final int cacheType) {
+        FilePathDatabase.FileMeta parentMeta = getFileMetadataFromParent(currentAccount, parentObject);
+        if (parentMeta != null && OpengramContentFilter.isHiddenChannel(currentAccount, parentMeta.dialogId)) {
+            return null;
+        }
         String fileName;
         if (location != null) {
             fileName = getAttachFileName(location, locationExt);

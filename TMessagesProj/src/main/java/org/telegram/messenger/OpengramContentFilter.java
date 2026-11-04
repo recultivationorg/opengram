@@ -13,16 +13,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Hides channel posts and bot-chat messages whose text contains a keyword.
- * The keyword list is a per-account snapshot. StrongBox mode authenticates the
- * header as additional data. A bad seal, a mode mismatch, or a truncated file
- * clears the in-memory list and stops filtering.
- */
-public final class OpengramMessageFilter {
+public final class OpengramContentFilter {
 
     public static final int MAX_KEYWORDS = 32;
     public static final int MAX_KEYWORD_LENGTH = 48;
+    public static final int MAX_CHANNELS = 256;
+    static final String CHANNEL_PREFIX = "\u007F";
 
     private static final int ACCOUNT_SLOTS = 4;
     private static final String FILE_PREFIX = "opengram-filter-";
@@ -39,10 +35,16 @@ public final class OpengramMessageFilter {
     public static final class Snapshot {
         public final OpengramSnapshotFile.Status status;
         public final List<String> keywords;
+        public final List<Long> channels;
 
         Snapshot(OpengramSnapshotFile.Status status, List<String> keywords) {
+            this(status, keywords, Collections.<Long>emptyList());
+        }
+
+        Snapshot(OpengramSnapshotFile.Status status, List<String> keywords, List<Long> channels) {
             this.status = status;
             this.keywords = keywords == null ? Collections.<String>emptyList() : keywords;
+            this.channels = channels == null ? Collections.<Long>emptyList() : channels;
         }
     }
 
@@ -53,6 +55,7 @@ public final class OpengramMessageFilter {
         int mode;
         final ArrayList<String> keywords = new ArrayList<>();
         final ArrayList<String> folded = new ArrayList<>();
+        final ArrayList<Long> channels = new ArrayList<>();
 
         void clear() {
             loaded = false;
@@ -61,6 +64,7 @@ public final class OpengramMessageFilter {
             mode = 0;
             keywords.clear();
             folded.clear();
+            channels.clear();
         }
 
         void fail(long clientUserId, int mode) {
@@ -70,6 +74,7 @@ public final class OpengramMessageFilter {
             this.mode = mode;
             keywords.clear();
             folded.clear();
+            channels.clear();
         }
 
         void replaceKeywords(Collection<String> next) {
@@ -88,9 +93,21 @@ public final class OpengramMessageFilter {
                 }
             }
         }
+
+        void replaceChannels(Collection<Long> next) {
+            channels.clear();
+            if (next == null) {
+                return;
+            }
+            for (Long channelId : next) {
+                if (channelId != null && channelId < 0 && !channels.contains(channelId)) {
+                    channels.add(channelId);
+                }
+            }
+        }
     }
 
-    private OpengramMessageFilter() {
+    private OpengramContentFilter() {
     }
 
     public static List<String> parseKeywords(String raw) {
@@ -106,7 +123,7 @@ public final class OpengramMessageFilter {
             }
             String token = raw.substring(start, i).replace('\n', ' ').replace('\r', ' ').trim();
             start = i + 1;
-            if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH) {
+            if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH || token.charAt(0) == CHANNEL_PREFIX.charAt(0)) {
                 continue;
             }
             if (!seen.add(token.toLowerCase(Locale.ROOT))) {
@@ -606,6 +623,10 @@ public final class OpengramMessageFilter {
     }
 
     public static boolean writeKeywords(File file, int mode, long clientUserId, Collection<String> keywords, OpengramSnapshotFile.Sealer sealer) {
+        return writeFilter(file, mode, clientUserId, keywords, Collections.<Long>emptyList(), sealer);
+    }
+
+    public static boolean writeFilter(File file, int mode, long clientUserId, Collection<String> keywords, Collection<Long> channels, OpengramSnapshotFile.Sealer sealer) {
         LinkedHashSet<String> peers = new LinkedHashSet<>();
         if (keywords != null) {
             for (String keyword : keywords) {
@@ -613,13 +634,28 @@ public final class OpengramMessageFilter {
                     continue;
                 }
                 String token = keyword.replace('\n', ' ').replace('\r', ' ').trim();
-                if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH || token.indexOf('\n') >= 0 || token.indexOf('\r') >= 0) {
+                if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH || token.charAt(0) == CHANNEL_PREFIX.charAt(0)) {
                     continue;
                 }
                 if (!peers.add(token)) {
                     continue;
                 }
                 if (peers.size() == MAX_KEYWORDS) {
+                    break;
+                }
+            }
+        }
+        int channelCount = 0;
+        if (channels != null) {
+            for (Long channelId : channels) {
+                if (channelId == null || channelId >= 0) {
+                    continue;
+                }
+                if (!peers.add(CHANNEL_PREFIX + channelId)) {
+                    continue;
+                }
+                channelCount++;
+                if (channelCount == MAX_CHANNELS) {
                     break;
                 }
             }
@@ -636,9 +672,23 @@ public final class OpengramMessageFilter {
             return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
         }
         ArrayList<String> keywords = new ArrayList<>();
+        ArrayList<Long> channels = new ArrayList<>();
         for (String peer : read.record.peers) {
             if (peer == null || peer.indexOf('\n') >= 0 || peer.indexOf('\r') >= 0) {
                 return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
+            }
+            if (peer.startsWith(CHANNEL_PREFIX)) {
+                Long channelId = parseChannelId(peer);
+                if (channelId == null) {
+                    return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
+                }
+                if (!channels.contains(channelId)) {
+                    channels.add(channelId);
+                }
+                if (channels.size() > MAX_CHANNELS) {
+                    return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
+                }
+                continue;
             }
             String token = peer.trim();
             if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH) {
@@ -649,7 +699,22 @@ public final class OpengramMessageFilter {
                 return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
             }
         }
-        return new Snapshot(OpengramSnapshotFile.Status.OK, keywords);
+        return new Snapshot(OpengramSnapshotFile.Status.OK, keywords, channels);
+    }
+
+    private static Long parseChannelId(String peer) {
+        if (peer.length() <= CHANNEL_PREFIX.length()) {
+            return null;
+        }
+        try {
+            long id = Long.parseLong(peer.substring(CHANNEL_PREFIX.length()));
+            if (id >= 0) {
+                return null;
+            }
+            return id;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public static Phase phase(int account) {
@@ -717,6 +782,7 @@ public final class OpengramMessageFilter {
             state.clientUserId = clientUserId;
             state.mode = mode;
             state.replaceKeywords(Collections.<String>emptyList());
+            state.replaceChannels(Collections.<Long>emptyList());
         }
         notifyDialogs(account);
         return true;
@@ -746,29 +812,22 @@ public final class OpengramMessageFilter {
             return false;
         }
         UserConfig config = UserConfig.getInstance(account);
-        long clientUserId = config.getClientUserId();
-        int mode = config.messageFilterMode;
-        if (clientUserId <= 0) {
+        if (config.getClientUserId() <= 0) {
             return false;
         }
         List<String> keywords = parseKeywords(raw);
-        OpengramSnapshotFile.Sealer sealer = mode == OpengramSnapshotFile.MODE_STRONGBOX ? OpengramStrongBox.forFilter(clientUserId) : null;
-        if (!writeKeywords(file(clientUserId), mode, clientUserId, keywords, sealer)) {
-            return false;
-        }
+        boolean wrote;
         synchronized (lock) {
-            State state = stateLocked(account);
-            state.loaded = true;
-            state.error = false;
-            state.clientUserId = clientUserId;
-            state.mode = mode;
-            state.replaceKeywords(keywords);
+            wrote = writeStateLocked(account, keywords, new ArrayList<>(stateLocked(account).channels));
         }
-        notifyDialogs(account);
-        return true;
+        if (wrote) {
+            notifyDialogs(account);
+        }
+        return wrote;
     }
 
     private static void notifyDialogs(int account) {
+        MessagesController.getInstance(account).sortDialogs(null);
         MessagesController.getInstance(account).clearVisibleDialogPreviews();
         NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.dialogsNeedReload);
         NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.messageFilterChanged);
@@ -877,6 +936,100 @@ public final class OpengramMessageFilter {
         }
     }
 
+    public static boolean isHiddenChannel(int account, long dialogId) {
+        if (dialogId >= 0 || phase(account) != Phase.READY) {
+            return false;
+        }
+        synchronized (lock) {
+            if (!stateLocked(account).channels.contains(dialogId)) {
+                return false;
+            }
+        }
+        TLRPC.Chat chat = MessagesController.getInstance(account).getChat(-dialogId);
+        return chat == null || chat.broadcast;
+    }
+
+    public static ArrayList<Long> hiddenChannels(int account) {
+        ArrayList<Long> copy = new ArrayList<>();
+        if (phase(account) != Phase.READY) {
+            return copy;
+        }
+        synchronized (lock) {
+            copy.addAll(stateLocked(account).channels);
+        }
+        return copy;
+    }
+
+    public static boolean addChannel(int account, long dialogId) {
+        if (phase(account) != Phase.READY || dialogId >= 0) {
+            return false;
+        }
+        TLRPC.Chat chat = MessagesController.getInstance(account).getChat(-dialogId);
+        if (chat == null || !chat.broadcast) {
+            return false;
+        }
+        boolean wrote;
+        synchronized (lock) {
+            State state = stateLocked(account);
+            if (state.channels.contains(dialogId)) {
+                return true;
+            }
+            if (state.channels.size() >= MAX_CHANNELS) {
+                return false;
+            }
+            ArrayList<Long> channels = new ArrayList<>(state.channels);
+            channels.add(dialogId);
+            wrote = writeStateLocked(account, new ArrayList<>(state.keywords), channels);
+        }
+        if (!wrote) {
+            return false;
+        }
+        FileLoader.getInstance(account).cancelLoadsForDialog(dialogId);
+        notifyDialogs(account);
+        return true;
+    }
+
+    public static boolean removeChannel(int account, long dialogId) {
+        if (phase(account) != Phase.READY) {
+            return false;
+        }
+        boolean wrote;
+        synchronized (lock) {
+            State state = stateLocked(account);
+            if (!state.channels.contains(dialogId)) {
+                return true;
+            }
+            ArrayList<Long> channels = new ArrayList<>(state.channels);
+            channels.remove(dialogId);
+            wrote = writeStateLocked(account, new ArrayList<>(state.keywords), channels);
+        }
+        if (wrote) {
+            notifyDialogs(account);
+        }
+        return wrote;
+    }
+
+    private static boolean writeStateLocked(int account, List<String> keywords, List<Long> channels) {
+        UserConfig config = UserConfig.getInstance(account);
+        long clientUserId = config.getClientUserId();
+        int mode = config.messageFilterMode;
+        if (clientUserId <= 0) {
+            return false;
+        }
+        OpengramSnapshotFile.Sealer sealer = mode == OpengramSnapshotFile.MODE_STRONGBOX ? OpengramStrongBox.forFilter(clientUserId) : null;
+        if (!writeFilter(file(clientUserId), mode, clientUserId, keywords, channels, sealer)) {
+            return false;
+        }
+        State state = stateLocked(account);
+        state.loaded = true;
+        state.error = false;
+        state.clientUserId = clientUserId;
+        state.mode = mode;
+        state.replaceKeywords(keywords);
+        state.replaceChannels(channels);
+        return true;
+    }
+
     public static void preload(int account) {
         if (!validAccount(account)) {
             return;
@@ -942,6 +1095,7 @@ public final class OpengramMessageFilter {
         state.clientUserId = clientUserId;
         state.mode = mode;
         state.replaceKeywords(snapshot.keywords);
+        state.replaceChannels(snapshot.channels);
     }
 
     private static boolean validAccount(int account) {

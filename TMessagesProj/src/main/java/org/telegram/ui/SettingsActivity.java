@@ -83,7 +83,7 @@ import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.OpengramGhostReads;
-import org.telegram.messenger.OpengramMessageFilter;
+import org.telegram.messenger.OpengramContentFilter;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.SharedPrefsHelper;
 import org.telegram.ui.Cells.TextCell;
@@ -513,14 +513,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     private CharSequence messageFilterSubtitle() {
-        OpengramMessageFilter.Phase phase = OpengramMessageFilter.phase(currentAccount);
-        if (phase == OpengramMessageFilter.Phase.ERROR) {
+        OpengramContentFilter.Phase phase = OpengramContentFilter.phase(currentAccount);
+        if (phase == OpengramContentFilter.Phase.ERROR) {
             return getString(R.string.MessageFilterError);
         }
-        if (phase != OpengramMessageFilter.Phase.READY) {
+        if (phase != OpengramContentFilter.Phase.READY) {
             return getString(R.string.MessageFilterOff);
         }
-        return LocaleController.formatPluralString("MessageFilterKeywords", OpengramMessageFilter.keywordCount(currentAccount));
+        return LocaleController.formatPluralString("MessageFilterKeywords", OpengramContentFilter.keywordCount(currentAccount));
     }
 
     @Override
@@ -947,7 +947,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             }
             case 28: {
-                presentFragment(new OpengramMessageFilterActivity());
+                presentFragment(new OpengramContentFilterActivity());
                 break;
             }
             case 27: {

@@ -1563,7 +1563,7 @@ public class MessagesController extends BaseController implements NotificationCe
         ImageLoader.getInstance();
         getMessagesStorage();
         OpengramGhostReads.load(currentAccount);
-        OpengramMessageFilter.preload(currentAccount);
+        OpengramContentFilter.preload(currentAccount);
         getLocationController();
         AndroidUtilities.runOnUIThread(() -> {
             MessagesController messagesController = getMessagesController();
@@ -11534,6 +11534,9 @@ public class MessagesController extends BaseController implements NotificationCe
         if (BuildVars.LOGS_ENABLED && loaderLogger == null && mode == 0) {
             loaderLogger = new Timer("MessageLoaderLogger dialogId=" + dialogId + " index=" + loadIndex + " count=" + count);
         }
+        if (OpengramContentFilter.isHiddenChannel(currentAccount, dialogId)) {
+            return;
+        }
         if ((threadMessageId == 0 || isTopic || mode == ChatActivity.MODE_SUGGESTIONS || mode == ChatActivity.MODE_SAVED || mode == ChatActivity.MODE_QUICK_REPLIES || mode == ChatActivity.MODE_WELCOME_MESSAGES) && mode != ChatActivity.MODE_PINNED && (fromCache || DialogObject.isEncryptedDialog(dialogId))) {
             getMessagesStorage().getMessages(dialogId, mergeDialogId, loadInfo, count, max_id, offset_date, minDate, classGuid, load_type, mode, threadMessageId, loadIndex, processMessages, isTopic, loaderLogger);
         } else {
@@ -11936,6 +11939,9 @@ public class MessagesController extends BaseController implements NotificationCe
 
     public void processLoadedMessages(TLRPC.messages_Messages messagesRes, int resCount, long dialogId, long mergeDialogId, int count, int max_id, int offset_date, boolean isCache, int classGuid,
                                       int first_unread, int last_message_id, int unread_count, int last_date, int load_type, boolean isEnd, int mode, long threadMessageId, int loadIndex, boolean queryFromServer, int mentionsCount, boolean needProcess, boolean isTopic, Timer loaderLogger) {
+        if (OpengramContentFilter.isHiddenChannel(currentAccount, dialogId)) {
+            return;
+        }
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("processLoadedMessages size " + messagesRes.messages.size() + " in chat " + dialogId + " topic_id " + threadMessageId + " count " + count + " max_id " + max_id + " cache " + isCache + " guid " + classGuid + " load_type " + load_type + " last_message_id " + last_message_id + " index " + loadIndex + " firstUnread " + first_unread + " unread_count " + unread_count + " last_date " + last_date + " queryFromServer " + queryFromServer + " isTopic " + isTopic + " mode " + mode);
         }
@@ -16660,7 +16666,30 @@ public class MessagesController extends BaseController implements NotificationCe
                 user.id == 4298000);
     }
 
+    private boolean isHiddenChannelUpdate(TLRPC.Update update) {
+        long channelId = 0;
+        if (update instanceof TL_update.TL_updateNewChannelMessage) {
+            TLRPC.Message message = ((TL_update.TL_updateNewChannelMessage) update).message;
+            if (message != null && message.peer_id != null) {
+                channelId = message.peer_id.channel_id;
+            }
+        } else if (update instanceof TL_update.TL_updateEditChannelMessage) {
+            TLRPC.Message message = ((TL_update.TL_updateEditChannelMessage) update).message;
+            if (message != null && message.peer_id != null) {
+                channelId = message.peer_id.channel_id;
+            }
+        } else if (update instanceof TL_update.TL_updateDeleteChannelMessages) {
+            channelId = ((TL_update.TL_updateDeleteChannelMessages) update).channel_id;
+        } else if (update instanceof TL_update.TL_updateChannelTooLong) {
+            channelId = ((TL_update.TL_updateChannelTooLong) update).channel_id;
+        }
+        return channelId != 0 && OpengramContentFilter.isHiddenChannel(currentAccount, -channelId);
+    }
+
     protected void getChannelDifference(long channelId, int newDialogType, long taskId, TLRPC.InputChannel inputChannel) {
+        if (OpengramContentFilter.isHiddenChannel(currentAccount, -channelId)) {
+            return;
+        }
         boolean gettingDifferenceChannel = gettingDifferenceChannels.get(channelId, false);
         if (gettingDifferenceChannel) {
             return;
@@ -16746,6 +16775,13 @@ public class MessagesController extends BaseController implements NotificationCe
             FileLog.d("start getChannelDifference with pts = " + channelPts + " channelId = " + channelId);
         }
         getConnectionsManager().sendRequest(req, (response, error) -> {
+            if (OpengramContentFilter.isHiddenChannel(currentAccount, -channelId)) {
+                gettingDifferenceChannels.delete(channelId);
+                if (newTaskId != 0) {
+                    getMessagesStorage().removePendingTask(newTaskId);
+                }
+                return;
+            }
             if (response != null) {
                 TLRPC.updates_ChannelDifference res = (TLRPC.updates_ChannelDifference) response;
 
@@ -18594,6 +18630,9 @@ public class MessagesController extends BaseController implements NotificationCe
             TLRPC.Update baseUpdate = updates.get(c);
             if (BuildVars.LOGS_ENABLED && baseUpdate != null) {
                 FileLog.d("process update " + baseUpdate.getClass().getSimpleName());
+            }
+            if (isHiddenChannelUpdate(baseUpdate)) {
+                continue;
             }
             if (baseUpdate instanceof TL_update.TL_updateNewMessage || baseUpdate instanceof TL_update.TL_updateNewChannelMessage || baseUpdate instanceof TL_update.TL_updateNewScheduledMessage) {
                 TLRPC.Message message;
@@ -22065,7 +22104,7 @@ public class MessagesController extends BaseController implements NotificationCe
     public void ensureVisibleDialogPreview(long dialogId) {
         TLRPC.Dialog dialog = dialogs_dict.get(dialogId);
         ArrayList<MessageObject> current = dialogMessage.get(dialogId);
-        if (dialog == null || !OpengramMessageFilter.previewIsHidden(currentAccount, dialogId, current)) {
+        if (dialog == null || !OpengramContentFilter.previewIsHidden(currentAccount, dialogId, current)) {
             return;
         }
         if (visibleDialogPreviewTops.indexOfKey(dialogId) >= 0 && visibleDialogPreviewTops.get(dialogId) == dialog.top_message) {
@@ -22087,7 +22126,7 @@ public class MessagesController extends BaseController implements NotificationCe
         if (dialog == null || dialog.top_message != topMessage) {
             return;
         }
-        if (!OpengramMessageFilter.previewIsHidden(currentAccount, dialogId, dialogMessage.get(dialogId))) {
+        if (!OpengramContentFilter.previewIsHidden(currentAccount, dialogId, dialogMessage.get(dialogId))) {
             return;
         }
         if (messages == null) {
@@ -22118,11 +22157,11 @@ public class MessagesController extends BaseController implements NotificationCe
         long channelId = 0;
         boolean updateRating = false;
         boolean hasNotOutMessage = false;
-        HashSet<Long> hiddenGroups = OpengramMessageFilter.hiddenGroups(currentAccount, dialogId, messages);
+        HashSet<Long> hiddenGroups = OpengramContentFilter.hiddenGroups(currentAccount, dialogId, messages);
         if (!scheduled && !quickReplies && !welcomeMessages) {
             for (int a = 0; a < messages.size(); a++) {
                 MessageObject message = messages.get(a);
-                if (message == null || OpengramMessageFilter.shouldHide(currentAccount, dialogId, message) || hiddenGroups.contains(message.getGroupId())) {
+                if (message == null || OpengramContentFilter.shouldHide(currentAccount, dialogId, message) || hiddenGroups.contains(message.getGroupId())) {
                     continue;
                 }
                 if (lastMessage == null || (!isEncryptedChat && message.getId() > lastMessage.getId() || (isEncryptedChat || message.getId() < 0 && lastMessage.getId() < 0) && message.getId() < lastMessage.getId()) || message.messageOwner.date > lastMessage.messageOwner.date) {
@@ -22621,6 +22660,9 @@ public class MessagesController extends BaseController implements NotificationCe
                                 dialogId = encryptedChat.user_id;
                             }
                         }
+                        if (OpengramContentFilter.isHiddenChannel(currentAccount, d.id)) {
+                            continue;
+                        }
                         if (sortingDialogFilter.includesDialog(getAccountInstance(), dialogId, d)) {
                             if (canAddToForward(d)) {
                                 dialogsForward.add(d);
@@ -22644,6 +22686,9 @@ public class MessagesController extends BaseController implements NotificationCe
         }
         for (int a = 0, N = allDialogs.size(); a < N; a++) {
             TLRPC.Dialog d = allDialogs.get(a);
+            if (OpengramContentFilter.isHiddenChannel(currentAccount, d.id)) {
+                continue;
+            }
             if (d instanceof TLRPC.TL_dialog) {
                 ArrayList<MessageObject> messageObjects = dialogMessage.get(d.id);
                 if (messageObjects != null) {

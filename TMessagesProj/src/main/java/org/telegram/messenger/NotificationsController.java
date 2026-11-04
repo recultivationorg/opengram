@@ -706,7 +706,7 @@ public class NotificationsController extends BaseController implements Notificat
                 continue;
             }
             long groupId = message.getGroupId();
-            if (groupId != 0 && OpengramMessageFilter.shouldHide(currentAccount, message.getDialogId(), message)) {
+            if (groupId != 0 && OpengramContentFilter.shouldHide(currentAccount, message.getDialogId(), message)) {
                 hiddenGroups.add(groupId);
             }
         }
@@ -717,7 +717,7 @@ public class NotificationsController extends BaseController implements Notificat
                 continue;
             }
             long dialogId = message.getDialogId();
-            boolean hide = OpengramMessageFilter.shouldHide(currentAccount, dialogId, message) || hiddenGroups.contains(message.getGroupId());
+            boolean hide = OpengramContentFilter.isHiddenChannel(currentAccount, dialogId) || OpengramContentFilter.shouldHide(currentAccount, dialogId, message) || hiddenGroups.contains(message.getGroupId());
             if (!hide) {
                 continue;
             }
@@ -1076,7 +1076,7 @@ public class NotificationsController extends BaseController implements Notificat
             HashSet<Long> hiddenGroups = null;
             for (int i = 0; i < messageObjects.size(); ++i) {
                 final MessageObject messageObject = messageObjects.get(i);
-                if (messageObject != null && messageObject.messageOwner != null && OpengramMessageFilter.shouldHide(currentAccount, messageObject.getDialogId(), messageObject)) {
+                if (messageObject != null && messageObject.messageOwner != null && (OpengramContentFilter.isHiddenChannel(currentAccount, messageObject.getDialogId()) || OpengramContentFilter.shouldHide(currentAccount, messageObject.getDialogId(), messageObject))) {
                     long groupId = messageObject.getGroupId();
                     if (groupId != 0) {
                         if (hiddenGroups == null) {
