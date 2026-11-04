@@ -1370,7 +1370,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                         }
                         textCell2.setTextAndValueAndIcon(getString(R.string.Passkey), value, true, R.drawable.msg2_permissions, true);
                     } else if (position == reloadRow) {
-                        textCell2.setTextAndIcon(getString(R.string.OpengramReload), R.drawable.msg_upload, true);
+                        textCell2.setTextAndValueAndIcon(getString(R.string.OpengramReload), getString(R.string.Export), true, R.drawable.msg_upload, true);
                     } else if (position == passcodeRow) {
                         int icon;
                         if (SharedConfig.passcodeHash.length() != 0) {

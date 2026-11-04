@@ -3348,6 +3348,7 @@
     <string name="MessageFilterStorageError">Secure storage for the keyword list failed. Nothing was written in plaintext.</string>
     <string name="MessageFilterStrongBoxWarning">This device has no Android StrongBox. The keyword list saved for this option is a potential information leak.</string>
     <string name="OpengramReload">Opengram Reload</string>
+    <string name="Export">Export</string>
     <string name="OpengramReloadInfo">Opengram Reload allows you to save your session data into an encrypted file and restore it in a different installation. You can use this for backups, sharing one session across devices, and more.</string>
     <string name="OpengramReloadExport">Export session</string>
     <string name="OpengramReloadExportUnavailable">This account has no session key to export.</string>
