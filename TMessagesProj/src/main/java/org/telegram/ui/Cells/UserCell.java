@@ -908,5 +908,17 @@ public class UserCell extends FrameLayout implements NotificationCenter.Notifica
             }
             closeView.setOnClickListener(onClick);
         }
+        int end = AndroidUtilities.dp(onClick == null ? 28 : 56);
+        FrameLayout.LayoutParams nameLayout = (FrameLayout.LayoutParams) nameTextView.getLayoutParams();
+        FrameLayout.LayoutParams statusLayout = (FrameLayout.LayoutParams) statusTextView.getLayoutParams();
+        if (LocaleController.isRTL) {
+            nameLayout.leftMargin = end;
+            statusLayout.leftMargin = end;
+        } else {
+            nameLayout.rightMargin = end;
+            statusLayout.rightMargin = end;
+        }
+        nameTextView.setLayoutParams(nameLayout);
+        statusTextView.setLayoutParams(statusLayout);
     }
 }

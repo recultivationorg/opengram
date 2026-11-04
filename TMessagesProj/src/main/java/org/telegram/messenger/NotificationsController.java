@@ -1600,7 +1600,7 @@ public class NotificationsController extends BaseController implements Notificat
                     if (message == null) {
                         continue;
                     }
-                    if (OpengramContentFilter.isHiddenChannel(currentAccount, MessageObject.getDialogId(message))) {
+                    if (OpengramContentFilter.isHiddenChannel(currentAccount, MessageObject.getDialogId(message)) || OpengramContentFilter.isHiddenRepost(currentAccount, message)) {
                         continue;
                     }
                     if (message.fwd_from != null && message.fwd_from.imported ||
@@ -1692,7 +1692,7 @@ public class NotificationsController extends BaseController implements Notificat
             if (push != null) {
                 for (int a = 0; a < push.size(); a++) {
                     MessageObject messageObject = push.get(a);
-                    if (messageObject != null && OpengramContentFilter.isHiddenChannel(currentAccount, messageObject.getDialogId())) {
+                    if (messageObject != null && (OpengramContentFilter.isHiddenChannel(currentAccount, messageObject.getDialogId()) || OpengramContentFilter.isHiddenRepost(currentAccount, messageObject))) {
                         continue;
                     }
                     int mid = messageObject.getId();

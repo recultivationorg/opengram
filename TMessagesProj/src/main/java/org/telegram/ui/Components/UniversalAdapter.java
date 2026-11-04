@@ -4,6 +4,8 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
@@ -693,6 +695,16 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                         cell.setTextAndValueAndIcon(item.text, item.textValue, item.iconResId, divider);
                     }
                 }
+                if (item.clickCallback != null) {
+                    cell.getValueImageView().setVisibility(View.VISIBLE);
+                    cell.getValueImageView().setImageResource(R.drawable.ic_close_white);
+                    cell.getValueImageView().setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText3, resourcesProvider), PorterDuff.Mode.SRC_IN));
+                    cell.getValueImageView().setMinimumWidth(dp(40));
+                    cell.getValueImageView().setMinimumHeight(dp(40));
+                    cell.getValueImageView().setOnClickListener(item.clickCallback);
+                } else {
+                    cell.getValueImageView().setOnClickListener(null);
+                }
                 if (item.accent) {
                     cell.setColors(Theme.key_windowBackgroundWhiteBlueText4, Theme.key_windowBackgroundWhiteBlueText4);
                 } else if (item.red) {
@@ -845,6 +857,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_FILTER_CHAT_CHECK:
                 UserCell userCell = (UserCell) holder.itemView;
                 userCell.setFromUItem(currentAccount, item, divider);
+                userCell.setCloseIcon(item.clickCallback);
                 if (viewType == VIEW_TYPE_FILTER_CHAT_CHECK) {
                     userCell.setChecked(item.checked, false);
                 }

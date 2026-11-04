@@ -756,7 +756,7 @@ public class FilteredSearchView extends FrameLayout implements NotificationCente
                     int n = messageObjects.size();
                     for (int i = 0; i < n; i++) {
                         MessageObject messageObject = messageObjects.get(i);
-                        if (OpengramContentFilter.isHiddenChannel(currentAccount, messageObject.getDialogId())) {
+                        if (OpengramContentFilter.isHiddenChannel(currentAccount, messageObject.getDialogId()) || OpengramContentFilter.isHiddenRepost(currentAccount, messageObject)) {
                             continue;
                         }
                         added++;

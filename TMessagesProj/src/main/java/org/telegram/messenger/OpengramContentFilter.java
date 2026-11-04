@@ -727,6 +727,86 @@ public final class OpengramContentFilter {
         }
     }
 
+    public static ArrayList<String> keywords(int account) {
+        ArrayList<String> copy = new ArrayList<>();
+        if (phase(account) != Phase.READY) {
+            return copy;
+        }
+        synchronized (lock) {
+            copy.addAll(stateLocked(account).keywords);
+        }
+        return copy;
+    }
+
+    public static boolean addKeyword(int account, String raw) {
+        if (phase(account) != Phase.READY) {
+            return false;
+        }
+        List<String> parsed = parseKeywords(raw);
+        if (parsed.isEmpty()) {
+            return true;
+        }
+        ArrayList<String> keywords;
+        synchronized (lock) {
+            keywords = new ArrayList<>(stateLocked(account).keywords);
+        }
+        boolean changed = false;
+        for (int i = 0; i < parsed.size(); i++) {
+            String keyword = parsed.get(i);
+            if (keywords.size() >= MAX_KEYWORDS) {
+                break;
+            }
+            boolean exists = false;
+            for (int j = 0; j < keywords.size(); j++) {
+                if (keywords.get(j).equalsIgnoreCase(keyword)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                keywords.add(keyword);
+                changed = true;
+            }
+        }
+        if (!changed) {
+            return true;
+        }
+        return replaceKeywords(account, keywords);
+    }
+
+    public static boolean removeKeyword(int account, String keyword) {
+        if (phase(account) != Phase.READY || keyword == null) {
+            return false;
+        }
+        ArrayList<String> keywords;
+        synchronized (lock) {
+            keywords = new ArrayList<>(stateLocked(account).keywords);
+        }
+        boolean removed = false;
+        for (int i = 0; i < keywords.size(); i++) {
+            if (keywords.get(i).equals(keyword)) {
+                keywords.remove(i);
+                removed = true;
+                break;
+            }
+        }
+        if (!removed) {
+            return true;
+        }
+        return replaceKeywords(account, keywords);
+    }
+
+    private static boolean replaceKeywords(int account, List<String> keywords) {
+        boolean wrote;
+        synchronized (lock) {
+            wrote = writeStateLocked(account, keywords, new ArrayList<>(stateLocked(account).channels));
+        }
+        if (wrote) {
+            notifyDialogs(account);
+        }
+        return wrote;
+    }
+
     public static int keywordCount(int account) {
         if (phase(account) != Phase.READY) {
             return 0;
@@ -839,14 +919,19 @@ public final class OpengramContentFilter {
             return messages;
         }
         List<String> keywords = keywordsForHide(account);
-        if (keywords.isEmpty() || !appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId, null), isBotChat(account, dialogId))) {
-            return messages;
+        boolean keywordsApply = !keywords.isEmpty() && appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId, null), isBotChat(account, dialogId));
+        HashSet<Long> hiddenGroups = keywordsApply ? hiddenGroups(messages, keywords) : new HashSet<Long>();
+        for (int i = 0; i < messages.size(); i++) {
+            MessageObject message = messages.get(i);
+            if (message != null && isHiddenRepost(account, message) && message.getGroupId() != 0) {
+                hiddenGroups.add(message.getGroupId());
+            }
         }
-        HashSet<Long> hiddenGroups = hiddenGroups(messages, keywords);
         ArrayList<MessageObject> visible = null;
         for (int i = 0; i < messages.size(); i++) {
             MessageObject message = messages.get(i);
-            if (message != null && (messageMatchesPrepared(message, keywords) || hiddenGroups.contains(message.getGroupId()))) {
+            boolean hide = message != null && (isHiddenRepost(account, message) || hiddenGroups.contains(message.getGroupId()) || keywordsApply && messageMatchesPrepared(message, keywords));
+            if (hide) {
                 if (visible == null) {
                     visible = new ArrayList<>(Math.max(0, messages.size() - 1));
                     for (int j = 0; j < i; j++) {
@@ -888,9 +973,43 @@ public final class OpengramContentFilter {
         return hiddenGroups(messages, keywords);
     }
 
+    public static boolean isHiddenRepost(int account, TLRPC.Message message) {
+        long dialogId = repostChannelDialogId(message);
+        return dialogId != 0 && isHiddenChannel(account, dialogId);
+    }
+
+    public static boolean isHiddenRepost(int account, MessageObject message) {
+        return message != null && isHiddenRepost(account, message.messageOwner);
+    }
+
+    static long repostChannelDialogId(TLRPC.Message message) {
+        if (message == null || message.fwd_from == null) {
+            return 0;
+        }
+        long dialogId = channelDialogId(message.fwd_from.from_id);
+        if (dialogId != 0) {
+            return dialogId;
+        }
+        dialogId = channelDialogId(message.fwd_from.saved_from_peer);
+        if (dialogId != 0) {
+            return dialogId;
+        }
+        return channelDialogId(message.fwd_from.saved_from_id);
+    }
+
+    private static long channelDialogId(TLRPC.Peer peer) {
+        if (peer == null || peer.channel_id == 0) {
+            return 0;
+        }
+        return -peer.channel_id;
+    }
+
     public static boolean shouldHide(int account, long dialogId, MessageObject message) {
         if (message == null) {
             return false;
+        }
+        if (isHiddenRepost(account, message)) {
+            return true;
         }
         List<String> keywords = keywordsForHide(account);
         if (keywords.isEmpty()) {

@@ -33,8 +33,9 @@ import java.util.ArrayList;
 public class OpengramContentFilterActivity extends BaseFragment {
 
     private static final int ROW_ENABLE = 1;
-    private static final int ROW_KEYWORDS = 2;
+    private static final int ROW_ADD_KEYWORD = 2;
     private static final int ROW_ADD_CHANNEL = 3;
+    private static final int ROW_KEYWORD = 100;
 
     private UniversalRecyclerView listView;
 
@@ -65,20 +66,32 @@ public class OpengramContentFilterActivity extends BaseFragment {
         OpengramContentFilter.Phase phase = OpengramContentFilter.phase(currentAccount);
         boolean enabled = phase != OpengramContentFilter.Phase.DISABLED;
         items.add(UItem.asCheck(ROW_ENABLE, getString(R.string.MessageFilter)).setChecked(enabled));
-        String info = phase == OpengramContentFilter.Phase.ERROR ? getString(R.string.MessageFilterError) : getString(R.string.MessageFilterInfo);
-        items.add(UItem.asShadow(info));
-        items.add(UItem.asButton(ROW_KEYWORDS, getString(R.string.MessageFilterKeywords)).setEnabled(phase == OpengramContentFilter.Phase.READY));
-        items.add(UItem.asShadow(null));
+        if (phase == OpengramContentFilter.Phase.ERROR) {
+            items.add(UItem.asShadow(getString(R.string.MessageFilterError)));
+        } else {
+            items.add(UItem.asShadow(null));
+        }
         boolean ready = phase == OpengramContentFilter.Phase.READY;
+        items.add(UItem.asHeader(getString(R.string.MessageFilterKeywords)));
+        items.add(UItem.asButton(ROW_ADD_KEYWORD, getString(R.string.MessageFilterAddKeyword)).setEnabled(ready));
+        if (ready) {
+            ArrayList<String> keywords = OpengramContentFilter.keywords(currentAccount);
+            for (int a = 0; a < keywords.size(); a++) {
+                String keyword = keywords.get(a);
+                items.add(UItem.asButton(ROW_KEYWORD + a, keyword).setCloseIcon(v -> removeKeyword(keyword)));
+            }
+        }
+        items.add(UItem.asShadow(getString(R.string.MessageFilterInfo)));
         items.add(UItem.asHeader(getString(R.string.MessageFilterHiddenChannels)));
         items.add(UItem.asButton(ROW_ADD_CHANNEL, getString(R.string.MessageFilterAddChannel)).setEnabled(ready));
         if (ready) {
             ArrayList<Long> channels = OpengramContentFilter.hiddenChannels(currentAccount);
             for (int a = 0; a < channels.size(); a++) {
-                items.add(UItem.asFilterChat(false, channels.get(a)));
+                long dialogId = channels.get(a);
+                items.add(UItem.asFilterChat(false, dialogId).setCloseIcon(v -> removeChannel(dialogId)));
             }
         }
-        items.add(UItem.asShadow(null));
+        items.add(UItem.asShadow(getString(R.string.MessageFilterChannelsInfo)));
     }
 
     private void onClick(UItem item, View view, int position, float x, float y) {
@@ -114,17 +127,32 @@ public class OpengramContentFilterActivity extends BaseFragment {
                 builder.setNegativeButton(getString(R.string.Cancel), (dialogInterface, i) -> listView.adapter.update(true));
                 showDialog(builder.create());
             }
-        } else if (item.id == ROW_KEYWORDS) {
-            showKeywordsDialog();
+        } else if (item.id == ROW_ADD_KEYWORD) {
+            showAddKeywordDialog();
+        } else if (item.id >= ROW_KEYWORD && item.text != null) {
+            removeKeyword(item.text.toString());
         } else if (item.id == ROW_ADD_CHANNEL) {
             openChannelPicker();
         } else if (item.viewType == UniversalAdapter.VIEW_TYPE_FILTER_CHAT && item.dialogId < 0) {
-            if (!OpengramContentFilter.removeChannel(currentAccount, item.dialogId)) {
-                showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
-            }
-            if (listView != null) {
-                listView.adapter.update(true);
-            }
+            removeChannel(item.dialogId);
+        }
+    }
+
+    private void removeKeyword(String keyword) {
+        if (!OpengramContentFilter.removeKeyword(currentAccount, keyword)) {
+            showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
+        }
+        if (listView != null) {
+            listView.adapter.update(true);
+        }
+    }
+
+    private void removeChannel(long dialogId) {
+        if (!OpengramContentFilter.removeChannel(currentAccount, dialogId)) {
+            showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
+        }
+        if (listView != null) {
+            listView.adapter.update(true);
         }
     }
 
@@ -168,36 +196,32 @@ public class OpengramContentFilterActivity extends BaseFragment {
         }
     }
 
-    private void showKeywordsDialog() {
+    private void showAddKeywordDialog() {
         if (getParentActivity() == null || OpengramContentFilter.phase(currentAccount) != OpengramContentFilter.Phase.READY) {
+            return;
+        }
+        if (OpengramContentFilter.keywords(currentAccount).size() >= OpengramContentFilter.MAX_KEYWORDS) {
             return;
         }
         final EditTextBoldCursor editText = new EditTextBoldCursor(getParentActivity());
         editText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
         editText.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
         editText.setHintTextColor(getThemedColor(Theme.key_dialogTextHint));
-        editText.setHint(getString(R.string.MessageFilterKeywordsHint));
+        editText.setHint(getString(R.string.MessageFilterKeywordHint));
         editText.setBackground(Theme.createEditTextDrawable(getParentActivity(), true));
         editText.setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8));
-        editText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        editText.setImeOptions(EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        editText.setSingleLine(false);
-        editText.setMinLines(1);
-        editText.setMaxLines(6);
+        editText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        editText.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        editText.setSingleLine(true);
         editText.setGravity(LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT);
-        String current = OpengramContentFilter.keywordsText(currentAccount);
-        if (current.length() > 0) {
-            editText.setText(current);
-            editText.setSelection(current.length());
-        }
         FrameLayout container = new FrameLayout(getParentActivity());
         container.addView(editText, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 24, 6, 24, 6));
 
         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-        builder.setTitle(getString(R.string.MessageFilterKeywords));
+        builder.setTitle(getString(R.string.MessageFilterAddKeyword));
         builder.setView(container);
-        builder.setPositiveButton(getString(R.string.Save), (dialog, which) -> {
-            if (!OpengramContentFilter.saveKeywords(currentAccount, editText.getText().toString())) {
+        builder.setPositiveButton(getString(R.string.Add), (dialog, which) -> {
+            if (!OpengramContentFilter.addKeyword(currentAccount, editText.getText().toString())) {
                 showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
             }
             if (listView != null) {

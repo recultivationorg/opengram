@@ -322,6 +322,23 @@ public class OpengramContentFilterTest {
         assertTrue(OpengramContentFilter.applyChannelPts(false));
     }
 
+    @Test
+    public void repostUsesTheForwardedChannel() {
+        TLRPC.TL_message message = new TLRPC.TL_message();
+        message.fwd_from = new TLRPC.TL_messageFwdHeader();
+        message.fwd_from.from_id = new TLRPC.TL_peerChannel();
+        message.fwd_from.from_id.channel_id = 15L;
+        assertEquals(-15L, OpengramContentFilter.repostChannelDialogId(message));
+
+        TLRPC.TL_message saved = new TLRPC.TL_message();
+        saved.fwd_from = new TLRPC.TL_messageFwdHeader();
+        saved.fwd_from.saved_from_peer = new TLRPC.TL_peerChannel();
+        saved.fwd_from.saved_from_peer.channel_id = 9L;
+        assertEquals(-9L, OpengramContentFilter.repostChannelDialogId(saved));
+
+        assertEquals(0L, OpengramContentFilter.repostChannelDialogId(new TLRPC.TL_message()));
+    }
+
     private static File temp() throws Exception {
         File file = File.createTempFile("opengram-filter", ".bin");
         file.delete();

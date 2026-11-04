@@ -866,6 +866,9 @@ public class FileLoader extends BaseController {
 
 
     private boolean isHiddenChannelParent(Object parentObject) {
+        if (parentObject instanceof MessageObject && OpengramContentFilter.isHiddenRepost(currentAccount, (MessageObject) parentObject)) {
+            return true;
+        }
         FilePathDatabase.FileMeta parentMeta = getFileMetadataFromParent(currentAccount, parentObject);
         return parentMeta != null && OpengramContentFilter.isHiddenChannel(currentAccount, parentMeta.dialogId);
     }

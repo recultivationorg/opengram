@@ -482,7 +482,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             if (maxId != 0 && message.id <= maxId) {
                                 continue;
                             }
-                            if (OpengramContentFilter.isHiddenChannel(currentAccount, did)) {
+                            if (OpengramContentFilter.isHiddenChannel(currentAccount, did) || OpengramContentFilter.isHiddenRepost(currentAccount, message)) {
                                 continue;
                             }
                             searchForumResultMessages.add(messageObjects.get(a));
@@ -658,7 +658,7 @@ public class DialogsSearchAdapter extends RecyclerListView.SelectionAdapter {
                             if (maxId != 0 && message.id <= maxId) {
                                 continue;
                             }
-                            if (OpengramContentFilter.isHiddenChannel(currentAccount, did)) {
+                            if (OpengramContentFilter.isHiddenChannel(currentAccount, did) || OpengramContentFilter.isHiddenRepost(currentAccount, message)) {
                                 continue;
                             }
                             MessageObject msg = messageObjects.get(a);

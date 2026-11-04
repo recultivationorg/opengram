@@ -3250,9 +3250,6 @@ public class ChatActivity extends BaseFragment implements
         if (currentEncryptedChat != null) {
             return;
         }
-        if ((currentChat == null || !currentChat.broadcast) && (currentUser == null || !currentUser.bot)) {
-            return;
-        }
         resetForReload();
         int count = initialMessagesSize > 0 ? initialMessagesSize : 30;
         waitingForLoad.add(lastLoadIndex);

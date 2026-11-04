@@ -3331,10 +3331,13 @@
     <string name="MessageFilter">Opengram Content Filter</string>
     <string name="MessageFilterOff">Off</string>
     <string name="MessageFilterKeywords">Keywords</string>
+    <string name="MessageFilterAddKeyword">Add a keyword</string>
+    <string name="MessageFilterKeywordHint">keyword</string>
     <string name="MessageFilterKeywordsHint">word, another word</string>
     <string name="MessageFilterKeywords_one">%1$d keyword</string>
     <string name="MessageFilterKeywords_other">%1$d keywords</string>
-    <string name="MessageFilterInfo">Posts in channels and bot chats that contain these keywords are hidden. Personal chats, groups, and secret chats stay visible. Up to 32 keywords, 48 characters each. Channels you add below are fully hidden on this device.</string>
+    <string name="MessageFilterInfo">Posts in channels and bot chats that contain these keywords are hidden. Personal chats, groups, and secret chats stay visible. Up to 32 keywords, 48 characters each.</string>
+    <string name="MessageFilterChannelsInfo">Channels you add here are fully hidden on this device. They do not appear in your chat list, and their posts are not loaded.</string>
     <string name="MessageFilterHiddenChannels">Hidden channels</string>
     <string name="MessageFilterHiddenChannelsCount_one">%1$d hidden channel</string>
     <string name="MessageFilterHiddenChannelsCount_other">%1$d hidden channels</string>
