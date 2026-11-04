@@ -2680,9 +2680,23 @@ public class ChatActivity extends BaseFragment implements
         if (activity == null) {
             return;
         }
+        String username = ChatObject.getPublicUsername(currentChat);
+        String channelLabel;
+        if (!TextUtils.isEmpty(username)) {
+            channelLabel = "@" + username;
+        } else if (currentChat != null && !TextUtils.isEmpty(currentChat.title)) {
+            channelLabel = currentChat.title;
+        } else {
+            channelLabel = LocaleController.getString(R.string.AccDescrChannel);
+        }
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
         builder.setTitle(LocaleController.getString(R.string.MessageFilter));
-        builder.setMessage(LocaleController.getString(R.string.MessageFilterHiddenLink));
+        builder.setMessage(LocaleController.formatString(R.string.MessageFilterHiddenLink, channelLabel));
+        builder.setNegativeButton(LocaleController.getString(R.string.MessageFilterOpenSettings), (dialog, which) -> {
+            if (LaunchActivity.instance != null) {
+                LaunchActivity.instance.presentFragment(new OpengramContentFilterActivity());
+            }
+        });
         builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
         builder.show();
     }

@@ -3342,7 +3342,8 @@
     <string name="MessageFilterHiddenChannelsCount_one">%1$d hidden channel</string>
     <string name="MessageFilterHiddenChannelsCount_other">%1$d hidden channels</string>
     <string name="MessageFilterAddChannel">Add a channel</string>
-    <string name="MessageFilterHiddenLink">You have this channel in your hidden list. While it remains there, the corresponding links to it are also disabled. To re-enable them, just remove the channel from the list</string>
+    <string name="MessageFilterHiddenLink">You have %1$s in your hidden list. While it remains there, the corresponding links to it are also disabled. To re-enable them, just remove the channel from the list</string>
+    <string name="MessageFilterOpenSettings">Open settings</string>
     <string name="MessageFilterError">The keyword list could not be read. Filtering is stopped. Turn this off and on again.</string>
     <string name="MessageFilterStorageError">Secure storage for the keyword list failed. Nothing was written in plaintext.</string>
     <string name="MessageFilterStrongBoxWarning">This device has no Android StrongBox. The keyword list saved for this option is a potential information leak.</string>
