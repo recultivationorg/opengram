@@ -20770,9 +20770,9 @@ public class ChatActivity extends BaseFragment implements
                 int count = chatListView.getChildCount();
                 for (int i = 0; i < count; i++) {
                     View child = chatListView.getChildAt(i);
-                    if (child instanceof ChatMessageCell) {
-                        child.requestLayout();
-                    }
+                if (child instanceof ChatMessageCell) {
+                    ((ChatMessageCell) child).updateRemoteDeletion();
+                }
                 }
                 chatListView.invalidateViews();
             }

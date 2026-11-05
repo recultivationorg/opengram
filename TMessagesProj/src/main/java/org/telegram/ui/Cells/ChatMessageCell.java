@@ -23972,16 +23972,35 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
     }
 
+    public void updateRemoteDeletion() {
+        if (currentMessageObject == null) {
+            return;
+        }
+        boolean marked = keptRemoteDeletion(currentMessageObject);
+        if (marked == remoteDeletionMarked) {
+            invalidate();
+            return;
+        }
+        setMessageObject(currentMessageObject, currentMessagesGroup, pinnedBottom, pinnedTop, firstInChat);
+        requestLayout();
+        invalidate();
+    }
+
     private boolean keptRemoteDeletion(MessageObject messageObject) {
-        if (OpengramRemoteDeletion.isMarked(currentAccount, messageObject)) {
+        boolean sharedTime = currentMessagesGroup != null && !currentMessagesGroup.isDocuments && currentPosition != null;
+        if (sharedTime && !currentPosition.last) {
+            return false;
+        }
+        if (messageObject != null && OpengramRemoteDeletion.isMarked(currentAccount, messageObject)) {
             return true;
         }
-        if (currentMessagesGroup != null) {
-            ArrayList<MessageObject> grouped = currentMessagesGroup.messages;
-            for (int i = 0; i < grouped.size(); i++) {
-                if (OpengramRemoteDeletion.isMarked(currentAccount, grouped.get(i))) {
-                    return true;
-                }
+        if (!sharedTime || currentMessagesGroup == null) {
+            return false;
+        }
+        ArrayList<MessageObject> grouped = currentMessagesGroup.messages;
+        for (int i = 0; i < grouped.size(); i++) {
+            if (OpengramRemoteDeletion.isMarked(currentAccount, grouped.get(i))) {
+                return true;
             }
         }
         return false;

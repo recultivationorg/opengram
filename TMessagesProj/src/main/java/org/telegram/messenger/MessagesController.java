@@ -8296,8 +8296,7 @@ public class MessagesController extends BaseController implements NotificationCe
                     for (int a = 0, N = task.size(); a < N; a++) {
                         long dialogId = task.keyAt(a);
                         ArrayList<Integer> mids = task.valueAt(a);
-                        if (OpengramRemoteDeletion.keeps(currentAccount) && DialogObject.isEncryptedDialog(dialogId)) {
-                            OpengramRemoteDeletion.markMessages(currentAccount, dialogId, mids);
+                        if (OpengramRemoteDeletion.keeps(currentAccount) && DialogObject.isEncryptedDialog(dialogId) && OpengramRemoteDeletion.markMessages(currentAccount, dialogId, mids)) {
                             continue;
                         }
                         deleteMessages(mids, null, null, dialogId, 0, true, 0, !mids.isEmpty() && mids.get(0) > 0);
@@ -8309,8 +8308,7 @@ public class MessagesController extends BaseController implements NotificationCe
                     for (int a = 0, N = taskMedia.size(); a < N; a++) {
                         long dialogId = taskMedia.keyAt(a);
                         ArrayList<Integer> mids = taskMedia.valueAt(a);
-                        if (OpengramRemoteDeletion.keeps(currentAccount) && DialogObject.isEncryptedDialog(dialogId)) {
-                            OpengramRemoteDeletion.markMessages(currentAccount, dialogId, mids);
+                        if (OpengramRemoteDeletion.keeps(currentAccount) && DialogObject.isEncryptedDialog(dialogId) && OpengramRemoteDeletion.markMessages(currentAccount, dialogId, mids)) {
                             continue;
                         }
                         if (checkViewer && viewerObject != null && viewerObject.currentAccount == currentAccount && viewerObject.getDialogId() == dialogId && mids.contains(viewerObject.getId())) {
@@ -17836,13 +17834,12 @@ public class MessagesController extends BaseController implements NotificationCe
         });
     }
 
-    protected void deleteMessagesByPush(long dialogId, ArrayList<Integer> ids, long channelId) {
+    protected boolean deleteMessagesByPush(long dialogId, ArrayList<Integer> ids, long channelId) {
+        long recordDialog = OpengramRemoteDeletion.deletionDialogId(dialogId, channelId);
+        if (OpengramRemoteDeletion.keeps(currentAccount) && recordDialog != 0 && OpengramRemoteDeletion.markMessages(currentAccount, recordDialog, ids)) {
+            return true;
+        }
         getMessagesStorage().getStorageQueue().postRunnable(() -> {
-            if (OpengramRemoteDeletion.keeps(currentAccount)) {
-                long recordDialog = dialogId != 0 ? dialogId : -channelId;
-                OpengramRemoteDeletion.markMessages(currentAccount, recordDialog, ids);
-                return;
-            }
             AndroidUtilities.runOnUIThread(() -> {
                 getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, ids, channelId, false);
                 if (channelId == 0) {
@@ -17872,6 +17869,60 @@ public class MessagesController extends BaseController implements NotificationCe
             ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(dialogId, ids, false, true, 0, 0);
             getMessagesStorage().updateDialogsWithDeletedMessages(dialogId, channelId, ids, dialogIds);
         });
+        return false;
+    }
+
+    private void applyDeletedMessages(long key, ArrayList<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, ids, -key, false);
+        if (key == 0) {
+            for (int b = 0, size2 = ids.size(); b < size2; b++) {
+                Integer id = ids.get(b);
+                MessageObject obj = dialogMessagesByIds.get(id);
+                if (obj != null) {
+                    obj.deleted = true;
+                }
+            }
+        } else {
+            ArrayList<MessageObject> objs = dialogMessage.get(key);
+            if (objs != null) {
+                for (int i = 0; i < objs.size(); ++i) {
+                    MessageObject obj = objs.get(i);
+                    if (obj == null) {
+                        continue;
+                    }
+                    for (int b = 0, size2 = ids.size(); b < size2; b++) {
+                        if (obj.getId() == ids.get(b)) {
+                            obj.deleted = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        LongSparseArray<ArrayList<Integer>> deleted = new LongSparseArray<>();
+        deleted.put(key, ids);
+        getNotificationsController().removeDeletedMessagesFromNotifications(deleted, false);
+    }
+
+    private void applyHistoryCleared(long key, int messageId) {
+        long did = -key;
+        getNotificationCenter().postNotificationName(NotificationCenter.historyCleared, did, messageId);
+        ArrayList<MessageObject> objs = dialogMessage.get(did);
+        if (objs != null) {
+            for (int i = 0; i < objs.size(); ++i) {
+                MessageObject obj = objs.get(i);
+                if (obj != null && obj.getId() <= messageId) {
+                    obj.deleted = true;
+                    break;
+                }
+            }
+        }
+        LongSparseIntArray deleted = new LongSparseIntArray();
+        deleted.put(key, messageId);
+        getNotificationsController().removeDeletedHisoryFromNotifications(deleted);
     }
 
     public void checkChatInviter(long chatId, boolean _createMessage) {
@@ -21385,10 +21436,7 @@ public class MessagesController extends BaseController implements NotificationCe
                     getNotificationCenter().postNotificationName(NotificationCenter.messagesReadContent, key, value);
                 }
             }
-            if (deletedMessagesFinal != null) {
-                if (OpengramRemoteDeletion.keeps(currentAccount)) {
-                    getNotificationCenter().postNotificationName(NotificationCenter.remoteDeletionMarked);
-                } else {
+            if (deletedMessagesFinal != null && !OpengramRemoteDeletion.keeps(currentAccount)) {
                     for (int a = 0, size = deletedMessagesFinal.size(); a < size; a++) {
                         long dialogId = deletedMessagesFinal.keyAt(a);
                         ArrayList<Integer> arrayList = deletedMessagesFinal.valueAt(a);
@@ -21425,7 +21473,6 @@ public class MessagesController extends BaseController implements NotificationCe
                         }
                     }
                     getNotificationsController().removeDeletedMessagesFromNotifications(deletedMessagesFinal, false);
-                }
             }
             if (deletedQuickRepliesMessagesFinal != null) {
                 for (int a = 0, size = deletedQuickRepliesMessagesFinal.size(); a < size; a++) {
@@ -21448,10 +21495,7 @@ public class MessagesController extends BaseController implements NotificationCe
                     getNotificationCenter().postNotificationName(NotificationCenter.messagesDeleted, arrayList, DialogObject.isChatDialog(key) && ChatObject.isChannel(getChat(-key)) ? -key : 0, true, false, false, 0, sentMessageIds);
                 }
             }
-            if (clearHistoryMessagesFinal != null) {
-                if (OpengramRemoteDeletion.keeps(currentAccount)) {
-                    getNotificationCenter().postNotificationName(NotificationCenter.remoteDeletionMarked);
-                } else {
+            if (clearHistoryMessagesFinal != null && !OpengramRemoteDeletion.keeps(currentAccount)) {
                     for (int a = 0, size = clearHistoryMessagesFinal.size(); a < size; a++) {
                         long key = clearHistoryMessagesFinal.keyAt(a);
                         int id = clearHistoryMessagesFinal.valueAt(a);
@@ -21469,7 +21513,6 @@ public class MessagesController extends BaseController implements NotificationCe
                         }
                     }
                     getNotificationsController().removeDeletedHisoryFromNotifications(clearHistoryMessagesFinal);
-                }
             }
             if (updateMask != 0) {
                 getNotificationCenter().postNotificationName(NotificationCenter.updateInterfaces, updateMask);
@@ -21520,11 +21563,24 @@ public class MessagesController extends BaseController implements NotificationCe
                 getMessagesStorage().getStorageQueue().postRunnable(() -> {
                     if (OpengramRemoteDeletion.keeps(currentAccount)) {
                         if (key != 0) {
-                            OpengramRemoteDeletion.markMessages(currentAccount, key, arrayList);
+                            if (OpengramRemoteDeletion.markMessages(currentAccount, key, arrayList)) {
+                                return;
+                            }
                         } else {
-                            OpengramRemoteDeletion.markMessages(currentAccount, getMessagesStorage().loadMessageDialogs(arrayList));
+                            LongSparseArray<ArrayList<Integer>> grouped = getMessagesStorage().loadMessageDialogs(arrayList);
+                            ArrayList<Integer> missing = OpengramRemoteDeletion.idsNotFound(arrayList, grouped);
+                            boolean recorded = grouped.size() > 0 && OpengramRemoteDeletion.markMessages(currentAccount, grouped);
+                            if (recorded && missing.isEmpty()) {
+                                return;
+                            }
+                            if (recorded) {
+                                ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, missing, false, true, 0, 0);
+                                getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, missing, dialogIds);
+                                AndroidUtilities.runOnUIThread(() -> applyDeletedMessages(key, missing));
+                                return;
+                            }
                         }
-                        return;
+                        AndroidUtilities.runOnUIThread(() -> applyDeletedMessages(key, arrayList));
                     }
                     ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, arrayList, false, true, 0, 0);
                     getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, arrayList, dialogIds);
@@ -21555,8 +21611,11 @@ public class MessagesController extends BaseController implements NotificationCe
                 int id = clearHistoryMessages.valueAt(a);
                 getMessagesStorage().getStorageQueue().postRunnable(() -> {
                     if (OpengramRemoteDeletion.keeps(currentAccount)) {
-                        OpengramRemoteDeletion.markMessages(currentAccount, key, getMessagesStorage().loadMessageIdsUpTo(key, id));
-                        return;
+                        ArrayList<Integer> ids = getMessagesStorage().loadClearedMessageIds(key, id);
+                        if (!ids.isEmpty() && OpengramRemoteDeletion.markMessages(currentAccount, key, ids)) {
+                            return;
+                        }
+                        AndroidUtilities.runOnUIThread(() -> applyHistoryCleared(key, id));
                     }
                     ArrayList<Long> dialogIds = getMessagesStorage().markMessagesAsDeleted(key, id, false, true);
                     getMessagesStorage().updateDialogsWithDeletedMessages(key, -key, new ArrayList<>(), dialogIds);

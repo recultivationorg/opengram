@@ -114,26 +114,24 @@ public class SecretChatHelper extends BaseController {
     }
 
     protected void processPendingEncMessages() {
-        if (!pendingEncMessagesToDelete.isEmpty()) {
-            if (OpengramRemoteDeletion.keeps(currentAccount)) {
-                ArrayList<Long> kept = new ArrayList<>(pendingEncMessagesToDelete);
-                getMessagesStorage().markMessagesAsDeletedByRandoms(kept);
-                pendingEncMessagesToDelete.clear();
-                return;
-            }
-            ArrayList<Long> pendingEncMessagesToDeleteCopy = new ArrayList<>(pendingEncMessagesToDelete);
-            AndroidUtilities.runOnUIThread(() -> {
-                for (int a = 0; a < pendingEncMessagesToDeleteCopy.size(); a++) {
-                    MessageObject messageObject = getMessagesController().dialogMessagesByRandomIds.get(pendingEncMessagesToDeleteCopy.get(a));
-                    if (messageObject != null) {
-                        messageObject.deleted = true;
-                    }
-                }
-            });
-            ArrayList<Long> arr = new ArrayList<>(pendingEncMessagesToDelete);
-            getMessagesStorage().markMessagesAsDeletedByRandoms(arr);
-            pendingEncMessagesToDelete.clear();
+        if (pendingEncMessagesToDelete.isEmpty()) {
+            return;
         }
+        ArrayList<Long> pendingEncMessagesToDeleteCopy = new ArrayList<>(pendingEncMessagesToDelete);
+        pendingEncMessagesToDelete.clear();
+        if (OpengramRemoteDeletion.keeps(currentAccount)) {
+            getMessagesStorage().markMessagesAsDeletedByRandoms(pendingEncMessagesToDeleteCopy);
+            return;
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            for (int a = 0; a < pendingEncMessagesToDeleteCopy.size(); a++) {
+                MessageObject messageObject = getMessagesController().dialogMessagesByRandomIds.get(pendingEncMessagesToDeleteCopy.get(a));
+                if (messageObject != null) {
+                    messageObject.deleted = true;
+                }
+            }
+        });
+        getMessagesStorage().markMessagesAsDeletedByRandoms(pendingEncMessagesToDeleteCopy);
     }
 
     private TLRPC.TL_messageService createServiceSecretMessage(TLRPC.EncryptedChat encryptedChat, TLRPC.DecryptedMessageAction decryptedMessage) {
@@ -1148,7 +1146,28 @@ public class SecretChatHelper extends BaseController {
                 } else if (serviceMessage.action instanceof TLRPC.TL_decryptedMessageActionFlushHistory) {
                     long did = DialogObject.makeEncryptedDialogId(chat.id);
                     if (OpengramRemoteDeletion.keeps(currentAccount)) {
-                        getMessagesStorage().getStorageQueue().postRunnable(() -> OpengramRemoteDeletion.markMessages(currentAccount, did, getMessagesStorage().loadMessageIds(did)));
+                        getMessagesStorage().getStorageQueue().postRunnable(() -> {
+                            ArrayList<Integer> ids = getMessagesStorage().loadMessageIds(did);
+                            if (OpengramRemoteDeletion.markMessages(currentAccount, did, ids)) {
+                                return;
+                            }
+                            AndroidUtilities.runOnUIThread(() -> {
+                                TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(did);
+                                if (dialog != null) {
+                                    dialog.unread_count = 0;
+                                    getMessagesController().dialogMessage.remove(dialog.id);
+                                }
+                                getMessagesStorage().getStorageQueue().postRunnable(() -> AndroidUtilities.runOnUIThread(() -> {
+                                    getNotificationsController().processReadMessages(null, did, 0, Integer.MAX_VALUE, false);
+                                    LongSparseIntArray dialogsToUpdate = new LongSparseIntArray(1);
+                                    dialogsToUpdate.put(did, 0);
+                                    getNotificationsController().processDialogsUpdateRead(dialogsToUpdate);
+                                }));
+                                getMessagesStorage().deleteDialog(did, 1);
+                                getNotificationCenter().postNotificationName(NotificationCenter.dialogsNeedReload);
+                                getNotificationCenter().postNotificationName(NotificationCenter.removeAllMessagesFromDialog, did, false, null);
+                            });
+                        });
                         return null;
                     }
                     AndroidUtilities.runOnUIThread(() -> {
@@ -1170,10 +1189,9 @@ public class SecretChatHelper extends BaseController {
                     return null;
                 } else if (serviceMessage.action instanceof TLRPC.TL_decryptedMessageActionDeleteMessages) {
                     if (!serviceMessage.action.random_ids.isEmpty()) {
-                        if (OpengramRemoteDeletion.keeps(currentAccount)) {
-                            OpengramRemoteDeletion.markRandoms(currentAccount, DialogObject.makeEncryptedDialogId(chat.id), serviceMessage.action.random_ids);
+                        if (!OpengramRemoteDeletion.keeps(currentAccount) || !OpengramRemoteDeletion.markRandoms(currentAccount, DialogObject.makeEncryptedDialogId(chat.id), serviceMessage.action.random_ids)) {
+                            pendingEncMessagesToDelete.addAll(serviceMessage.action.random_ids);
                         }
-                        pendingEncMessagesToDelete.addAll(serviceMessage.action.random_ids);
                     }
                     return null;
                 } else if (serviceMessage.action instanceof TLRPC.TL_decryptedMessageActionReadMessages) {

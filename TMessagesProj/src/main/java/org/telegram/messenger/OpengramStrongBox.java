@@ -113,7 +113,7 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
     }
 
     public void deleteKey() {
-        if (Build.VERSION.SDK_INT < 31 || !(alias.startsWith(GHOST_ALIAS_PREFIX) || alias.startsWith(FILTER_ALIAS_PREFIX))) {
+        if (Build.VERSION.SDK_INT < 31 || !(alias.startsWith(GHOST_ALIAS_PREFIX) || alias.startsWith(FILTER_ALIAS_PREFIX) || alias.startsWith(DELETIONS_ALIAS_PREFIX))) {
             return;
         }
         synchronized (keystoreLock) {

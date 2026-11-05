@@ -17,6 +17,17 @@ public final class OpengramRemoteDeletion {
     private static final String FILE_SUFFIX = ".bin";
     private static final Object lock = new Object();
     private static final State[] states = new State[UserConfig.MAX_ACCOUNT_COUNT];
+    static File directoryOverride;
+    static Hook hook;
+
+    static final class Hook {
+        boolean remoteDeletion;
+        int remoteDeletionMode;
+        long clientUserId;
+        boolean strongBoxAvailable;
+        OpengramSnapshotFile.Sealer sealer;
+        File directory;
+    }
 
     private OpengramRemoteDeletion() {
     }
@@ -34,7 +45,33 @@ public final class OpengramRemoteDeletion {
     }
 
     public static boolean keeps(int account) {
-        return validAccount(account) && UserConfig.getInstance(account).remoteDeletion;
+        return validAccount(account) && preferenceOn(account);
+    }
+
+    public static long deletionDialogId(long dialogId, long channelId) {
+        if (channelId != 0) {
+            return -channelId;
+        }
+        return dialogId;
+    }
+
+    public static boolean clearedByAvailableMin(int messageId, int availableMinId) {
+        return messageId > 0 && messageId < availableMinId;
+    }
+
+    public static ArrayList<Integer> idsNotFound(ArrayList<Integer> requested, LongSparseArray<ArrayList<Integer>> found) {
+        ArrayList<Integer> missing = new ArrayList<>();
+        if (requested == null) {
+            return missing;
+        }
+        for (int i = 0; i < requested.size(); i++) {
+            Integer messageId = requested.get(i);
+            if (messageId == null || messageId == 0 || containsId(found, messageId)) {
+                continue;
+            }
+            missing.add(messageId);
+        }
+        return missing;
     }
 
     public static boolean enable(int account, int mode) {
@@ -44,37 +81,41 @@ public final class OpengramRemoteDeletion {
         if (mode != OpengramSnapshotFile.MODE_STRONGBOX && mode != OpengramSnapshotFile.MODE_PLAINTEXT) {
             return false;
         }
-        UserConfig config = UserConfig.getInstance(account);
-        long clientUserId = config.getClientUserId();
+        long clientUserId = clientUserId(account);
         if (clientUserId <= 0) {
             return false;
         }
         synchronized (lock) {
             State state = stateLocked(account);
             File target = file(clientUserId);
-            Snapshot existing = readRecords(target, clientUserId, OpengramStrongBox.forDeletions(clientUserId));
+            Snapshot existing = readRecords(target, clientUserId, sealerFor(clientUserId, OpengramSnapshotFile.MODE_STRONGBOX));
             if (existing.status == OpengramSnapshotFile.Status.OK) {
-                adopt(state, clientUserId, existing.mode, existing.records, false);
-                config.remoteDeletion = true;
-                config.remoteDeletionMode = existing.mode;
-                config.saveConfig(false);
+                if (existing.mode != mode) {
+                    if (!strongBoxReady(clientUserId, mode)) {
+                        return false;
+                    }
+                    if (!writeRecords(target, mode, clientUserId, existing.records, sealerFor(clientUserId, mode))) {
+                        return false;
+                    }
+                }
+                adopt(state, clientUserId, mode, existing.records, false);
+                setPreference(account, true, mode);
             } else if (existing.status != OpengramSnapshotFile.Status.MISSING) {
-                adopt(state, clientUserId, mode, Collections.<String>emptyList(), true);
-                config.remoteDeletion = true;
-                config.remoteDeletionMode = mode;
-                config.saveConfig(false);
+                OpengramSnapshotFile.delete(target);
+                state.loaded = false;
+                state.error = false;
+                state.records.clear();
+                state.clientUserId = clientUserId;
+                return false;
             } else {
-                if (mode == OpengramSnapshotFile.MODE_STRONGBOX && OpengramStrongBox.forDeletions(clientUserId).probeKey() != OpengramStrongBox.Probe.AVAILABLE) {
+                if (!strongBoxReady(clientUserId, mode)) {
                     return false;
                 }
-                OpengramSnapshotFile.Sealer sealer = mode == OpengramSnapshotFile.MODE_STRONGBOX ? OpengramStrongBox.forDeletions(clientUserId) : null;
-                if (!writeRecords(target, mode, clientUserId, Collections.<String>emptyList(), sealer)) {
+                if (!writeRecords(target, mode, clientUserId, Collections.<String>emptyList(), sealerFor(clientUserId, mode))) {
                     return false;
                 }
                 adopt(state, clientUserId, mode, Collections.<String>emptyList(), false);
-                config.remoteDeletion = true;
-                config.remoteDeletionMode = mode;
-                config.saveConfig(false);
+                setPreference(account, true, mode);
             }
         }
         notifyMarked(account);
@@ -85,9 +126,23 @@ public final class OpengramRemoteDeletion {
         if (!validAccount(account)) {
             return;
         }
-        UserConfig config = UserConfig.getInstance(account);
-        config.remoteDeletion = false;
-        config.saveConfig(false);
+        long clientUserId = clientUserId(account);
+        setPreference(account, false, 0);
+        synchronized (lock) {
+            State state = stateLocked(account);
+            state.loaded = true;
+            state.error = false;
+            state.clientUserId = clientUserId;
+            state.mode = 0;
+            state.records.clear();
+        }
+        if (clientUserId > 0) {
+            OpengramSnapshotFile.delete(file(clientUserId));
+            if (hook == null) {
+                OpengramStrongBox.forDeletions(clientUserId).deleteKey();
+            }
+        }
+        notifyMarked(account);
     }
 
     public static void wipe(int account) {
@@ -127,6 +182,9 @@ public final class OpengramRemoteDeletion {
             }
             add.add(messageRecord(dialogId, messageId));
         }
+        if (add.isEmpty()) {
+            return false;
+        }
         return update(account, add, null);
     }
 
@@ -149,6 +207,9 @@ public final class OpengramRemoteDeletion {
                 add.add(messageRecord(dialogId, messageId));
             }
         }
+        if (add.isEmpty()) {
+            return false;
+        }
         return update(account, add, null);
     }
 
@@ -163,6 +224,9 @@ public final class OpengramRemoteDeletion {
                 continue;
             }
             add.add(randomRecord(dialogId, randomId));
+        }
+        if (add.isEmpty()) {
+            return false;
         }
         return update(account, add, null);
     }
@@ -202,7 +266,7 @@ public final class OpengramRemoteDeletion {
     }
 
     public static boolean isMarked(int account, long dialogId, int messageId) {
-        if (!validAccount(account) || dialogId == 0 || messageId == 0) {
+        if (!keeps(account) || dialogId == 0 || messageId == 0) {
             return false;
         }
         synchronized (lock) {
@@ -223,44 +287,72 @@ public final class OpengramRemoteDeletion {
         return randomId != 0 && isMarkedRandom(account, message.getDialogId(), randomId);
     }
 
-    public static void dropKeptFiles(int account, File dir) {
-        if (!validAccount(account) || dir == null || !dir.exists()) {
-            return;
+    public static boolean randomRecorded(int account, long randomId) {
+        if (!keeps(account) || randomId == 0) {
+            return false;
         }
-        ArrayList<File> files = new ArrayList<>();
-        collectFiles(dir, files);
-        if (files.isEmpty()) {
-            return;
+        synchronized (lock) {
+            ensureLoadedLocked(account);
+            State state = stateLocked(account);
+            if (state.error) {
+                return false;
+            }
+            for (String record : state.records) {
+                if (isRandomRecord(record, randomId)) {
+                    return true;
+                }
+            }
+            return false;
         }
-        FilePathDatabase database = FileLoader.getInstance(account).getFileDatabase();
-        LongSparseArray<ArrayList<Integer>> byDialog = new LongSparseArray<>();
-        FilePathDatabase.FileMeta meta = new FilePathDatabase.FileMeta();
-        for (int i = 0; i < files.size(); i++) {
-            FilePathDatabase.FileMeta found = database.getFileDialogId(files.get(i), meta);
-            if (found == null || found.dialogId == 0 || found.messageId == 0) {
+    }
+
+    public static ArrayList<Long> unrecordedRandoms(int account, ArrayList<Long> randomIds, ArrayList<Long> found) {
+        ArrayList<Long> missing = new ArrayList<>();
+        if (randomIds == null) {
+            return missing;
+        }
+        for (int i = 0; i < randomIds.size(); i++) {
+            Long randomId = randomIds.get(i);
+            if (randomId == null || randomId == 0 || (found != null && found.contains(randomId))) {
                 continue;
             }
-            if (!isMarked(account, found.dialogId, found.messageId)) {
-                continue;
-            }
-            ArrayList<Integer> ids = byDialog.get(found.dialogId);
-            if (ids == null) {
-                ids = new ArrayList<>();
-                byDialog.put(found.dialogId, ids);
-            }
-            if (!ids.contains(found.messageId)) {
-                ids.add(found.messageId);
+            if (!randomRecorded(account, randomId)) {
+                missing.add(randomId);
             }
         }
-        if (byDialog.size() == 0) {
+        return missing;
+    }
+
+    public static void forgetRandomIds(int account, ArrayList<Long> randomIds) {
+        if (!validAccount(account) || randomIds == null || randomIds.isEmpty()) {
             return;
         }
-        AndroidUtilities.runOnUIThread(() -> {
-            MessagesController controller = MessagesController.getInstance(account);
-            for (int i = 0; i < byDialog.size(); i++) {
-                controller.deleteMessages(byDialog.valueAt(i), null, null, byDialog.keyAt(i), 0, false, 0, true);
+        synchronized (lock) {
+            ensureLoadedLocked(account);
+            State state = stateLocked(account);
+            if (state.error) {
+                return;
             }
-        });
+            ArrayList<String> remove = new ArrayList<>();
+            for (String record : state.records) {
+                for (int i = 0; i < randomIds.size(); i++) {
+                    Long randomId = randomIds.get(i);
+                    if (randomId != null && isRandomRecord(record, randomId)) {
+                        remove.add(record);
+                        break;
+                    }
+                }
+            }
+            if (remove.isEmpty()) {
+                return;
+            }
+            state.records.removeAll(remove);
+            long clientUserId = clientUserId(account);
+            int mode = storedMode(state, account);
+            if (clientUserId <= 0 || mode == 0 || !writeRecords(file(clientUserId), mode, clientUserId, state.records, sealerFor(clientUserId, mode))) {
+                state.records.addAll(remove);
+            }
+        }
     }
 
     public static String messageRecord(long dialogId, int messageId) {
@@ -323,7 +415,7 @@ public final class OpengramRemoteDeletion {
         synchronized (lock) {
             ensureLoadedLocked(account);
             State state = stateLocked(account);
-            return !state.error && state.records.contains(randomRecord(dialogId, randomId));
+            return keeps(account) && !state.error && state.records.contains(randomRecord(dialogId, randomId));
         }
     }
 
@@ -333,8 +425,11 @@ public final class OpengramRemoteDeletion {
         }
         boolean changed = false;
         synchronized (lock) {
-            ensureLoadedLocked(account);
             State state = stateLocked(account);
+            if (state.error) {
+                state.loaded = false;
+            }
+            ensureLoadedLocked(account);
             if (state.error) {
                 return false;
             }
@@ -360,22 +455,15 @@ public final class OpengramRemoteDeletion {
             if (!changed) {
                 return true;
             }
-            UserConfig config = UserConfig.getInstance(account);
-            long clientUserId = config.getClientUserId();
+            long clientUserId = clientUserId(account);
             if (clientUserId <= 0) {
                 return false;
             }
-            int mode = state.mode;
-            if (mode != OpengramSnapshotFile.MODE_STRONGBOX && mode != OpengramSnapshotFile.MODE_PLAINTEXT) {
-                mode = config.remoteDeletionMode;
-            }
-            if (mode != OpengramSnapshotFile.MODE_STRONGBOX && mode != OpengramSnapshotFile.MODE_PLAINTEXT) {
+            int mode = storedMode(state, account);
+            if (mode == 0 || !strongBoxReady(clientUserId, mode)) {
                 return false;
             }
-            if (mode == OpengramSnapshotFile.MODE_STRONGBOX && OpengramStrongBox.forDeletions(clientUserId).probeKey() != OpengramStrongBox.Probe.AVAILABLE) {
-                return false;
-            }
-            OpengramSnapshotFile.Sealer sealer = mode == OpengramSnapshotFile.MODE_STRONGBOX ? OpengramStrongBox.forDeletions(clientUserId) : null;
+            OpengramSnapshotFile.Sealer sealer = sealerFor(clientUserId, mode);
             if (!writeRecords(file(clientUserId), mode, clientUserId, next, sealer)) {
                 return false;
             }
@@ -391,21 +479,20 @@ public final class OpengramRemoteDeletion {
 
     private static void ensureLoadedLocked(int account) {
         State state = stateLocked(account);
-        UserConfig config = UserConfig.getInstance(account);
-        long clientUserId = config.getClientUserId();
-        if (state.loaded && state.clientUserId == clientUserId) {
+        long clientUserId = clientUserId(account);
+        if (state.loaded && state.clientUserId == clientUserId && !state.error) {
             return;
         }
         state.loaded = true;
         state.clientUserId = clientUserId;
         state.records.clear();
         state.error = false;
-        state.mode = config.remoteDeletionMode;
+        state.mode = preferenceMode(account);
         if (clientUserId <= 0) {
-            state.error = config.remoteDeletion;
+            state.error = preferenceOn(account);
             return;
         }
-        Snapshot snapshot = readRecords(file(clientUserId), clientUserId, OpengramStrongBox.forDeletions(clientUserId));
+        Snapshot snapshot = readRecords(file(clientUserId), clientUserId, sealerFor(clientUserId, OpengramSnapshotFile.MODE_STRONGBOX));
         if (snapshot.status == OpengramSnapshotFile.Status.OK) {
             state.mode = snapshot.mode;
             state.records.addAll(snapshot.records);
@@ -427,23 +514,109 @@ public final class OpengramRemoteDeletion {
     }
 
     private static void notifyMarked(int account) {
+        if (hook != null) {
+            return;
+        }
         AndroidUtilities.runOnUIThread(() -> NotificationCenter.getInstance(account).postNotificationName(NotificationCenter.remoteDeletionMarked));
     }
 
-    private static void collectFiles(File file, ArrayList<File> out) {
-        if (file.isDirectory()) {
-            if ("drafts".equals(file.getName())) {
-                return;
+    private static boolean preferenceOn(int account) {
+        if (hook != null) {
+            return hook.remoteDeletion;
+        }
+        return UserConfig.getInstance(account).remoteDeletion;
+    }
+
+    private static int preferenceMode(int account) {
+        if (hook != null) {
+            return hook.remoteDeletionMode;
+        }
+        return UserConfig.getInstance(account).remoteDeletionMode;
+    }
+
+    private static long clientUserId(int account) {
+        if (hook != null) {
+            return hook.clientUserId;
+        }
+        return UserConfig.getInstance(account).getClientUserId();
+    }
+
+    private static void setPreference(int account, boolean enabled, int mode) {
+        if (hook != null) {
+            hook.remoteDeletion = enabled;
+            hook.remoteDeletionMode = mode;
+            return;
+        }
+        UserConfig config = UserConfig.getInstance(account);
+        config.remoteDeletion = enabled;
+        config.remoteDeletionMode = mode;
+        config.saveConfig(false);
+    }
+
+    private static boolean strongBoxReady(long clientUserId, int mode) {
+        if (mode != OpengramSnapshotFile.MODE_STRONGBOX) {
+            return mode == OpengramSnapshotFile.MODE_PLAINTEXT;
+        }
+        if (hook != null) {
+            return hook.strongBoxAvailable;
+        }
+        return OpengramStrongBox.forDeletions(clientUserId).probeKey() == OpengramStrongBox.Probe.AVAILABLE;
+    }
+
+    private static OpengramSnapshotFile.Sealer sealerFor(long clientUserId, int mode) {
+        if (mode != OpengramSnapshotFile.MODE_STRONGBOX) {
+            return null;
+        }
+        if (hook != null) {
+            return hook.sealer;
+        }
+        return OpengramStrongBox.forDeletions(clientUserId);
+    }
+
+    private static int storedMode(State state, int account) {
+        int mode = state.mode;
+        if (mode != OpengramSnapshotFile.MODE_STRONGBOX && mode != OpengramSnapshotFile.MODE_PLAINTEXT) {
+            mode = preferenceMode(account);
+        }
+        if (mode != OpengramSnapshotFile.MODE_STRONGBOX && mode != OpengramSnapshotFile.MODE_PLAINTEXT) {
+            return 0;
+        }
+        return mode;
+    }
+
+    private static boolean containsId(LongSparseArray<ArrayList<Integer>> found, int messageId) {
+        if (found == null) {
+            return false;
+        }
+        for (int i = 0; i < found.size(); i++) {
+            ArrayList<Integer> ids = found.valueAt(i);
+            if (ids != null && ids.contains(messageId)) {
+                return true;
             }
-            File[] children = file.listFiles();
-            if (children == null) {
-                return;
-            }
-            for (int i = 0; i < children.length; i++) {
-                collectFiles(children[i], out);
-            }
-        } else if (file.isFile()) {
-            out.add(file);
+        }
+        return false;
+    }
+
+    private static boolean isRandomRecord(String record, long randomId) {
+        if (record == null || record.length() < 5 || record.charAt(0) != 'r' || record.charAt(1) != ':') {
+            return false;
+        }
+        int split = record.lastIndexOf(':');
+        if (split <= 1 || split >= record.length() - 1) {
+            return false;
+        }
+        try {
+            return Long.parseLong(record.substring(split + 1)) == randomId;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    static void resetForTest() {
+        hook = null;
+        directoryOverride = null;
+        for (int i = 0; i < states.length; i++) {
+            states[i] = null;
         }
     }
 
@@ -483,11 +656,18 @@ public final class OpengramRemoteDeletion {
     }
 
     private static File file(long clientUserId) {
-        Context context = ApplicationLoader.applicationContext;
-        if (context == null || clientUserId <= 0) {
+        if (clientUserId <= 0) {
             return null;
         }
-        return new File(context.getNoBackupFilesDir(), FILE_PREFIX + clientUserId + FILE_SUFFIX);
+        File directory = directoryOverride != null ? directoryOverride : (hook != null ? hook.directory : null);
+        if (directory == null) {
+            Context context = ApplicationLoader.applicationContext;
+            if (context == null) {
+                return null;
+            }
+            directory = context.getNoBackupFilesDir();
+        }
+        return new File(directory, FILE_PREFIX + clientUserId + FILE_SUFFIX);
     }
 
     private static final class State {

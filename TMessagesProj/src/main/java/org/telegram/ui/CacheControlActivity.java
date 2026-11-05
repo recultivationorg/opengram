@@ -57,7 +57,6 @@ import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.CacheByChatsController;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
-import org.telegram.messenger.OpengramRemoteDeletion;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.FilePathDatabase;
 import org.telegram.messenger.FilesMigrationService;
@@ -1000,9 +999,7 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
             }
             if (a == 7) {
                 try {
-                    File wallpaper = ApplicationLoader.getFilesDirFixed("rasterized/wallpaper");
-                    OpengramRemoteDeletion.dropKeptFiles(currentAccount, wallpaper);
-                    cleanDirJava(wallpaper.getAbsolutePath(), 0, null, null);
+                    cleanDirJava(ApplicationLoader.getFilesDirFixed("rasterized/wallpaper").getAbsolutePath(), 0, null, null);
                 } catch (Exception e) {
                     FileLog.e(e);
                 }
@@ -1016,7 +1013,6 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
                 file = FileLoader.checkDirectory(type);
             }
             if (file != null) {
-                OpengramRemoteDeletion.dropKeptFiles(currentAccount, file);
                 cleanDirJava(file.getAbsolutePath(), documentsMusicType, null, updateProgress);
             }
             clearDirI[0]++;
@@ -1024,7 +1020,6 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
             if (type == 100) {
                 file = FileLoader.checkDirectory(FileLoader.MEDIA_DIR_CACHE);
                 if (file != null) {
-                    OpengramRemoteDeletion.dropKeptFiles(currentAccount, file);
                     cleanDirJava(file.getAbsolutePath(), 3, null, updateProgress);
                 }
                 clearDirI[0]++;
@@ -1040,7 +1035,6 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
                 file = FileLoader.checkDirectory(publicDirectoryType);
 
                 if (file != null) {
-                    OpengramRemoteDeletion.dropKeptFiles(currentAccount, file);
                     cleanDirJava(file.getAbsolutePath(), documentsMusicType, null, updateProgress);
                 }
                 clearDirI[0]++;
@@ -1049,7 +1043,6 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
             if (type == FileLoader.MEDIA_DIR_DOCUMENT) {
                 file = FileLoader.checkDirectory(FileLoader.MEDIA_DIR_FILES);
                 if (file != null) {
-                    OpengramRemoteDeletion.dropKeptFiles(currentAccount, file);
                     cleanDirJava(file.getAbsolutePath(), documentsMusicType, null, updateProgress);
                 }
                 clearDirI[0]++;
@@ -1528,23 +1521,6 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
                     }
                 }
             }
-        }
-        LongSparseArray<ArrayList<Integer>> keptMessages = new LongSparseArray<>();
-        for (CacheModel.FileInfo fileInfo : filesToRemove) {
-            if (fileInfo.dialogId == 0 || fileInfo.messageId == 0 || !OpengramRemoteDeletion.isMarked(currentAccount, fileInfo.dialogId, fileInfo.messageId)) {
-                continue;
-            }
-            ArrayList<Integer> ids = keptMessages.get(fileInfo.dialogId);
-            if (ids == null) {
-                ids = new ArrayList<>();
-                keptMessages.put(fileInfo.dialogId, ids);
-            }
-            if (!ids.contains(fileInfo.messageId)) {
-                ids.add(fileInfo.messageId);
-            }
-        }
-        for (int i = 0; i < keptMessages.size(); i++) {
-            getMessagesController().deleteMessages(keptMessages.valueAt(i), null, null, keptMessages.keyAt(i), 0, false, 0, true);
         }
         for (CacheModel.FileInfo fileInfo : filesToRemove) {
             this.cacheModel.onFileDeleted(fileInfo);
