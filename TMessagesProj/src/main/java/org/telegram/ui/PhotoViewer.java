@@ -4830,8 +4830,9 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         ViewCompat.setOnApplyWindowInsetsListener(containerView, (v, newInsetsCompat) -> {
             final Rect oldInsets = new Rect(insets);
             final Insets r = AndroidUtilities.getDefaultWindowInsets(newInsetsCompat, false);
+            final int visibleNavigationBottom = newInsetsCompat.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;
 
-            insets.set(r.left, r.top, r.right, r.bottom);
+            insets.set(r.left, r.top, r.right, visibleNavigationBottom);
 
             int newTopInset = insets.top;
             if (!oldInsets.equals(insets)) {
@@ -13283,12 +13284,22 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
         }
     }
 
+    private boolean isLandscapeViewer() {
+        int width = windowView != null ? windowView.getWidth() : 0;
+        int height = windowView != null ? windowView.getHeight() : 0;
+        if (width <= 0 || height <= 0) {
+            width = AndroidUtilities.displaySize.x;
+            height = AndroidUtilities.displaySize.y;
+        }
+        return width > height;
+    }
+
     private void updateContainerFlags(boolean actionBarVisible) {
         if (sendPhotoType != SELECT_TYPE_AVATAR && containerView != null) {
             int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
             if (!actionBarVisible) {
                 flags |= View.SYSTEM_UI_FLAG_FULLSCREEN;
-                if (containerView.getPaddingLeft() > 0 || containerView.getPaddingRight() > 0) {
+                if (isLandscapeViewer() || containerView.getPaddingLeft() > 0 || containerView.getPaddingRight() > 0) {
                     flags |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
                 }
             }
