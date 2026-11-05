@@ -1921,7 +1921,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         builder.setMessage(getString(R.string.DebugMenuRandomizeFingerprintWarning));
         builder.setPositiveButton(getString(R.string.OK), (dialog, which) -> {
             if (getParentActivity() != null) {
-                OpengramClientFingerprint.rerollAndRestart(getParentActivity());
+                OpengramClientFingerprint.rerollAndRestart(getParentActivity(), currentAccount);
             }
         });
         builder.setNegativeButton(getString(R.string.Cancel), null);

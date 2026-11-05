@@ -219,7 +219,7 @@ public class ConnectionsManager extends BaseController {
         String deviceModelReported = BuildVars.REPORTED_DEVICE_MODEL;
         int timezoneOffset = BuildVars.REPORTED_TIMEZONE_OFFSET;
         try {
-            OpengramClientFingerprint.Identity reported = OpengramClientFingerprint.resolve(ApplicationLoader.applicationContext);
+            OpengramClientFingerprint.Identity reported = OpengramClientFingerprint.resolve(ApplicationLoader.applicationContext, currentAccount);
             if (reported != null && reported.deviceModel != null && reported.deviceModel.length() > 0) {
                 deviceModelReported = reported.deviceModel;
                 timezoneOffset = reported.timezoneOffset;
@@ -1059,6 +1059,14 @@ public class ConnectionsManager extends BaseController {
     private static native void native_setUserPremium(int currentAccount, boolean premium);
     public static native void native_setProxySettings(int currentAccount, String address, int port, String username, String password, String secret);
     public static native void native_setLangCode(int currentAccount, String langCode);
+    private static native void native_setReportedIdentity(int currentAccount, String deviceModel, int timezoneOffset);
+
+    public static void applyReportedIdentity(int account, String deviceModel, int timezoneOffset) {
+        if (deviceModel == null || deviceModel.length() == 0 || account < 0 || account >= Instance.length || Instance[account] == null) {
+            return;
+        }
+        native_setReportedIdentity(account, deviceModel, timezoneOffset);
+    }
     public static native void native_setRegId(int currentAccount, String regId);
     public static native void native_setSystemLangCode(int currentAccount, String langCode);
     public static native void native_setJava(boolean useJavaByteBuffers);

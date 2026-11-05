@@ -29,6 +29,7 @@ import androidx.fragment.app.FragmentActivity;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.OpengramClientFingerprint;
 import org.telegram.messenger.OpengramReloadCrypto;
 import org.telegram.messenger.OpengramReloadWords;
 import org.telegram.messenger.R;
@@ -427,10 +428,13 @@ public class OpengramReloadActivity extends BaseFragment {
         final byte[] blob = userBlob;
         final long uid = userId;
         final int dc = dcId;
+        final int account = currentAccount;
         AlertDialog progress = new AlertDialog(getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER);
         progress.show();
         Utilities.globalQueue.postRunnable(() -> {
-            byte[] file = OpengramReloadCrypto.seal(dc, key, uid, blob, passphrase, new SecureRandom());
+            OpengramClientFingerprint.Identity reported = OpengramClientFingerprint.resolve(ApplicationLoader.applicationContext, account);
+            OpengramReloadCrypto.ClientIdentity identity = reported == null ? null : new OpengramReloadCrypto.ClientIdentity(reported.deviceModel, reported.timezone);
+            byte[] file = OpengramReloadCrypto.seal(dc, key, uid, blob, identity, passphrase, new SecureRandom());
             Arrays.fill(passphrase, '\0');
             AndroidUtilities.runOnUIThread(() -> {
                 dismiss(progress);

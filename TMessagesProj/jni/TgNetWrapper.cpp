@@ -476,6 +476,14 @@ void discardConnection(JNIEnv *env, jclass c,  jint instanceNum, jint datacenerI
     ConnectionsManager::getInstance(instanceNum).reconnect(datacenerId, connectionType);
 }
 
+void setReportedIdentity(JNIEnv *env, jclass c, jint instanceNum, jstring deviceModel, jint timezoneOffset) {
+    const char *deviceModelStr = deviceModel == nullptr ? nullptr : env->GetStringUTFChars(deviceModel, 0);
+    if (deviceModelStr != 0) {
+        ConnectionsManager::getInstance(instanceNum).setReportedIdentity(std::string(deviceModelStr), timezoneOffset);
+        env->ReleaseStringUTFChars(deviceModel, deviceModelStr);
+    }
+}
+
 void setLangCode(JNIEnv *env, jclass c, jint instanceNum, jstring langCode) {
     const char *langCodeStr = env->GetStringUTFChars(langCode, 0);
 
@@ -586,6 +594,7 @@ static JNINativeMethod ConnectionsManagerMethods[] = {
         {"native_setUserPremium", "(IZ)V", (void *) setUserPremium},
         {"native_init", "(IIIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IJZZZII)V", (void *) init},
         {"native_setLangCode", "(ILjava/lang/String;)V", (void *) setLangCode},
+        {"native_setReportedIdentity", "(ILjava/lang/String;I)V", (void *) setReportedIdentity},
         {"native_setRegId", "(ILjava/lang/String;)V", (void *) setRegId},
         {"native_setSystemLangCode", "(ILjava/lang/String;)V", (void *) setSystemLangCode},
         {"native_switchBackend", "(IZ)V", (void *) switchBackend},

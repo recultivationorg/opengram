@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.zip.CRC32;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
@@ -38,6 +39,19 @@ public final class OpengramReloadCrypto {
     static final byte VERSION = 1;
     private static final byte KDF_PBKDF2_SHA512 = 1;
     private static final int GCM_TAG_BITS = 128;
+    private static final int IDENTITY_MODEL_MAX = 128;
+    private static final int IDENTITY_TIMEZONE_MAX = 64;
+    private static final int IDENTITY_FOOTER = 8 + 2 + 2 + IDENTITY_MODEL_MAX + IDENTITY_TIMEZONE_MAX + 4;
+
+    public static final class ClientIdentity {
+        public final String deviceModel;
+        public final String timezone;
+
+        public ClientIdentity(String deviceModel, String timezone) {
+            this.deviceModel = deviceModel;
+            this.timezone = timezone;
+        }
+    }
 
     public static final class Opened {
         public final int dcId;
@@ -45,13 +59,15 @@ public final class OpengramReloadCrypto {
         public final long authKeyId;
         public final long userId;
         public final TLRPC.User user;
+        public final ClientIdentity clientIdentity;
 
-        Opened(int dcId, byte[] authKey, long authKeyId, long userId, TLRPC.User user) {
+        Opened(int dcId, byte[] authKey, long authKeyId, long userId, TLRPC.User user, ClientIdentity clientIdentity) {
             this.dcId = dcId;
             this.authKey = authKey;
             this.authKeyId = authKeyId;
             this.userId = userId;
             this.user = user;
+            this.clientIdentity = clientIdentity;
         }
 
         public void wipe() {
@@ -113,6 +129,10 @@ public final class OpengramReloadCrypto {
     }
 
     public static byte[] seal(int dcId, byte[] authKey, long userId, byte[] userBlob, char[] passphrase, SecureRandom random) {
+        return seal(dcId, authKey, userId, userBlob, null, passphrase, random);
+    }
+
+    public static byte[] seal(int dcId, byte[] authKey, long userId, byte[] userBlob, ClientIdentity identity, char[] passphrase, SecureRandom random) {
         if (dcId < 1 || dcId > 5 || userId <= 0 || passphrase == null || passphrase.length == 0 || random == null) {
             return null;
         }
@@ -124,7 +144,7 @@ public final class OpengramReloadCrypto {
             return null;
         }
         long keyId = authKeyId(authKey);
-        byte[] plain = buildPlaintext(dcId, authKey, keyId, userId, userBlob, random);
+        byte[] plain = buildPlaintext(dcId, authKey, keyId, userId, userBlob, identity, random);
         if (plain == null) {
             return null;
         }
@@ -181,6 +201,10 @@ public final class OpengramReloadCrypto {
     }
 
     static byte[] buildPlaintext(int dcId, byte[] authKey, long authKeyId, long userId, byte[] userBlob, SecureRandom random) {
+        return buildPlaintext(dcId, authKey, authKeyId, userId, userBlob, null, random);
+    }
+
+    static byte[] buildPlaintext(int dcId, byte[] authKey, long authKeyId, long userId, byte[] userBlob, ClientIdentity identity, SecureRandom random) {
         if (authKey == null || authKey.length != AUTH_KEY_LENGTH || userBlob == null || userBlob.length == 0 || userBlob.length > MAX_USER_BLOB || random == null) {
             return null;
         }
@@ -200,7 +224,13 @@ public final class OpengramReloadCrypto {
         offset += 8;
         writeInt(plain, offset, userBlob.length);
         offset += 4;
+        if (offset + userBlob.length > plain.length - IDENTITY_FOOTER) {
+            return null;
+        }
         System.arraycopy(userBlob, 0, plain, offset, userBlob.length);
+        if (identity != null) {
+            writeIdentity(plain, identity.deviceModel, identity.timezone);
+        }
         return plain;
     }
 
@@ -277,7 +307,74 @@ public final class OpengramReloadCrypto {
             Arrays.fill(authKey, (byte) 0);
             return null;
         }
-        return new Opened(dcId, authKey, storedId, userId, user);
+        return new Opened(dcId, authKey, storedId, userId, user, readIdentity(plain));
+    }
+
+    private static void writeIdentity(byte[] plain, String model, String timezone) {
+        if (!identityText(model, IDENTITY_MODEL_MAX) || !identityText(timezone, IDENTITY_TIMEZONE_MAX)) {
+            return;
+        }
+        byte[] modelBytes = model.getBytes(StandardCharsets.UTF_8);
+        byte[] timezoneBytes = timezone.getBytes(StandardCharsets.UTF_8);
+        if (modelBytes.length > IDENTITY_MODEL_MAX || timezoneBytes.length > IDENTITY_TIMEZONE_MAX) {
+            return;
+        }
+        int base = plain.length - IDENTITY_FOOTER;
+        Arrays.fill(plain, base, plain.length, (byte) 0);
+        plain[base] = 'O';
+        plain[base + 1] = 'G';
+        plain[base + 2] = 'I';
+        plain[base + 3] = 'D';
+        plain[base + 4] = 1;
+        writeShort(plain, base + 8, modelBytes.length);
+        writeShort(plain, base + 10, timezoneBytes.length);
+        System.arraycopy(modelBytes, 0, plain, base + 12, modelBytes.length);
+        System.arraycopy(timezoneBytes, 0, plain, base + 12 + IDENTITY_MODEL_MAX, timezoneBytes.length);
+        CRC32 crc = new CRC32();
+        crc.update(plain, base, IDENTITY_FOOTER - 4);
+        writeInt(plain, base + IDENTITY_FOOTER - 4, (int) crc.getValue());
+    }
+
+    private static ClientIdentity readIdentity(byte[] plain) {
+        if (plain.length < IDENTITY_FOOTER) {
+            return null;
+        }
+        int base = plain.length - IDENTITY_FOOTER;
+        if (plain[base] != 'O' || plain[base + 1] != 'G' || plain[base + 2] != 'I' || plain[base + 3] != 'D' || plain[base + 4] != 1 || plain[base + 5] != 0 || plain[base + 6] != 0 || plain[base + 7] != 0) {
+            return null;
+        }
+        CRC32 crc = new CRC32();
+        crc.update(plain, base, IDENTITY_FOOTER - 4);
+        if (readInt(plain, base + IDENTITY_FOOTER - 4) != (int) crc.getValue()) {
+            return null;
+        }
+        int modelLength = readShort(plain, base + 8);
+        int timezoneLength = readShort(plain, base + 10);
+        if (modelLength <= 0 || modelLength > IDENTITY_MODEL_MAX || timezoneLength <= 0 || timezoneLength > IDENTITY_TIMEZONE_MAX) {
+            return null;
+        }
+        String model = new String(plain, base + 12, modelLength, StandardCharsets.UTF_8);
+        String timezone = new String(plain, base + 12 + IDENTITY_MODEL_MAX, timezoneLength, StandardCharsets.UTF_8);
+        if (!identityText(model, IDENTITY_MODEL_MAX) || !identityText(timezone, IDENTITY_TIMEZONE_MAX)) {
+            return null;
+        }
+        if (model.getBytes(StandardCharsets.UTF_8).length != modelLength || timezone.getBytes(StandardCharsets.UTF_8).length != timezoneLength) {
+            return null;
+        }
+        return new ClientIdentity(model, timezone);
+    }
+
+    private static boolean identityText(String value, int max) {
+        if (value == null || value.length() == 0 || value.length() > max) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x20 || c > 0x7e) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static TLRPC.User deserializeUser(byte[] blob) {
@@ -392,6 +489,15 @@ public final class OpengramReloadCrypto {
             acc |= key[i];
         }
         return acc == 0;
+    }
+
+    private static void writeShort(byte[] out, int offset, int value) {
+        out[offset] = (byte) (value >>> 8);
+        out[offset + 1] = (byte) value;
+    }
+
+    private static int readShort(byte[] in, int offset) {
+        return ((in[offset] & 0xff) << 8) | (in[offset + 1] & 0xff);
     }
 
     private static void writeInt(byte[] out, int offset, int value) {

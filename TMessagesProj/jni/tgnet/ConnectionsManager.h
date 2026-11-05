@@ -74,6 +74,7 @@ public:
     void setLangCode(std::string langCode);
     void setRegId(std::string regId);
     void setSystemLangCode(std::string langCode);
+    void setReportedIdentity(std::string deviceModel, int32_t timezoneOffset);
     void updateDcSettings(uint32_t datacenterId, bool workaround, bool ifLoadingTryAgain);
     void setPushConnectionEnabled(bool value);
     void applyDnsConfig(NativeByteBuffer *buffer, std::string phone, int32_t date);

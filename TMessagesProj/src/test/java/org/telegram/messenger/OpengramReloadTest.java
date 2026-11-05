@@ -71,7 +71,34 @@ public class OpengramReloadTest {
         assertEquals(42L, opened.user.id);
         assertTrue(Arrays.equals(key, opened.authKey));
         assertEquals(OpengramReloadCrypto.authKeyId(key), opened.authKeyId);
+        assertNull(opened.clientIdentity);
         opened.wipe();
+    }
+
+    @Test
+    public void sealedFileCarriesTheClientIdentity() {
+        byte[] key = key();
+        byte[] userBlob = userBlob(42);
+        char[] passphrase = passphrase();
+        OpengramReloadCrypto.ClientIdentity identity = new OpengramReloadCrypto.ClientIdentity("samsungSM-S928B", "Europe/Berlin");
+        byte[] file = OpengramReloadCrypto.seal(2, key, 42, userBlob, identity, passphrase, new SecureRandom());
+        assertNotNull(file);
+        assertEquals(OpengramReloadCrypto.FILE_LENGTH, file.length);
+        OpengramReloadCrypto.Opened opened = OpengramReloadCrypto.open(file, passphrase);
+        assertNotNull(opened);
+        assertNotNull(opened.clientIdentity);
+        assertEquals("samsungSM-S928B", opened.clientIdentity.deviceModel);
+        assertEquals("Europe/Berlin", opened.clientIdentity.timezone);
+        assertEquals(42L, opened.userId);
+        opened.wipe();
+
+        byte[] plain = OpengramReloadCrypto.buildPlaintext(2, key, OpengramReloadCrypto.authKeyId(key), 42, userBlob, identity, new SecureRandom());
+        plain[plain.length - 1] ^= 0x01;
+        OpengramReloadCrypto.Opened damaged = OpengramReloadCrypto.parsePlaintext(plain);
+        assertNotNull(damaged);
+        assertNull(damaged.clientIdentity);
+        assertEquals(42L, damaged.user.id);
+        damaged.wipe();
     }
 
     @Test

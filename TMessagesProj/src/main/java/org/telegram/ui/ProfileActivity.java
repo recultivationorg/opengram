@@ -5029,7 +5029,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 warning.setMessage(getString(R.string.DebugMenuRandomizeFingerprintWarning));
                                 warning.setPositiveButton(getString(R.string.OK), (d, w) -> {
                                     if (getParentActivity() != null) {
-                                        OpengramClientFingerprint.rerollAndRestart(getParentActivity());
+                                        OpengramClientFingerprint.rerollAndRestart(getParentActivity(), currentAccount);
                                     }
                                 });
                                 warning.setNegativeButton(getString(R.string.Cancel), null);

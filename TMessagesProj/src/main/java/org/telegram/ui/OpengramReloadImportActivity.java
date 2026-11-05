@@ -19,6 +19,8 @@ import android.widget.ScrollView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.OpengramClientFingerprint;
 import org.telegram.messenger.OpengramReloadCrypto;
 import org.telegram.messenger.OpengramReloadImportMachine;
 import org.telegram.messenger.OpengramReloadWords;
@@ -196,6 +198,12 @@ public class OpengramReloadImportActivity extends BaseFragment {
                     return;
                 }
                 final long userId = opened.userId;
+                final int slot = currentAccount;
+                final OpengramReloadCrypto.ClientIdentity imported = opened.clientIdentity;
+                final OpengramClientFingerprint.Identity previous = imported == null ? null : OpengramClientFingerprint.accountOverride(ApplicationLoader.applicationContext, slot);
+                if (imported != null) {
+                    OpengramClientFingerprint.apply(ApplicationLoader.applicationContext, slot, imported.deviceModel, imported.timezone);
+                }
                 boolean started = machine.start(opened.dcId, opened.authKey, userId, new OpengramReloadImportMachine.Listener() {
                     @Override
                     public void onSuccess() {
@@ -205,6 +213,9 @@ public class OpengramReloadImportActivity extends BaseFragment {
 
                     @Override
                     public void onFailure(int reason) {
+                        if (imported != null) {
+                            restoreIdentity(slot, previous);
+                        }
                         setRollbackPending(currentAccount, reason == OpengramReloadImportMachine.ROLLBACK_FAILED);
                         if (destroyed) {
                             dismiss(progress);
@@ -215,10 +226,21 @@ public class OpengramReloadImportActivity extends BaseFragment {
                 });
                 opened.wipe();
                 if (!started) {
+                    if (imported != null) {
+                        restoreIdentity(slot, previous);
+                    }
                     finishAttempt(needsRecovery() ? getString(R.string.OpengramReloadRollbackFailed) : getString(R.string.OpengramReloadImportFailed));
                 }
             });
         });
+    }
+
+    private static void restoreIdentity(int account, OpengramClientFingerprint.Identity previous) {
+        if (previous != null) {
+            OpengramClientFingerprint.apply(ApplicationLoader.applicationContext, account, previous.deviceModel, previous.timezone);
+            return;
+        }
+        OpengramClientFingerprint.clear(ApplicationLoader.applicationContext, account);
     }
 
     private boolean needsRecovery() {

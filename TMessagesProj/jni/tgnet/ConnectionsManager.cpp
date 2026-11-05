@@ -4032,6 +4032,20 @@ void ConnectionsManager::setProxySettings(std::string address, uint16_t port, st
     });
 }
 
+void ConnectionsManager::setReportedIdentity(std::string deviceModel, int32_t timezoneOffset) {
+    scheduleTask([&, deviceModel, timezoneOffset] {
+        if (deviceModel.empty()) {
+            return;
+        }
+        currentDeviceModel = deviceModel;
+        currentDeviceTimezone = timezoneOffset;
+        for (auto & datacenter : datacenters) {
+            datacenter.second->resetInitVersion();
+        }
+        saveConfig();
+    });
+}
+
 void ConnectionsManager::setLangCode(std::string langCode) {
     scheduleTask([&, langCode] {
         if (currentLangCode == langCode) {
