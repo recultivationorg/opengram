@@ -8375,8 +8375,8 @@ public class Theme {
             addChatDrawable(key_drawable_msgOutMenuSelected, chat_msgOutMenuSelectedDrawable, key_chat_outMenuSelected);
             addChatDrawable(key_drawable_msgOutPinned, chat_msgOutPinnedDrawable, key_chat_outViews);
             addChatDrawable(key_drawable_msgOutPinnedSelected, chat_msgOutPinnedSelectedDrawable, key_chat_outViewsSelected);
-            addChatDrawable(key_drawable_msgOutRemoteDeletion, chat_msgOutRemoteDeletionDrawable, key_chat_outViews);
-            addChatDrawable(key_drawable_msgOutRemoteDeletionSelected, chat_msgOutRemoteDeletionSelectedDrawable, key_chat_outViewsSelected);
+            addChatDrawable(key_drawable_msgOutRemoteDeletion, chat_msgOutRemoteDeletionDrawable, key_chat_outTimeText);
+            addChatDrawable(key_drawable_msgOutRemoteDeletionSelected, chat_msgOutRemoteDeletionSelectedDrawable, key_chat_outTimeSelectedText);
             addChatDrawable(key_drawable_msgOutReplies, chat_msgOutRepliesDrawable, key_chat_outViews);
             addChatDrawable(key_drawable_msgOutRepliesSelected, chat_msgOutRepliesSelectedDrawable, key_chat_outViewsSelected);
             addChatDrawable(key_drawable_msgOutViews, chat_msgOutViewsDrawable, key_chat_outViews);
@@ -8506,11 +8506,11 @@ public class Theme {
             setDrawableColorByKey(chat_msgOutPinnedSelectedDrawable, key_chat_outViewsSelected);
             setDrawableColorByKey(chat_msgMediaPinnedDrawable, key_chat_mediaViews);
             setDrawableColorByKey(chat_msgStickerPinnedDrawable, key_chat_serviceText);
-            setDrawableColorByKey(chat_msgInRemoteDeletionDrawable, key_chat_inViews);
-            setDrawableColorByKey(chat_msgInRemoteDeletionSelectedDrawable, key_chat_inViewsSelected);
-            setDrawableColorByKey(chat_msgOutRemoteDeletionDrawable, key_chat_outViews);
-            setDrawableColorByKey(chat_msgOutRemoteDeletionSelectedDrawable, key_chat_outViewsSelected);
-            setDrawableColorByKey(chat_msgMediaRemoteDeletionDrawable, key_chat_mediaViews);
+            setDrawableColorByKey(chat_msgInRemoteDeletionDrawable, key_chat_inTimeText);
+            setDrawableColorByKey(chat_msgInRemoteDeletionSelectedDrawable, key_chat_inTimeSelectedText);
+            setDrawableColorByKey(chat_msgOutRemoteDeletionDrawable, key_chat_outTimeText);
+            setDrawableColorByKey(chat_msgOutRemoteDeletionSelectedDrawable, key_chat_outTimeSelectedText);
+            setDrawableColorByKey(chat_msgMediaRemoteDeletionDrawable, key_chat_mediaTimeText);
             setDrawableColorByKey(chat_msgStickerRemoteDeletionDrawable, key_chat_serviceText);
             setDrawableColorByKey(chat_msgMediaViewsDrawable, key_chat_mediaViews);
             setDrawableColorByKey(chat_msgMediaRepliesDrawable, key_chat_mediaViews);
