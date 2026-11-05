@@ -276,6 +276,26 @@ public class OpengramRemoteDeletionTest {
     }
 
     @Test
+    public void keptGroupsMarkedMessagesByDialog() {
+        assertTrue(OpengramRemoteDeletion.enable(0, OpengramSnapshotFile.MODE_PLAINTEXT));
+        ArrayList<Integer> first = new ArrayList<>();
+        first.add(4);
+        first.add(5);
+        ArrayList<Integer> second = new ArrayList<>();
+        second.add(9);
+        assertTrue(OpengramRemoteDeletion.markMessages(0, -20L, first));
+        assertTrue(OpengramRemoteDeletion.markMessages(0, 3L, second));
+        ArrayList<Long> randoms = new ArrayList<>();
+        randoms.add(77L);
+        assertTrue(OpengramRemoteDeletion.markRandoms(0, -20L, randoms));
+
+        OpengramRemoteDeletion.KeptMessages kept = OpengramRemoteDeletion.kept(0);
+        assertEquals(Arrays.asList(4, 5), kept.messages.get(-20L));
+        assertEquals(Arrays.asList(9), kept.messages.get(3L));
+        assertEquals(Arrays.asList(77L), kept.randoms.get(-20L));
+    }
+
+    @Test
     public void channelPushUsesTheChannelDialog() {
         assertEquals(-42L, OpengramRemoteDeletion.deletionDialogId(99L, 42L));
         assertEquals(15L, OpengramRemoteDeletion.deletionDialogId(15L, 0L));

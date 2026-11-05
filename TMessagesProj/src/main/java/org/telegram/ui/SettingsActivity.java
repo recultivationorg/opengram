@@ -515,6 +515,39 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         return fragmentView = contentView;
     }
 
+    private void confirmDisableRemoteDeletion() {
+        OpengramRemoteDeletion.KeptMessages kept = OpengramRemoteDeletion.kept(currentAccount);
+        if (kept.isEmpty() || getParentActivity() == null) {
+            OpengramRemoteDeletion.disable(currentAccount);
+            if (listView != null) {
+                listView.adapter.update(true);
+            }
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(getString(R.string.RemoteDeletion));
+        builder.setMessage(getString(R.string.RemoteDeletionDisableDelete));
+        builder.setPositiveButton(getString(R.string.Delete), (dialogInterface, i) -> {
+            OpengramRemoteDeletion.disable(currentAccount);
+            OpengramRemoteDeletion.deleteKeptLocally(currentAccount, kept);
+            if (listView != null) {
+                listView.adapter.update(true);
+            }
+        });
+        builder.setNegativeButton(getString(R.string.RemoteDeletionDisableKeep), (dialogInterface, i) -> {
+            OpengramRemoteDeletion.disable(currentAccount);
+            if (listView != null) {
+                listView.adapter.update(true);
+            }
+        });
+        builder.setOnDismissListener(dialog -> {
+            if (listView != null) {
+                listView.adapter.update(true);
+            }
+        });
+        showDialog(builder.create());
+    }
+
     private void showRemoteDeletionStorageError() {
         if (getParentActivity() == null) {
             return;
@@ -971,8 +1004,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
             case 30: {
                 if (getUserConfig().remoteDeletion) {
-                    OpengramRemoteDeletion.disable(currentAccount);
-                    listView.adapter.update(true);
+                    confirmDisableRemoteDeletion();
                     break;
                 }
                 if (getParentActivity() == null) {

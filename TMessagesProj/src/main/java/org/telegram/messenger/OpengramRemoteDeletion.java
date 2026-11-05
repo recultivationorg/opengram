@@ -122,6 +122,79 @@ public final class OpengramRemoteDeletion {
         return true;
     }
 
+    public static final class KeptMessages {
+        public final LongSparseArray<ArrayList<Integer>> messages = new LongSparseArray<>();
+        public final LongSparseArray<ArrayList<Long>> randoms = new LongSparseArray<>();
+
+        public boolean isEmpty() {
+            return messages.size() == 0 && randoms.size() == 0;
+        }
+    }
+
+    public static KeptMessages kept(int account) {
+        KeptMessages kept = new KeptMessages();
+        if (!validAccount(account)) {
+            return kept;
+        }
+        synchronized (lock) {
+            ensureLoadedLocked(account);
+            State state = stateLocked(account);
+            if (state.error) {
+                return kept;
+            }
+            for (String record : state.records) {
+                if (!validRecord(record)) {
+                    continue;
+                }
+                long dialogId = recordDialog(record);
+                long id = recordId(record);
+                if (dialogId == 0 || id == 0) {
+                    continue;
+                }
+                if (record.charAt(0) == 'd') {
+                    ArrayList<Integer> ids = kept.messages.get(dialogId);
+                    if (ids == null) {
+                        ids = new ArrayList<>();
+                        kept.messages.put(dialogId, ids);
+                    }
+                    ids.add((int) id);
+                } else {
+                    ArrayList<Long> ids = kept.randoms.get(dialogId);
+                    if (ids == null) {
+                        ids = new ArrayList<>();
+                        kept.randoms.put(dialogId, ids);
+                    }
+                    ids.add(id);
+                }
+            }
+        }
+        return kept;
+    }
+
+    public static void deleteKeptLocally(int account, KeptMessages kept) {
+        if (!validAccount(account) || kept == null) {
+            return;
+        }
+        MessagesController controller = MessagesController.getInstance(account);
+        for (int i = 0; i < kept.messages.size(); i++) {
+            ArrayList<Integer> ids = kept.messages.valueAt(i);
+            if (ids == null || ids.isEmpty()) {
+                continue;
+            }
+            controller.deleteMessages(ids, null, null, kept.messages.keyAt(i), 0, true, 0, true);
+        }
+        ArrayList<Long> randoms = new ArrayList<>();
+        for (int i = 0; i < kept.randoms.size(); i++) {
+            ArrayList<Long> ids = kept.randoms.valueAt(i);
+            if (ids != null) {
+                randoms.addAll(ids);
+            }
+        }
+        if (!randoms.isEmpty()) {
+            MessagesStorage.getInstance(account).markMessagesAsDeletedByRandoms(randoms);
+        }
+    }
+
     public static void disable(int account) {
         if (!validAccount(account)) {
             return;
@@ -595,6 +668,30 @@ public final class OpengramRemoteDeletion {
             }
         }
         return false;
+    }
+
+    private static long recordDialog(String record) {
+        int split = record.indexOf(':', 2);
+        if (split <= 2) {
+            return 0;
+        }
+        try {
+            return Long.parseLong(record.substring(2, split));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private static long recordId(String record) {
+        int split = record.lastIndexOf(':');
+        if (split <= 1 || split >= record.length() - 1) {
+            return 0;
+        }
+        try {
+            return Long.parseLong(record.substring(split + 1));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private static boolean isRandomRecord(String record, long randomId) {
