@@ -3336,6 +3336,8 @@
     <string name="RemoteDeletionExportInfo">Saves the messages kept after a remote deletion into a zip file. Each chat is a folder named by its id. Each message is a file named by its id: text is JSON, and media keeps its original extension.</string>
     <string name="RemoteDeletionExportEmpty">There are no kept messages to export.</string>
     <string name="RemoteDeletionExportFailed">The export could not be saved.</string>
+    <string name="RemoteDeletionExportPartial">The zip was saved, but some messages could not be included.</string>
+    <string name="RemoteDeletionOn">On</string>
     <string name="RemoteDeletionDisableDelete">You can choose to keep or delete the messages which were marked for deletion by telegram. If you keep them, they will be displayed as normal messages, without the trashcan marker.</string>
     <string name="RemoteDeletionDisableKeep">Keep</string>
     <string name="RemoteDeletionStrongBoxWarning">This device has no Android StrongBox. The record of kept messages saved for this option is a potential information leak.</string>

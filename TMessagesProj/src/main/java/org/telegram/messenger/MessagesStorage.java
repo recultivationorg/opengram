@@ -71,6 +71,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -7886,7 +7887,145 @@ public class MessagesStorage extends BaseController {
         return result;
     }
 
+    public static final class KeptExport {
+        public final ArrayList<TLRPC.Message> messages = new ArrayList<>();
+        public final ArrayList<long[]> unresolvedRandoms = new ArrayList<>();
+        public int missing;
+    }
 
+    private static final class ExportWork {
+        long dialogId;
+        int messageId;
+        long randomId;
+        boolean random;
+    }
+
+    public KeptExport loadKeptForExport(OpengramRemoteDeletion.KeptMessages kept, AtomicBoolean cancelled) {
+        KeptExport export = new KeptExport();
+        if (kept == null) {
+            return export;
+        }
+        ArrayList<ExportWork> work = new ArrayList<>();
+        for (int i = 0; i < kept.messages.size(); i++) {
+            long dialogId = kept.messages.keyAt(i);
+            ArrayList<Integer> ids = kept.messages.valueAt(i);
+            if (ids == null) {
+                continue;
+            }
+            for (int j = 0; j < ids.size(); j++) {
+                Integer id = ids.get(j);
+                if (id == null || id == 0) {
+                    continue;
+                }
+                ExportWork item = new ExportWork();
+                item.dialogId = dialogId;
+                item.messageId = id;
+                work.add(item);
+            }
+        }
+        for (int i = 0; i < kept.randoms.size(); i++) {
+            long dialogId = kept.randoms.keyAt(i);
+            ArrayList<Long> ids = kept.randoms.valueAt(i);
+            if (ids == null) {
+                continue;
+            }
+            for (int j = 0; j < ids.size(); j++) {
+                Long randomId = ids.get(j);
+                if (randomId == null || randomId == 0) {
+                    continue;
+                }
+                ExportWork item = new ExportWork();
+                item.dialogId = dialogId;
+                item.randomId = randomId;
+                item.random = true;
+                work.add(item);
+            }
+        }
+        HashSet<String> seen = new HashSet<>();
+        int index = 0;
+        while (index < work.size()) {
+            if (cancelled != null && cancelled.get()) {
+                return export;
+            }
+            final int start = index;
+            final int end = Math.min(index + 64, work.size());
+            CountDownLatch latch = new CountDownLatch(1);
+            storageQueue.postRunnable(() -> {
+                try {
+                    for (int i = start; i < end; i++) {
+                        applyExportWork(work.get(i), export, seen);
+                    }
+                } catch (Exception e) {
+                    checkSQLException(e);
+                } finally {
+                    latch.countDown();
+                }
+            });
+            try {
+                latch.await();
+            } catch (Exception e) {
+                checkSQLException(e);
+            }
+            index = end;
+        }
+        return export;
+    }
+
+    private void applyExportWork(ExportWork item, KeptExport export, HashSet<String> seen) {
+        if (item == null) {
+            return;
+        }
+        if (!item.random) {
+            addKeptExportMessage(export, seen, item.dialogId, item.messageId, 0);
+            return;
+        }
+        Integer mid = randomMessageId(item.dialogId, item.randomId);
+        if (mid == null) {
+            export.unresolvedRandoms.add(new long[]{item.dialogId, item.randomId});
+            return;
+        }
+        addKeptExportMessage(export, seen, item.dialogId, mid, item.randomId);
+    }
+
+    private void addKeptExportMessage(KeptExport export, HashSet<String> seen, long dialogId, int messageId, long randomId) {
+        if (messageId != 0 && !seen.add(dialogId + ":" + messageId)) {
+            return;
+        }
+        TLRPC.Message message = getMessageInternal(dialogId, messageId);
+        if (message == null) {
+            if (randomId != 0) {
+                export.unresolvedRandoms.add(new long[]{dialogId, randomId});
+            } else {
+                export.missing++;
+            }
+            return;
+        }
+        if (message.id == 0) {
+            message.id = messageId;
+        }
+        message.dialog_id = dialogId;
+        if (message.random_id == 0 && randomId != 0) {
+            message.random_id = randomId;
+        }
+        export.messages.add(message);
+    }
+
+    private Integer randomMessageId(long dialogId, long randomId) {
+        SQLiteCursor cursor = null;
+        try {
+            cursor = database.queryFinalized("SELECT mid FROM randoms_v2 WHERE random_id = " + randomId + " AND uid = " + dialogId + " LIMIT 1");
+            if (cursor.next()) {
+                return cursor.intValue(0);
+            }
+        } catch (Exception e) {
+            checkSQLException(e);
+        } finally {
+            if (cursor != null) {
+                cursor.dispose();
+            }
+        }
+        return null;
+    }
 
     public boolean hasInviteMeMessage(long chatId) {
         CountDownLatch countDownLatch = new CountDownLatch(1);

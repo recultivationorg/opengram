@@ -12,6 +12,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.FileLog;
 import org.telegram.messenger.OpengramRemoteDeletion;
 import org.telegram.messenger.OpengramRemoteDeletionExport;
 import org.telegram.messenger.OpengramSnapshotFile;
@@ -29,10 +30,11 @@ import org.telegram.ui.Components.UniversalRecyclerView;
 
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class OpengramRemoteDeletionActivity extends BaseFragment {
 
-    private static final int REQUEST_EXPORT = 41;
+    private static final int REQUEST_EXPORT = 47;
 
     private UniversalRecyclerView listView;
     private boolean exporting;
@@ -162,38 +164,51 @@ public class OpengramRemoteDeletionActivity extends BaseFragment {
         Uri uri = data.getData();
         ContentResolver resolver = getParentActivity().getContentResolver();
         exporting = true;
+        AtomicBoolean cancelled = new AtomicBoolean();
         AlertDialog progress = new AlertDialog(getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER);
-        progress.setCanCancel(false);
-        progress.show();
+        progress.setCanCancel(true);
+        if (showDialog(progress, dialog -> cancelled.set(true)) == null) {
+            exporting = false;
+            return;
+        }
         int account = currentAccount;
         Utilities.globalQueue.postRunnable(() -> {
             boolean ok = false;
-            int count = 0;
+            OpengramRemoteDeletionExport.Result result = null;
             try {
                 OutputStream out = resolver.openOutputStream(uri);
                 if (out != null) {
                     try {
-                        count = OpengramRemoteDeletionExport.write(account, out);
+                        result = OpengramRemoteDeletionExport.write(account, out, cancelled);
                         ok = true;
                     } finally {
                         out.close();
                     }
                 }
             } catch (Exception e) {
+                FileLog.e(e);
                 ok = false;
             }
             boolean wrote = ok;
-            int written = count;
+            OpengramRemoteDeletionExport.Result exportResult = result;
             AndroidUtilities.runOnUIThread(() -> {
                 exporting = false;
+                boolean stopped = cancelled.get();
                 try {
                     progress.dismiss();
                 } catch (Exception ignored) {
                 }
-                if (!wrote) {
+                if (stopped || (exportResult != null && exportResult.cancelled)) {
+                    return;
+                }
+                if (!wrote || exportResult == null) {
                     showNotice(getString(R.string.RemoteDeletionOptions), getString(R.string.RemoteDeletionExportFailed));
-                } else if (written == 0) {
+                } else if (exportResult.written == 0 && exportResult.failed > 0) {
+                    showNotice(getString(R.string.RemoteDeletionOptions), getString(R.string.RemoteDeletionExportFailed));
+                } else if (exportResult.written == 0) {
                     showNotice(getString(R.string.RemoteDeletionOptions), getString(R.string.RemoteDeletionExportEmpty));
+                } else if (exportResult.failed > 0 || exportResult.missing > 0) {
+                    showNotice(getString(R.string.RemoteDeletionOptions), getString(R.string.RemoteDeletionExportPartial));
                 }
             });
         });
