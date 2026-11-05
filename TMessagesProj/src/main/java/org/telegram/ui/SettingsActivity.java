@@ -84,9 +84,6 @@ import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.OpengramGhostReads;
 import org.telegram.messenger.OpengramContentFilter;
-import org.telegram.messenger.OpengramRemoteDeletion;
-import org.telegram.messenger.OpengramSnapshotFile;
-import org.telegram.messenger.OpengramStrongBox;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.SharedPrefsHelper;
 import org.telegram.ui.Cells.TextCell;
@@ -515,50 +512,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         return fragmentView = contentView;
     }
 
-    private void confirmDisableRemoteDeletion() {
-        OpengramRemoteDeletion.KeptMessages kept = OpengramRemoteDeletion.kept(currentAccount);
-        if (kept.isEmpty() || getParentActivity() == null) {
-            OpengramRemoteDeletion.disable(currentAccount);
-            if (listView != null) {
-                listView.adapter.update(true);
-            }
-            return;
-        }
-        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-        builder.setTitle(getString(R.string.RemoteDeletion));
-        builder.setMessage(getString(R.string.RemoteDeletionDisableDelete));
-        builder.setPositiveButton(getString(R.string.Delete), (dialogInterface, i) -> {
-            OpengramRemoteDeletion.disable(currentAccount);
-            OpengramRemoteDeletion.deleteKeptLocally(currentAccount, kept);
-            if (listView != null) {
-                listView.adapter.update(true);
-            }
-        });
-        builder.setNegativeButton(getString(R.string.RemoteDeletionDisableKeep), (dialogInterface, i) -> {
-            OpengramRemoteDeletion.disable(currentAccount);
-            if (listView != null) {
-                listView.adapter.update(true);
-            }
-        });
-        builder.setOnDismissListener(dialog -> {
-            if (listView != null) {
-                listView.adapter.update(true);
-            }
-        });
-        showDialog(builder.create());
-    }
-
-    private void showRemoteDeletionStorageError() {
-        if (getParentActivity() == null) {
-            return;
-        }
-        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-        builder.setTitle(getString(R.string.ForceEndToEndStrongBoxTitle));
-        builder.setMessage(getString(R.string.MessageFilterStorageError));
-        builder.setPositiveButton(getString(R.string.OK), null);
-        showDialog(builder.create());
-    }
-
     private CharSequence messageFilterSubtitle() {
         OpengramContentFilter.Phase phase = OpengramContentFilter.phase(currentAccount);
         if (phase == OpengramContentFilter.Phase.ERROR) {
@@ -788,7 +741,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(UItem.asShadow(null));
 
         items.add(SettingCell.Factory.ofCheck(27, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.msg_download, getString(R.string.DownloadSpeedScaling), SharedConfig.premiumDownloadLimits).setIconScale(0.83f));
-        items.add(SettingCell.Factory.ofCheck(30, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.msg_delete, getString(R.string.RemoteDeletion), getUserConfig().remoteDeletion).setIconScale(0.7f));
+        items.add(SettingCell.Factory.of(30, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.msg_delete, getString(R.string.RemoteDeletionOptions)).setIconScale(0.7f));
         items.add(SettingCell.Factory.of(26, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_secret, getString(R.string.ForceEndToEndEncryption)).setIconScale(0.7f));
         items.add(SettingCell.Factory.of(28, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.msg_block, getString(R.string.MessageFilter), messageFilterSubtitle()).setIconScale(0.7f));
         items.add(UItem.asShadow(null));
@@ -1003,44 +956,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 break;
             }
             case 30: {
-                if (getUserConfig().remoteDeletion) {
-                    confirmDisableRemoteDeletion();
-                    break;
-                }
-                if (getParentActivity() == null) {
-                    listView.adapter.update(true);
-                    break;
-                }
-                long clientUserId = getUserConfig().getClientUserId();
-                if (clientUserId <= 0) {
-                    showRemoteDeletionStorageError();
-                    listView.adapter.update(true);
-                    break;
-                }
-                OpengramStrongBox.Probe probe = OpengramStrongBox.forDeletions(clientUserId).probeKey();
-                if (probe == OpengramStrongBox.Probe.ERROR) {
-                    showRemoteDeletionStorageError();
-                    listView.adapter.update(true);
-                    break;
-                }
-                if (probe == OpengramStrongBox.Probe.AVAILABLE) {
-                    if (!OpengramRemoteDeletion.enable(currentAccount, OpengramSnapshotFile.MODE_STRONGBOX)) {
-                        showRemoteDeletionStorageError();
-                    }
-                    listView.adapter.update(true);
-                } else {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-                    builder.setTitle(getString(R.string.ForceEndToEndStrongBoxTitle));
-                    builder.setMessage(getString(R.string.RemoteDeletionStrongBoxWarning));
-                    builder.setPositiveButton(getString(R.string.OK), (dialogInterface, i) -> {
-                        if (!OpengramRemoteDeletion.enable(currentAccount, OpengramSnapshotFile.MODE_PLAINTEXT)) {
-                            showRemoteDeletionStorageError();
-                        }
-                        listView.adapter.update(true);
-                    });
-                    builder.setNegativeButton(getString(R.string.Cancel), (dialogInterface, i) -> listView.adapter.update(true));
-                    showDialog(builder.create());
-                }
+                presentFragment(new OpengramRemoteDeletionActivity());
                 break;
             }
             case 27: {

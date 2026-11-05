@@ -3329,7 +3329,13 @@
     <string name="ViewAsGhost">View as a ghost</string>
     <string name="GhostModeAlert">Ghost mode cannot cover sending messages, subscribing to channels, posting stories, and other interactions that involve servers.</string>
     <string name="MessageFilter">Opengram Content Filter</string>
+    <string name="RemoteDeletionOptions">Remote content deletion options</string>
     <string name="RemoteDeletion">Disable remote deletion</string>
+    <string name="RemoteDeletionInfo">While this is on, a deletion request from Telegram leaves the message on this device and marks it with a trash icon.</string>
+    <string name="RemoteDeletionExport">Export deleted messages</string>
+    <string name="RemoteDeletionExportInfo">Saves the messages kept after a remote deletion into a zip file. Each chat is a folder named by its id. Each message is a file named by its id: text is JSON, and media keeps its original extension.</string>
+    <string name="RemoteDeletionExportEmpty">There are no kept messages to export.</string>
+    <string name="RemoteDeletionExportFailed">The export could not be saved.</string>
     <string name="RemoteDeletionDisableDelete">You can choose to keep or delete the messages which were marked for deletion by telegram. If you keep them, they will be displayed as normal messages, without the trashcan marker.</string>
     <string name="RemoteDeletionDisableKeep">Keep</string>
     <string name="RemoteDeletionStrongBoxWarning">This device has no Android StrongBox. The record of kept messages saved for this option is a potential information leak.</string>
