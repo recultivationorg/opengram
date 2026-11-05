@@ -82,6 +82,7 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.OpengramClientFingerprint;
 import org.telegram.messenger.OpengramGhostReads;
 import org.telegram.messenger.OpengramContentFilter;
 import org.telegram.messenger.SharedConfig;
@@ -1589,7 +1590,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 (SharedConfig.frameMetricsEnabled ? "hide frame metrics" : "show frame metrics"),
                 BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.shadowsInSections ? "disable shadows in settings" : "enable shadows in settings") : null,
                 BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.debugViewMetrics ? "disable debug view metrics" : "enable debug view metrics") : null,
-                (SharedSettings.experimentalSettingsAllowed.get() ? "hide experimental settings" : "show experimental settings")
+                (SharedSettings.experimentalSettingsAllowed.get() ? "hide experimental settings" : "show experimental settings"),
+                getString(R.string.DebugMenuRandomizeFingerprint)
         };
 
         builder.setItems(items, (dialog, which) -> {
@@ -1902,6 +1904,24 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             } else if (which == 42) {
                 SharedSettings.experimentalSettingsAllowed.toggle();
                 listView.adapter.update(true);
+            } else if (which == 43) {
+                confirmRandomizeFingerprint();
+            }
+        });
+        builder.setNegativeButton(getString(R.string.Cancel), null);
+        showDialog(builder.create());
+    }
+
+    private void confirmRandomizeFingerprint() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), resourceProvider);
+        builder.setTitle(getString(R.string.DebugMenuRandomizeFingerprint));
+        builder.setMessage(getString(R.string.DebugMenuRandomizeFingerprintWarning));
+        builder.setPositiveButton(getString(R.string.OK), (dialog, which) -> {
+            if (getParentActivity() != null) {
+                OpengramClientFingerprint.rerollAndRestart(getParentActivity());
             }
         });
         builder.setNegativeButton(getString(R.string.Cancel), null);

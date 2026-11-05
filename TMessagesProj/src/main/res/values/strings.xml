@@ -2631,6 +2631,8 @@
     <string name="LargeEmoji">Large Emoji</string>
     <string name="TelegramVersion">Telegram for Android %1$s</string>
     <string name="DebugMenu">Debug Menu</string>
+    <string name="DebugMenuRandomizeFingerprint">Randomize the device fingerprint</string>
+    <string name="DebugMenuRandomizeFingerprintWarning">WARNING: Randomizing a fingerprint of an existing install can lead to all sorts of suspicion from telegram servers. Use at your own risk.</string>
     <string name="DebugMenuLongPress">Long press again for debug menu</string>
     <string name="DebugSendLogs">Send Logs</string>
     <string name="DebugSendLastLogs">Send Last Logs</string>

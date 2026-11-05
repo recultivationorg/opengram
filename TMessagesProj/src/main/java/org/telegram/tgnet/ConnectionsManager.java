@@ -33,6 +33,7 @@ import org.telegram.messenger.KeepAliveJob;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.OpengramClientFingerprint;
 import org.telegram.messenger.PushListenerController;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.StatsController;
@@ -215,10 +216,21 @@ public class ConnectionsManager extends BaseController {
         }
         String configPath = config.toString();
         boolean enablePushConnection = isPushConnectionEnabled();
+        String deviceModelReported = BuildVars.REPORTED_DEVICE_MODEL;
+        int timezoneOffset = BuildVars.REPORTED_TIMEZONE_OFFSET;
+        try {
+            OpengramClientFingerprint.Identity reported = OpengramClientFingerprint.resolve(ApplicationLoader.applicationContext);
+            if (reported != null && reported.deviceModel != null && reported.deviceModel.length() > 0) {
+                deviceModelReported = reported.deviceModel;
+                timezoneOffset = reported.timezoneOffset;
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
         try {
             systemLangCode = LocaleController.getSystemLocaleStringIso639().toLowerCase();
             langCode = LocaleController.getLocaleStringIso639().toLowerCase();
-            deviceModel = BuildVars.REPORTED_DEVICE_MODEL;
+            deviceModel = deviceModelReported;
             systemVersion = BuildVars.REPORTED_SYSTEM_VERSION;
             PackageInfo pInfo = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
             if (BuildVars.useOfficialWebIdentity()) {
@@ -236,7 +248,7 @@ public class ConnectionsManager extends BaseController {
         } catch (Exception e) {
             systemLangCode = "en";
             langCode = "";
-            deviceModel = BuildVars.REPORTED_DEVICE_MODEL;
+            deviceModel = deviceModelReported;
             appVersion = "App version unknown";
             systemVersion = BuildVars.REPORTED_SYSTEM_VERSION;
         }
@@ -256,7 +268,6 @@ public class ConnectionsManager extends BaseController {
         String pushString = getRegId();
         String fingerprint = BuildVars.useOfficialWebIdentity() ? BuildVars.OFFICIAL_WEB_CERT_SHA256 : BuildVars.useForkgramIdentity() ? BuildVars.FORKGRAM_CERT_SHA256 : AndroidUtilities.getCertificateSHA256Fingerprint();
 
-        int timezoneOffset = BuildVars.REPORTED_TIMEZONE_OFFSET;
         SharedPreferences mainPreferences;
         if (currentAccount == 0) {
             mainPreferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
@@ -264,15 +275,15 @@ public class ConnectionsManager extends BaseController {
             mainPreferences = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig" + currentAccount, Activity.MODE_PRIVATE);
         }
         forceTryIpV6 = mainPreferences.getBoolean("forceTryIpV6", false);
-        int initRevision = initConnectionRevision(deviceModel, systemVersion, appVersion, fingerprint, pushString);
+        int initRevision = initConnectionRevision(deviceModel, systemVersion, appVersion, fingerprint, pushString, timezoneOffset);
         init(initRevision, TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, FileLog.getNetworkLogPath(), pushString, fingerprint, timezoneOffset, getUserConfig().getClientUserId(), SharedConfig.premiumDownloadLimits, enablePushConnection);
     }
 
     // tgnet resends initConnection only when this value differs from the one stored in tgnet.dat.
     // It is never sent to Telegram.
-    private static int initConnectionRevision(String deviceModel, String systemVersion, String appVersion, String fingerprint, String regId) {
+    private static int initConnectionRevision(String deviceModel, String systemVersion, String appVersion, String fingerprint, String regId, int timezoneOffset) {
         int revision = Objects.hash(SharedConfig.buildVersion(), TLRPC.LAYER, BuildVars.APP_ID, deviceModel, systemVersion, appVersion, fingerprint, regId,
-                reportedPackageId(), BuildVars.REPORTED_INSTALLER, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_TIMEZONE_OFFSET, SharedConfig.PERFORMANCE_CLASS_HIGH);
+                reportedPackageId(), BuildVars.REPORTED_INSTALLER, BuildVars.REPORTED_LANG_CODE, timezoneOffset, SharedConfig.PERFORMANCE_CLASS_HIGH);
         return revision == 0 ? 1 : revision;
     }
 
@@ -720,7 +731,7 @@ public class ConnectionsManager extends BaseController {
                         proxySettings.getUser(), proxySettings.getPassword(), proxySettings.getSecret());
             }
         }
-        native_init(currentAccount, version, layer, apiId, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, logPath, regId, cFingerprint, BuildVars.REPORTED_INSTALLER, reportedPackageId(), BuildVars.REPORTED_TIMEZONE_OFFSET, userId, userPremium, enablePushConnection, ApplicationLoader.isNetworkOnline(), ApplicationLoader.getCurrentNetworkType(), SharedConfig.PERFORMANCE_CLASS_HIGH);
+        native_init(currentAccount, version, layer, apiId, deviceModel, systemVersion, appVersion, BuildVars.REPORTED_LANG_CODE, BuildVars.REPORTED_LANG_CODE, configPath, logPath, regId, cFingerprint, BuildVars.REPORTED_INSTALLER, reportedPackageId(), timezoneOffset, userId, userPremium, enablePushConnection, ApplicationLoader.isNetworkOnline(), ApplicationLoader.getCurrentNetworkType(), SharedConfig.PERFORMANCE_CLASS_HIGH);
         checkConnection();
     }
 

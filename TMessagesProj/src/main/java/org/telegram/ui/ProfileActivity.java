@@ -136,6 +136,7 @@ import org.telegram.messenger.AuthTokensHelper;
 import org.telegram.messenger.BillingController;
 import org.telegram.messenger.BirthdayController;
 import org.telegram.messenger.BuildVars;
+import org.telegram.messenger.OpengramClientFingerprint;
 import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ChatThemeController;
 import org.telegram.messenger.ContactsController;
@@ -4721,7 +4722,8 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 "Reload app config",
                                 !SharedConfig.forceForumTabs ? "Force Forum Tabs" : "Do Not Force Forum Tabs",
                             "Make Memory Dump",
-                                BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.fastWallpaperDisabled ? "enable wallpaper shader" : "disable wallpaper shader") : null
+                                BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.fastWallpaperDisabled ? "enable wallpaper shader" : "disable wallpaper shader") : null,
+                                getString(R.string.DebugMenuRandomizeFingerprint)
                         };
 
                         builder.setItems(items, (dialog, which) -> {
@@ -5018,6 +5020,20 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                                 FileLog.getInstance().dumpMemory(true);
                             } else if (which == 38) {
                                 SharedConfig.toggleFastWallpaperDisabled();
+                            } else if (which == 39) {
+                                if (getParentActivity() == null) {
+                                    return;
+                                }
+                                AlertDialog.Builder warning = new AlertDialog.Builder(getParentActivity(), resourcesProvider);
+                                warning.setTitle(getString(R.string.DebugMenuRandomizeFingerprint));
+                                warning.setMessage(getString(R.string.DebugMenuRandomizeFingerprintWarning));
+                                warning.setPositiveButton(getString(R.string.OK), (d, w) -> {
+                                    if (getParentActivity() != null) {
+                                        OpengramClientFingerprint.rerollAndRestart(getParentActivity());
+                                    }
+                                });
+                                warning.setNegativeButton(getString(R.string.Cancel), null);
+                                showDialog(warning.create());
                             }
                         });
                         builder.setNegativeButton(getString("Cancel", R.string.Cancel), null);
