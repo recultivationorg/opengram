@@ -2463,6 +2463,12 @@ public class Theme {
     public static Drawable chat_msgOutPinnedSelectedDrawable;
     public static Drawable chat_msgStickerPinnedDrawable;
     public static Drawable chat_msgMediaPinnedDrawable;
+    public static Drawable chat_msgInRemoteDeletionDrawable;
+    public static Drawable chat_msgInRemoteDeletionSelectedDrawable;
+    public static Drawable chat_msgOutRemoteDeletionDrawable;
+    public static Drawable chat_msgOutRemoteDeletionSelectedDrawable;
+    public static Drawable chat_msgMediaRemoteDeletionDrawable;
+    public static Drawable chat_msgStickerRemoteDeletionDrawable;
     public static Drawable chat_msgMediaViewsDrawable;
     public static Drawable chat_msgMediaRepliesDrawable;
     public static Drawable chat_msgInMenuDrawable;
@@ -3459,6 +3465,8 @@ public class Theme {
     public static final String key_drawable_msgOutMenuSelected = "drawableMsgOutMenuSelected";
     public static final String key_drawable_msgOutPinned = "drawableMsgOutPinned";
     public static final String key_drawable_msgOutPinnedSelected = "drawableMsgOutPinnedSelected";
+    public static final String key_drawable_msgOutRemoteDeletion = "drawableMsgOutRemoteDeletion";
+    public static final String key_drawable_msgOutRemoteDeletionSelected = "drawableMsgOutRemoteDeletionSelected";
     public static final String key_drawable_msgOutReplies = "drawableMsgOutReplies";
     public static final String key_drawable_msgOutRepliesSelected = "drawableMsgOutReplies";
     public static final String key_drawable_msgOutViews = "drawableMsgOutViews";
@@ -3467,6 +3475,7 @@ public class Theme {
     public static final String key_drawable_msgStickerClock = "drawableMsgStickerClock";
     public static final String key_drawable_msgStickerHalfCheck = "drawableMsgStickerHalfCheck";
     public static final String key_drawable_msgStickerPinned = "drawableMsgStickerPinned";
+    public static final String key_drawable_msgStickerRemoteDeletion = "drawableMsgStickerRemoteDeletion";
     public static final String key_drawable_msgStickerReplies = "drawableMsgStickerReplies";
     public static final String key_drawable_msgStickerViews = "drawableMsgStickerViews";
     public static final String key_drawable_replyIcon = "drawableReplyIcon";
@@ -8214,6 +8223,12 @@ public class Theme {
             chat_msgOutPinnedSelectedDrawable = resources.getDrawable(R.drawable.msg_pin_mini).mutate();
             chat_msgMediaPinnedDrawable = resources.getDrawable(R.drawable.msg_pin_mini).mutate();
             chat_msgStickerPinnedDrawable = resources.getDrawable(R.drawable.msg_pin_mini).mutate();
+            chat_msgInRemoteDeletionDrawable = resources.getDrawable(R.drawable.msg_trash_mini).mutate();
+            chat_msgInRemoteDeletionSelectedDrawable = resources.getDrawable(R.drawable.msg_trash_mini).mutate();
+            chat_msgOutRemoteDeletionDrawable = resources.getDrawable(R.drawable.msg_trash_mini).mutate();
+            chat_msgOutRemoteDeletionSelectedDrawable = resources.getDrawable(R.drawable.msg_trash_mini).mutate();
+            chat_msgMediaRemoteDeletionDrawable = resources.getDrawable(R.drawable.msg_trash_mini).mutate();
+            chat_msgStickerRemoteDeletionDrawable = resources.getDrawable(R.drawable.msg_trash_mini).mutate();
             chat_msgMediaViewsDrawable = resources.getDrawable(R.drawable.msg_views).mutate();
             chat_msgMediaRepliesDrawable = resources.getDrawable(R.drawable.msg_reply_small).mutate();
             chat_msgStickerViewsDrawable = resources.getDrawable(R.drawable.msg_views).mutate();
@@ -8360,6 +8375,8 @@ public class Theme {
             addChatDrawable(key_drawable_msgOutMenuSelected, chat_msgOutMenuSelectedDrawable, key_chat_outMenuSelected);
             addChatDrawable(key_drawable_msgOutPinned, chat_msgOutPinnedDrawable, key_chat_outViews);
             addChatDrawable(key_drawable_msgOutPinnedSelected, chat_msgOutPinnedSelectedDrawable, key_chat_outViewsSelected);
+            addChatDrawable(key_drawable_msgOutRemoteDeletion, chat_msgOutRemoteDeletionDrawable, key_chat_outViews);
+            addChatDrawable(key_drawable_msgOutRemoteDeletionSelected, chat_msgOutRemoteDeletionSelectedDrawable, key_chat_outViewsSelected);
             addChatDrawable(key_drawable_msgOutReplies, chat_msgOutRepliesDrawable, key_chat_outViews);
             addChatDrawable(key_drawable_msgOutRepliesSelected, chat_msgOutRepliesSelectedDrawable, key_chat_outViewsSelected);
             addChatDrawable(key_drawable_msgOutViews, chat_msgOutViewsDrawable, key_chat_outViews);
@@ -8367,6 +8384,7 @@ public class Theme {
             addChatDrawable(key_drawable_msgStickerCheck, chat_msgStickerCheckDrawable, key_chat_serviceText);
             addChatDrawable(key_drawable_msgStickerHalfCheck, chat_msgStickerHalfCheckDrawable, key_chat_serviceText);
             addChatDrawable(key_drawable_msgStickerPinned, chat_msgStickerPinnedDrawable, key_chat_serviceText);
+            addChatDrawable(key_drawable_msgStickerRemoteDeletion, chat_msgStickerRemoteDeletionDrawable, key_chat_serviceText);
             addChatDrawable(key_drawable_msgStickerReplies, chat_msgStickerRepliesDrawable, key_chat_serviceText);
             addChatDrawable(key_drawable_msgStickerViews, chat_msgStickerViewsDrawable, key_chat_serviceText);
             addChatDrawable(key_drawable_replyIcon, chat_replyIconDrawable, key_chat_serviceIcon);
@@ -8488,6 +8506,12 @@ public class Theme {
             setDrawableColorByKey(chat_msgOutPinnedSelectedDrawable, key_chat_outViewsSelected);
             setDrawableColorByKey(chat_msgMediaPinnedDrawable, key_chat_mediaViews);
             setDrawableColorByKey(chat_msgStickerPinnedDrawable, key_chat_serviceText);
+            setDrawableColorByKey(chat_msgInRemoteDeletionDrawable, key_chat_inViews);
+            setDrawableColorByKey(chat_msgInRemoteDeletionSelectedDrawable, key_chat_inViewsSelected);
+            setDrawableColorByKey(chat_msgOutRemoteDeletionDrawable, key_chat_outViews);
+            setDrawableColorByKey(chat_msgOutRemoteDeletionSelectedDrawable, key_chat_outViewsSelected);
+            setDrawableColorByKey(chat_msgMediaRemoteDeletionDrawable, key_chat_mediaViews);
+            setDrawableColorByKey(chat_msgStickerRemoteDeletionDrawable, key_chat_serviceText);
             setDrawableColorByKey(chat_msgMediaViewsDrawable, key_chat_mediaViews);
             setDrawableColorByKey(chat_msgMediaRepliesDrawable, key_chat_mediaViews);
             setDrawableColorByKey(chat_msgInMenuDrawable, key_chat_inMenu);

@@ -2240,6 +2240,7 @@ public class MessagesStorage extends BaseController {
             getUserConfig().clearFilters();
             getUserConfig().clearPinnedDialogsLoaded();
 
+            OpengramRemoteDeletion.wipe(currentAccount);
             getNotificationCenter().postNotificationName(NotificationCenter.didClearDatabase);
             getMediaDataController().loadAttachMenuBots(false, true);
             getNotificationCenter().postNotificationName(NotificationCenter.onDatabaseReset);
@@ -2254,6 +2255,7 @@ public class MessagesStorage extends BaseController {
             clearLoadingDialogsOffsets();
             openDatabase(1);
             AndroidUtilities.runOnUIThread(() -> {
+                OpengramRemoteDeletion.wipe(currentAccount);
                 getNotificationCenter().postNotificationName(NotificationCenter.onDatabaseReset);
                 getNotificationCenter().postNotificationName(NotificationCenter.didClearDatabase);
                 getMessagesController().getSavedMessagesController().cleanup();
@@ -14629,6 +14631,55 @@ public class MessagesStorage extends BaseController {
         }
     }
 
+    public LongSparseArray<ArrayList<Integer>> loadMessageDialogs(ArrayList<Integer> messages) {
+        LongSparseArray<ArrayList<Integer>> result = new LongSparseArray<>();
+        if (messages == null || messages.isEmpty()) {
+            return result;
+        }
+        SQLiteCursor cursor = null;
+        try {
+            cursor = database.queryFinalized(String.format(Locale.US, "SELECT uid, mid FROM messages_v2 WHERE mid IN(%s) AND is_channel = 0", TextUtils.join(",", messages)));
+            while (cursor.next()) {
+                long dialogId = cursor.longValue(0);
+                ArrayList<Integer> ids = result.get(dialogId);
+                if (ids == null) {
+                    ids = new ArrayList<>();
+                    result.put(dialogId, ids);
+                }
+                ids.add(cursor.intValue(1));
+            }
+        } catch (Exception e) {
+            checkSQLException(e);
+        } finally {
+            if (cursor != null) {
+                cursor.dispose();
+            }
+        }
+        return result;
+    }
+
+    public ArrayList<Integer> loadMessageIds(long dialogId) {
+        return loadMessageIdsUpTo(dialogId, Integer.MAX_VALUE);
+    }
+
+    public ArrayList<Integer> loadMessageIdsUpTo(long dialogId, int maxId) {
+        ArrayList<Integer> result = new ArrayList<>();
+        SQLiteCursor cursor = null;
+        try {
+            cursor = database.queryFinalized(String.format(Locale.US, "SELECT mid FROM messages_v2 WHERE uid = %d AND mid <= %d AND mid != 0", dialogId, maxId));
+            while (cursor.next()) {
+                result.add(cursor.intValue(0));
+            }
+        } catch (Exception e) {
+            checkSQLException(e);
+        } finally {
+            if (cursor != null) {
+                cursor.dispose();
+            }
+        }
+        return result;
+    }
+
     public void markMessagesAsDeletedByRandoms(ArrayList<Long> messages) {
         if (messages.isEmpty()) {
             return;
@@ -14637,6 +14688,22 @@ public class MessagesStorage extends BaseController {
             SQLiteCursor cursor = null;
             try {
                 String ids = TextUtils.join(",", messages);
+                if (OpengramRemoteDeletion.keeps(currentAccount)) {
+                    cursor = database.queryFinalized(String.format(Locale.US, "SELECT random_id, mid, uid FROM randoms_v2 WHERE random_id IN(%s)", ids));
+                    ArrayList<String> randomRecords = new ArrayList<>();
+                    ArrayList<String> messageRecords = new ArrayList<>();
+                    while (cursor.next()) {
+                        long randomId = cursor.longValue(0);
+                        int messageId = cursor.intValue(1);
+                        long dialogId = cursor.longValue(2);
+                        randomRecords.add(OpengramRemoteDeletion.randomRecord(dialogId, randomId));
+                        messageRecords.add(OpengramRemoteDeletion.messageRecord(dialogId, messageId));
+                    }
+                    cursor.dispose();
+                    cursor = null;
+                    OpengramRemoteDeletion.promote(currentAccount, randomRecords, messageRecords);
+                    return;
+                }
                 cursor = database.queryFinalized(String.format(Locale.US, "SELECT mid, uid FROM randoms_v2 WHERE random_id IN(%s)", ids));
                 LongSparseArray<ArrayList<Integer>> dialogs = new LongSparseArray<>();
                 while (cursor.next()) {

@@ -115,6 +115,12 @@ public class SecretChatHelper extends BaseController {
 
     protected void processPendingEncMessages() {
         if (!pendingEncMessagesToDelete.isEmpty()) {
+            if (OpengramRemoteDeletion.keeps(currentAccount)) {
+                ArrayList<Long> kept = new ArrayList<>(pendingEncMessagesToDelete);
+                getMessagesStorage().markMessagesAsDeletedByRandoms(kept);
+                pendingEncMessagesToDelete.clear();
+                return;
+            }
             ArrayList<Long> pendingEncMessagesToDeleteCopy = new ArrayList<>(pendingEncMessagesToDelete);
             AndroidUtilities.runOnUIThread(() -> {
                 for (int a = 0; a < pendingEncMessagesToDeleteCopy.size(); a++) {
@@ -1141,6 +1147,10 @@ public class SecretChatHelper extends BaseController {
                     return newMessage;
                 } else if (serviceMessage.action instanceof TLRPC.TL_decryptedMessageActionFlushHistory) {
                     long did = DialogObject.makeEncryptedDialogId(chat.id);
+                    if (OpengramRemoteDeletion.keeps(currentAccount)) {
+                        getMessagesStorage().getStorageQueue().postRunnable(() -> OpengramRemoteDeletion.markMessages(currentAccount, did, getMessagesStorage().loadMessageIds(did)));
+                        return null;
+                    }
                     AndroidUtilities.runOnUIThread(() -> {
                         TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(did);
                         if (dialog != null) {
@@ -1160,6 +1170,9 @@ public class SecretChatHelper extends BaseController {
                     return null;
                 } else if (serviceMessage.action instanceof TLRPC.TL_decryptedMessageActionDeleteMessages) {
                     if (!serviceMessage.action.random_ids.isEmpty()) {
+                        if (OpengramRemoteDeletion.keeps(currentAccount)) {
+                            OpengramRemoteDeletion.markRandoms(currentAccount, DialogObject.makeEncryptedDialogId(chat.id), serviceMessage.action.random_ids);
+                        }
                         pendingEncMessagesToDelete.addAll(serviceMessage.action.random_ids);
                     }
                     return null;

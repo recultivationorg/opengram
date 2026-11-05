@@ -2964,6 +2964,7 @@ public class ChatActivity extends BaseFragment implements
             .add(NotificationCenter.premiumFloodWaitReceived)
             .add(NotificationCenter.messagesDidLoad)
             .add(NotificationCenter.messageFilterChanged)
+            .add(NotificationCenter.remoteDeletionMarked)
             .add(NotificationCenter.loadingMessagesFailed)
             .add(NotificationCenter.didUpdateConnectionState)
             .add(NotificationCenter.updateInterfaces)
@@ -20762,6 +20763,19 @@ public class ChatActivity extends BaseFragment implements
     public void didReceivedNotification(int id, int account, final Object... args) {
         if (id == NotificationCenter.messageFilterChanged) {
             reloadHistoryForFilter();
+            return;
+        }
+        if (id == NotificationCenter.remoteDeletionMarked) {
+            if (chatListView != null) {
+                int count = chatListView.getChildCount();
+                for (int i = 0; i < count; i++) {
+                    View child = chatListView.getChildAt(i);
+                    if (child instanceof ChatMessageCell) {
+                        child.requestLayout();
+                    }
+                }
+                chatListView.invalidateViews();
+            }
             return;
         }
         if (id == NotificationCenter.messagesDidLoad) {

@@ -56,6 +56,8 @@ public class UserConfig extends BaseController {
     public boolean ghostMode;
     public boolean messageFilter;
     public int messageFilterMode;
+    public boolean remoteDeletion;
+    public int remoteDeletionMode;
 
     public int sharingMyLocationUntil;
     public int lastMyLocationShareTime;
@@ -176,6 +178,8 @@ public class UserConfig extends BaseController {
                     editor.putBoolean("ghostMode", ghostMode);
                     editor.putBoolean("messageFilter", messageFilter);
                     editor.putInt("messageFilterMode", messageFilterMode);
+                    editor.putBoolean("remoteDeletion", remoteDeletion);
+                    editor.putInt("remoteDeletionMode", remoteDeletionMode);
                     editor.putString("premiumGiftsStickerPack", premiumGiftsStickerPack);
                     editor.putLong("lastUpdatedPremiumGiftsStickerPack", lastUpdatedPremiumGiftsStickerPack);
 
@@ -348,6 +352,8 @@ public class UserConfig extends BaseController {
             }
             messageFilter = preferences.getBoolean("messageFilter", false);
             messageFilterMode = preferences.getInt("messageFilterMode", 0);
+            remoteDeletion = preferences.getBoolean("remoteDeletion", false);
+            remoteDeletionMode = preferences.getInt("remoteDeletionMode", 0);
             premiumGiftsStickerPack = preferences.getString("premiumGiftsStickerPack", null);
             lastUpdatedPremiumGiftsStickerPack = preferences.getLong("lastUpdatedPremiumGiftsStickerPack", 0);
 

@@ -126,6 +126,7 @@ import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.OpengramRemoteDeletion;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.RichMessageLayout;
@@ -1536,6 +1537,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     public boolean isThreadChat;
     public boolean hasDiscussion;
     public boolean isPinned;
+    private boolean remoteDeletionMarked;
     private boolean wasPinned;
     public boolean isReportChat;
     public long linkedChatId;
@@ -18416,6 +18418,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     private void measureTime(MessageObject messageObject) {
+        remoteDeletionMarked = keptRemoteDeletion(messageObject);
         CharSequence signString;
         MessageObject primaryMessageObject = getPrimaryMessageObject();
         long fromId = messageObject.getFromChatId();
@@ -18580,6 +18583,9 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
         if (isPinned) {
             timeWidth += Theme.chat_msgInPinnedDrawable.getIntrinsicWidth() + dp(3);
+        }
+        if (remoteDeletionMarked && Theme.chat_msgInRemoteDeletionDrawable != null) {
+            timeWidth += Theme.chat_msgInRemoteDeletionDrawable.getIntrinsicWidth() + dp(3);
         }
         if (messageObject.scheduled) {
             if (messageObject.isSendError()) {
@@ -23966,6 +23972,48 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
     }
 
+    private boolean keptRemoteDeletion(MessageObject messageObject) {
+        if (OpengramRemoteDeletion.isMarked(currentAccount, messageObject)) {
+            return true;
+        }
+        if (currentMessagesGroup != null) {
+            ArrayList<MessageObject> grouped = currentMessagesGroup.messages;
+            for (int i = 0; i < grouped.size(); i++) {
+                if (OpengramRemoteDeletion.isMarked(currentAccount, grouped.get(i))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void drawRemoteDeletionIcon(Canvas canvas, float textX, float textY, float alpha, boolean drawSelectionBackground) {
+        if (!remoteDeletionMarked) {
+            return;
+        }
+        Drawable drawable;
+        if (shouldDrawTimeOnMedia()) {
+            if (currentMessageObject.shouldDrawWithoutBackground()) {
+                drawable = getThemedDrawable(Theme.key_drawable_msgStickerRemoteDeletion);
+            } else {
+                drawable = Theme.chat_msgMediaRemoteDeletionDrawable;
+            }
+        } else if (!currentMessageObject.isOutOwner()) {
+            drawable = drawSelectionBackground ? Theme.chat_msgInRemoteDeletionSelectedDrawable : Theme.chat_msgInRemoteDeletionDrawable;
+        } else {
+            drawable = getThemedDrawable(drawSelectionBackground ? Theme.key_drawable_msgOutRemoteDeletionSelected : Theme.key_drawable_msgOutRemoteDeletion);
+        }
+        if (drawable == null) {
+            return;
+        }
+        float size = Theme.chat_timePaint.getTextSize() + dp(1);
+        float width = drawable.getIntrinsicWidth() * size / Math.max(1, drawable.getIntrinsicHeight());
+        drawable.setAlpha((int) (255 * alpha));
+        setDrawableBounds(drawable, textX - width - dp(2), textY, size);
+        drawable.draw(canvas);
+        drawable.setAlpha(255);
+    }
+
     private void drawTimeInternal(Canvas canvas, float alpha, boolean fromParent, float timeX, StaticLayout timeLayout, float timeWidth, boolean drawSelectionBackground) {
         if ((!drawTime || groupPhotoInvisible) && shouldDrawTimeOnMedia() || timeLayout == null || (currentMessageObject.deleted && currentPosition != null) || currentMessageObject.type == MessageObject.TYPE_PHONE_CALL) {
             return;
@@ -24173,9 +24221,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 if (drawClock && fromParent && getParent() != null) {
                     ((View) getParent()).invalidate();
                 }
+            } else if (remoteDeletionMarked && Theme.chat_msgInRemoteDeletionDrawable != null) {
+                additionalX += Theme.chat_msgInRemoteDeletionDrawable.getIntrinsicWidth() + dp(3);
             }
 
             canvas.save();
+            drawRemoteDeletionIcon(canvas, timeTitleTimeX + additionalX, timeY - dp(7.3f) - timeLayout.getHeight(), alpha, drawSelectionBackground);
             canvas.translate(drawTimeX = timeTitleTimeX + additionalX, drawTimeY = timeY - dp(7.3f) - timeLayout.getHeight());
             SpoilerEffect.layoutDrawMaybe(timeLayout, canvas);
             canvas.restore();
@@ -24243,9 +24294,12 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 if (drawClock && fromParent && getParent() != null) {
                     ((View) getParent()).invalidate();
                 }
+            } else if (remoteDeletionMarked && Theme.chat_msgInRemoteDeletionDrawable != null) {
+                additionalX += Theme.chat_msgInRemoteDeletionDrawable.getIntrinsicWidth() + dp(3);
             }
 
             canvas.save();
+            drawRemoteDeletionIcon(canvas, timeTitleTimeX + additionalX, layoutHeight - dp(pinnedBottom || pinnedTop ? 7.5f : 6.5f) - timeLayout.getHeight() + timeYOffset, alpha, drawSelectionBackground);
             if (transitionParams.animateEditedEnter && transitionParams.animateChangeProgress != 1f) {
                 if (transitionParams.animateEditedLayout != null) {
                     canvas.translate(timeTitleTimeX + additionalX, layoutHeight - dp(pinnedBottom || pinnedTop ? 7.5f : 6.5f) - timeLayout.getHeight() + timeYOffset);

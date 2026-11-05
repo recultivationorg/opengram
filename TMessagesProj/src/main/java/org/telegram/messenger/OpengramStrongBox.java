@@ -30,6 +30,7 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
     private static final String E2E_ALIAS = "opengram_force_e2e_chats";
     private static final String GHOST_ALIAS_PREFIX = "opengram_ghost_";
     private static final String FILTER_ALIAS_PREFIX = "opengram_filter_";
+    private static final String DELETIONS_ALIAS_PREFIX = "opengram_deletions_";
     private static final int GCM_TAG_BITS = 128;
     private static final Object keystoreLock = new Object();
 
@@ -53,6 +54,13 @@ public final class OpengramStrongBox implements OpengramSnapshotFile.Sealer {
             throw new IllegalArgumentException("client user id required");
         }
         return new OpengramStrongBox(FILTER_ALIAS_PREFIX + clientUserId);
+    }
+
+    public static OpengramStrongBox forDeletions(long clientUserId) {
+        if (clientUserId <= 0) {
+            throw new IllegalArgumentException("client user id required");
+        }
+        return new OpengramStrongBox(DELETIONS_ALIAS_PREFIX + clientUserId);
     }
 
     public static Probe probe() {

@@ -3329,6 +3329,8 @@
     <string name="ViewAsGhost">View as a ghost</string>
     <string name="GhostModeAlert">Ghost mode cannot cover sending messages, subscribing to channels, posting stories, and other interactions that involve servers.</string>
     <string name="MessageFilter">Opengram Content Filter</string>
+    <string name="RemoteDeletion">Disable remote deletion</string>
+    <string name="RemoteDeletionStrongBoxWarning">This device has no Android StrongBox. The record of kept messages saved for this option is a potential information leak.</string>
     <string name="MessageFilterOff">Off</string>
     <string name="MessageFilterKeywords">Keywords</string>
     <string name="MessageFilterAddKeyword">Add a keyword</string>

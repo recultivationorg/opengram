@@ -418,7 +418,9 @@ public class PushListenerController {
                                 ids.add(Utilities.parseInt(messagesArgs[a]));
                             }
                             deletedMessages.put(-channel_id, ids);
-                            NotificationsController.getInstance(currentAccount).removeDeletedMessagesFromNotifications(deletedMessages, false);
+                            if (!OpengramRemoteDeletion.keeps(currentAccount)) {
+                                NotificationsController.getInstance(currentAccount).removeDeletedMessagesFromNotifications(deletedMessages, false);
+                            }
 
                             MessagesController.getInstance(currentAccount).deleteMessagesByPush(dialogId, ids, channel_id);
                             if (BuildVars.LOGS_ENABLED) {
