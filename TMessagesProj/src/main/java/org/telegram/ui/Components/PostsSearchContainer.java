@@ -84,8 +84,7 @@ public class PostsSearchContainer extends FrameLayout {
         listView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
-                final boolean news = TextUtils.isEmpty(lastQuery);
-                if (!(news ? newsMessages: messages).isEmpty() && (!listView.canScrollVertically(1) || isLoadingVisible())) {
+                if (!TextUtils.isEmpty(lastQuery) && !messages.isEmpty() && (!listView.canScrollVertically(1) || isLoadingVisible())) {
                     load(false);
                 }
                 if (listView.scrollingByUser && !isEmpty && fragment != null && fragment.getParentActivity() != null) {
@@ -203,7 +202,10 @@ public class PostsSearchContainer extends FrameLayout {
     private void load(final boolean pay) {
         if (loading) return;
 
-        final boolean news = TextUtils.isEmpty(lastQuery);
+        if (TextUtils.isEmpty(lastQuery)) {
+            return;
+        }
+        final boolean news = false;
         if (news && newsMessagesEndReached) {
             return;
         }
@@ -448,15 +450,8 @@ public class PostsSearchContainer extends FrameLayout {
             isEmpty = false;
             return;
         }
-        final boolean news = TextUtils.isEmpty(lastQuery);
-        if (news) {
-            if (!newsMessages.isEmpty()) {
-                items.add(UItem.asGraySection(getString(R.string.SearchPostsHeaderNews)));
-            }
-            for (MessageObject msg : newsMessages) {
-                items.add(UItem.asSearchMessage(msg));
-            }
-        } else {
+        final boolean news = false;
+        if (!news) {
             if (!messages.isEmpty()) {
                 items.add(UItem.asGraySection(getString(R.string.SearchPostsHeaderFound)));
             }

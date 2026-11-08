@@ -47,6 +47,7 @@ import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AvatarDrawable;
@@ -115,7 +116,7 @@ public class OAuthSheet {
             } else {
                 final BaseFragment fragment = LaunchActivity.getSafeLastFragment();
                 if (fragment == null) return;
-                Browser.openUrlInSystemBrowser(fragment.getContext(), r.url);
+                Browser.openUrlInSystemBrowser(fragment.getContext(), r.url, true);
             }
             return;
         } else if (result instanceof TLRPC.TL_urlAuthResultDefault) {
@@ -171,7 +172,7 @@ public class OAuthSheet {
 
         final FrameLayout accountSelectorLayout = new FrameLayout(context);
         final FrameLayout accountSelectorInnerLayout = new FrameLayout(context);
-        accountSelectorInnerLayout.setBackground(Theme.createRoundRectDrawable(dp(14), fragment.getThemedColor(Theme.key_dialogBackgroundGray)));
+        ThemeBind.fillBackground(accountSelectorInnerLayout, Theme.createRoundRectDrawable(dp(14), fragment.getThemedColor(Theme.key_dialogBackgroundGray)), ThemeBind.of(Theme.key_dialogBackgroundGray), resourcesProvider);
         final BackupImageView accountImageView = new BackupImageView(context);
         accountImageView.setRoundRadius(dp(14));
         accountImageView.getImageReceiver().setCrossfadeWithOldImage(true);
@@ -185,7 +186,7 @@ public class OAuthSheet {
         accountSelectorInnerLayout.addView(accountImageView, LayoutHelper.createFrame(28, 28, Gravity.LEFT | Gravity.FILL_VERTICAL));
         final ImageView accountSelectorIconView = new ImageView(context);
         accountSelectorIconView.setScaleType(ImageView.ScaleType.CENTER);
-        accountSelectorIconView.setColorFilter(new PorterDuffColorFilter(fragment.getThemedColor(Theme.key_dialogTextGray3), PorterDuff.Mode.SRC_IN));
+        ThemeBind.colorFilter(accountSelectorIconView, Theme.key_dialogTextGray3, resourcesProvider, PorterDuff.Mode.SRC_IN);
         accountSelectorIconView.setImageResource(R.drawable.arrows_select);
         accountSelectorInnerLayout.addView(accountSelectorIconView, LayoutHelper.createFrame(18, 18, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 4, 0));
         accountSelectorLayout.addView(accountSelectorInnerLayout, LayoutHelper.createFrame(52, 28, Gravity.CENTER));
@@ -215,7 +216,7 @@ public class OAuthSheet {
 
         final TextView titleView = TextHelper.makeTextView(context, 20, Theme.key_dialogTextBlack, true);
         titleView.setGravity(Gravity.CENTER);
-        titleView.setText(AndroidUtilities.replaceSingleLink(formatString(R.string.BotAuthTitle, domain), fragment.getThemedColor(Theme.key_featuredStickers_addButton)));
+        titleView.setText(AndroidUtilities.replaceSingleLinkKey(formatString(R.string.BotAuthTitle, domain), Theme.key_featuredStickers_addButton, fragment.getResourceProvider(), null));
         layout.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 32, 0, 32, 9.66f));
 
         final TextView subtitleView = TextHelper.makeTextView(context, 14, Theme.key_dialogTextBlack, false);
@@ -229,7 +230,7 @@ public class OAuthSheet {
             layout2.setClipToPadding(false);
             layout2.setClipChildren(false);
             layout2.setOrientation(LinearLayout.VERTICAL);
-            layout2.setBackground(Theme.createRoundRectDrawableShadowed(dp(16), fragment.getThemedColor(Theme.key_windowBackgroundWhite)));
+            ThemeBind.fillBackground(layout2, Theme.createRoundRectDrawableShadowed(dp(16), fragment.getThemedColor(Theme.key_windowBackgroundWhite)), ThemeBind.of(Theme.key_windowBackgroundWhite), resourcesProvider);
             layout.addView(layout2, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.FILL_HORIZONTAL, 9, -3, 9, -3));
 
             if (!TextUtils.isEmpty(r.platform) || !TextUtils.isEmpty(r.browser)) {
@@ -238,7 +239,7 @@ public class OAuthSheet {
 
                 ImageView imageView1 = new ImageView(context);
                 imageView1.setImageResource(R.drawable.msg2_devices);
-                imageView1.setColorFilter(new PorterDuffColorFilter(fragment.getThemedColor(Theme.key_dialogTextBlack), PorterDuff.Mode.SRC_IN));
+                ThemeBind.colorFilter(imageView1, Theme.key_dialogTextBlack, resourcesProvider, PorterDuff.Mode.SRC_IN);
                 cell1.addView(imageView1, LayoutHelper.createLinear(24, 24, Gravity.CENTER_VERTICAL | Gravity.LEFT, 17, 0, 20, 0));
 
                 LinearLayout textLayout = new LinearLayout(context);
@@ -261,7 +262,7 @@ public class OAuthSheet {
 
                 ImageView imageView1 = new ImageView(context);
                 imageView1.setImageResource(R.drawable.msg2_language);
-                imageView1.setColorFilter(new PorterDuffColorFilter(fragment.getThemedColor(Theme.key_dialogTextBlack), PorterDuff.Mode.SRC_IN));
+                ThemeBind.colorFilter(imageView1, Theme.key_dialogTextBlack, resourcesProvider, PorterDuff.Mode.SRC_IN);
                 cell1.addView(imageView1, LayoutHelper.createLinear(24, 24, Gravity.CENTER_VERTICAL | Gravity.LEFT, 17, 0, 20, 0));
 
                 LinearLayout textLayout = new LinearLayout(context);
@@ -287,10 +288,10 @@ public class OAuthSheet {
         final TextCheckCell allowMessages;
         if (r.request_write_access) {
             FrameLayout frameLayout = new FrameLayout(context);
-            frameLayout.setBackground(Theme.createRoundRectDrawableShadowed(dp(16), fragment.getThemedColor(Theme.key_windowBackgroundWhite)));
+            ThemeBind.fillBackground(frameLayout, Theme.createRoundRectDrawableShadowed(dp(16), fragment.getThemedColor(Theme.key_windowBackgroundWhite)), ThemeBind.of(Theme.key_windowBackgroundWhite), resourcesProvider);
             allowMessages = new TextCheckCell(context, fragment.getResourceProvider());
             allowMessages.setTextAndCheck(getString(R.string.BotAuthAllowMessages), true, false);
-            allowMessages.setBackground(Theme.createRadSelectorDrawable(fragment.getThemedColor(Theme.key_windowBackgroundWhite), fragment.getThemedColor(Theme.key_listSelector), 16, 16));
+            ThemeBind.selectorBackground(allowMessages, Theme.createRadSelectorDrawable(fragment.getThemedColor(Theme.key_windowBackgroundWhite), fragment.getThemedColor(Theme.key_listSelector), 16, 16), ThemeBind.of(Theme.key_windowBackgroundWhite), ThemeBind.of(Theme.key_listSelector), resourcesProvider);
             allowMessages.setOnClickListener(v -> {
                 allowMessages.setChecked(!allowMessages.isChecked());
             });
@@ -309,6 +310,9 @@ public class OAuthSheet {
 
         final ButtonWithCounterView cancel = new ButtonWithCounterView(context, fragment.getResourceProvider()).setRound();//.setNeutral();
         cancel.setColor(fragment.getThemedColor(Theme.key_text_RedRegular));
+        if (cancel.getBackground() != null) {
+            ThemeBind.fillBackground(cancel, cancel.getBackground(), ThemeBind.of(Theme.key_text_RedRegular), resourcesProvider);
+        }
         cancel.setText(getString(R.string.Decline));
         buttonsLayout.addView(cancel, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 1, Gravity.FILL, 0, 0, 5, 0));
 
@@ -555,7 +559,7 @@ public class OAuthSheet {
         titleView.setTypeface(AndroidUtilities.bold());
         titleView.setGravity(Gravity.CENTER);
         titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
-        titleView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
+        ThemeBind.textColor(titleView, Theme.key_windowBackgroundWhiteBlackText, resourcesProvider);
         layout.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 25, 0, 19));
 
         final LinearLayout buttonsLayout = new LinearLayout(context);
@@ -578,7 +582,7 @@ public class OAuthSheet {
         for (int i = 0; i < match_codes.size(); ++i) {
             final String code = match_codes.get(i);
             final FrameLayout buttonLayout = new FrameLayout(context);
-            buttonLayout.setBackground(Theme.createCircleDrawable(dp(70), Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider), 0.05f)));
+            ThemeBind.fillBackground(buttonLayout, Theme.createCircleDrawable(dp(70), Theme.multAlpha(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider), 0.05f)), ThemeBind.multAlpha(Theme.key_windowBackgroundWhiteBlackText, 0.05f), resourcesProvider);
 
             Drawable thumb = Emoji.getEmojiBigDrawable(code);
             if (thumb == null) {
@@ -657,8 +661,8 @@ public class OAuthSheet {
         final TextView footerView = new TextView(context);
         footerView.setGravity(Gravity.CENTER);
         footerView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
-        footerView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourcesProvider));
-        footerView.setText(AndroidUtilities.replaceSingleLink(formatString(R.string.BotAuthLoginRequestFrom, domain), Theme.getColor(Theme.key_featuredStickers_addButton)));
+        ThemeBind.textColor(footerView, Theme.key_windowBackgroundWhiteGrayText, resourcesProvider);
+        footerView.setText(AndroidUtilities.replaceSingleLinkKey(formatString(R.string.BotAuthLoginRequestFrom, domain), Theme.key_featuredStickers_addButton, null, null));
         layout.addView(footerView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 0, 23, 0, 11));
 
         final ButtonWithCounterView button = new ButtonWithCounterView(context, resourcesProvider).setRound();
@@ -667,6 +671,9 @@ public class OAuthSheet {
             button.setText(getString(R.string.Cancel));
         } else {
             button.setColor(Theme.getColor(Theme.key_text_RedRegular, resourcesProvider));
+            if (button.getBackground() != null) {
+                ThemeBind.fillBackground(button, button.getBackground(), ThemeBind.of(Theme.key_text_RedRegular), resourcesProvider);
+            }
             button.setText(getString(R.string.Decline));
         }
         layout.addView(button, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, Gravity.FILL_HORIZONTAL, 12, 12, 12, 12));

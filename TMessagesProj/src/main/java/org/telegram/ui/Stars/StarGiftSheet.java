@@ -22,6 +22,7 @@ import static org.telegram.ui.Stars.StarsIntroActivity.replaceStarsWithPlain;
 import static org.telegram.ui.Stars.StarsIntroActivity.setGiftImage;
 import static org.telegram.ui.bots.AffiliateProgramFragment.percents;
 
+import org.telegram.messenger.FileLog;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.LayoutTransition;
@@ -119,6 +120,7 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeBind;
 import org.telegram.ui.ActionBar.theme.ThemeKey;
 import org.telegram.ui.Cells.SessionCell;
 import org.telegram.ui.Cells.ShareDialogCell;
@@ -415,14 +417,14 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         });
         updateViewPager();
         bottomView = new View(context);
-        bottomView.setBackgroundColor(getThemedColor(Theme.key_dialogBackground));
+        ThemeBind.backgroundColor(bottomView, Theme.key_dialogBackground, resourcesProvider);
         final FrameLayout.LayoutParams bottomViewLayoutParams = LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 50, Gravity.BOTTOM);
         // only under the sheet: in landscape it is narrower than the screen
         bottomViewLayoutParams.leftMargin = bottomViewLayoutParams.rightMargin = backgroundPaddingLeft;
         containerView.addView(bottomView, bottomViewLayoutParams);
         containerView.addView(viewPager, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
-        fixNavigationBar(getThemedColor(Theme.key_dialogBackground));
+        fixNavigationBarKey(Theme.key_dialogBackground);
 
         AndroidUtilities.removeFromParent(recyclerListView);
         container.addView(recyclerListView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
@@ -439,11 +441,11 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         container.addView(infoLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
 
         beforeTableTextView = new LinkSpanDrawable.LinksTextView(context, resourcesProvider);
-        beforeTableTextView.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
+        ThemeBind.textColor(beforeTableTextView, Theme.key_dialogTextGray2, resourcesProvider);
         beforeTableTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
         beforeTableTextView.setGravity(Gravity.CENTER);
         beforeTableTextView.setLineSpacing(dp(2), 1f);
-        beforeTableTextView.setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider));
+        ThemeBind.linkTextColor(beforeTableTextView, Theme.key_chat_messageLinkIn, resourcesProvider);
         beforeTableTextView.setDisablePaddingsOffsetY(true);
         infoLayout.addView(beforeTableTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 4, -2, 4, 16));
         beforeTableTextView.setVisibility(View.GONE);
@@ -453,11 +455,11 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         infoLayout.addView(tableView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 12));
 
         afterTableTextView = new LinkSpanDrawable.LinksTextView(context, resourcesProvider);
-        afterTableTextView.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
+        ThemeBind.textColor(afterTableTextView, Theme.key_dialogTextGray2, resourcesProvider);
         afterTableTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
         afterTableTextView.setGravity(Gravity.CENTER);
         afterTableTextView.setLineSpacing(dp(2), 1f);
-        afterTableTextView.setLinkTextColor(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider));
+        ThemeBind.linkTextColor(afterTableTextView, Theme.key_featuredStickers_addButton, resourcesProvider);
         afterTableTextView.setDisablePaddingsOffsetY(true);
         afterTableTextView.setPadding(dp(5), 0, dp(5), 0);
         infoLayout.addView(afterTableTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 4, 2, 4, 8));
@@ -488,13 +490,13 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         upgradeLayout.addView(upgradeFeatureCells[2], LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         checkboxSeparator = new View(context);
-        checkboxSeparator.setBackgroundColor(Theme.getColor(Theme.key_divider, resourcesProvider));
+        ThemeBind.backgroundColor(checkboxSeparator, Theme.key_divider, resourcesProvider);
         upgradeLayout.addView(checkboxSeparator, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 1.0f / AndroidUtilities.density, Gravity.FILL_HORIZONTAL, 17, -4, 17, 6));
 
         checkboxLayout = new LinearLayout(context);
         checkboxLayout.setPadding(dp(12), dp(8), dp(12), dp(8));
         checkboxLayout.setOrientation(LinearLayout.HORIZONTAL);
-        checkboxLayout.setBackground(Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), 6, 6));
+        ThemeBind.selectorBackground(checkboxLayout, Theme.createRadSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), 6, 6), null, ThemeBind.of(Theme.key_listSelector), resourcesProvider);
         checkbox = new CheckBox2(context, 24, resourcesProvider);
         checkbox.setColor(Theme.key_radioBackgroundChecked, Theme.key_checkboxDisabled, Theme.key_checkboxCheck);
         checkbox.setDrawUnchecked(true);
@@ -502,7 +504,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         checkbox.setDrawBackgroundAsArc(10);
         checkboxLayout.addView(checkbox, LayoutHelper.createLinear(26, 26, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
         checkboxTextView = new TextView(context);
-        checkboxTextView.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
+        ThemeBind.textColor(checkboxTextView, Theme.key_dialogTextBlack, resourcesProvider);
         checkboxTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         checkboxTextView.setText(LocaleController.getString(R.string.Gift2AddSenderName));
         checkboxLayout.addView(checkboxTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 9, 0, 0, 0));
@@ -522,14 +524,14 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             container.addView(wearLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL_HORIZONTAL | Gravity.TOP));
 
             wearTitle = new TextView(context);
-            wearTitle.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+            ThemeBind.textColor(wearTitle, Theme.key_dialogTextBlack, resourcesProvider);
             wearTitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
             wearTitle.setGravity(Gravity.CENTER);
             wearTitle.setTypeface(AndroidUtilities.bold());
             wearLayout.addView(wearTitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.FILL_HORIZONTAL, 20, 0, 20, 0));
 
             wearSubtitle = new TextView(context);
-            wearSubtitle.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+            ThemeBind.textColor(wearSubtitle, Theme.key_dialogTextBlack, resourcesProvider);
             wearSubtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             wearSubtitle.setGravity(Gravity.CENTER);
             wearSubtitle.setText(LocaleController.getString(R.string.Gift2WearSubtitle));
@@ -590,10 +592,10 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         layoutManager.setReverseLayout(reverseLayout = true);
 
         buttonContainer = new FrameLayout(context);
-        buttonContainer.setBackgroundColor(getThemedColor(Theme.key_dialogBackground));
+        ThemeBind.backgroundColor(buttonContainer, Theme.key_dialogBackground, resourcesProvider);
 
         buttonShadow = new View(context);
-        buttonShadow.setBackgroundColor(getThemedColor(Theme.key_divider));
+        ThemeBind.backgroundColor(buttonShadow, Theme.key_divider, resourcesProvider);
         buttonShadow.setAlpha(0.0f);
         buttonContainer.addView(buttonShadow, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 1.0f / AndroidUtilities.density, Gravity.FILL_HORIZONTAL | Gravity.TOP));
 
@@ -607,12 +609,12 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         container.addView(buttonContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 12 + 48 + 12, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL));
 
         underButtonContainer = new FrameLayout(context);
-        underButtonContainer.setBackgroundColor(getThemedColor(Theme.key_dialogBackground));
+        ThemeBind.backgroundColor(underButtonContainer, Theme.key_dialogBackground, resourcesProvider);
 
         underButtonLinkTextView = new LinkSpanDrawable.LinksTextView(context);
         underButtonLinkTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
-        underButtonLinkTextView.setTextColor(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider));
-        underButtonLinkTextView.setLinkTextColor(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider));
+        ThemeBind.textColor(underButtonLinkTextView, Theme.key_featuredStickers_addButton, resourcesProvider);
+        ThemeBind.linkTextColor(underButtonLinkTextView, Theme.key_featuredStickers_addButton, resourcesProvider);
         underButtonLinkTextView.setGravity(Gravity.CENTER);
         underButtonContainer.addView(underButtonLinkTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 16, 8, 16, 14));
         container.addView(underButtonContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL));
@@ -644,6 +646,25 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         container.addView(actionView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.FILL_HORIZONTAL));
 
         actionView.prepareBlur(parentDecorView);
+    }
+
+    @Override
+    public void onThemeColorsChanged() {
+        super.onThemeColorsChanged();
+        try {
+            fixNavigationBarKey(Theme.key_dialogBackground);
+            if (topView != null) {
+                topView.updateTitleColors();
+            }
+            if (upgradeIconSpan != null && upgradeIconSpan.drawable instanceof UpgradeIcon) {
+                ((UpgradeIcon) upgradeIconSpan.drawable).setStrokeColor(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider));
+                if (button != null) {
+                    button.invalidate();
+                }
+            }
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
     }
 
     @Override
@@ -849,7 +870,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
     @Override
     public void onAttachedToWindow() {
         super.onAttachedToWindow();
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.starUserGiftsLoaded);
+        NotificationCenter.getInstance(currentAccount).addWeakObserver(this, NotificationCenter.starUserGiftsLoaded);
     }
 
     @Override
@@ -1608,7 +1629,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         layout.setOrientation(LinearLayout.VERTICAL);
 
         final FrameLayout topView = new FrameLayout(context);
-        topView.setBackground(Theme.createCircleDrawable(dp(64), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
+        ThemeBind.fillBackground(topView, Theme.createCircleDrawable(dp(64), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)), ThemeBind.of(Theme.key_featuredStickers_addButton), resourcesProvider);
         layout.addView(topView, LayoutHelper.createLinear(64, 64, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 6, 0, 0));
 
         final RLottieImageView imageView = new RLottieImageView(context);
@@ -2163,8 +2184,8 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             releasedView = new LinkSpanDrawable.LinksTextView(context);
             releasedView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
             releasedView.setGravity(Gravity.CENTER);
-            releasedView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
-            releasedView.setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider));
+            ThemeBind.textColor(releasedView, Theme.key_windowBackgroundWhiteBlackText, resourcesProvider);
+            ThemeBind.linkTextColor(releasedView, Theme.key_chat_messageLinkIn, resourcesProvider);
             releasedView.setPadding(dp(4), 0, dp(4), 0);
 
             collectionReleasedView = new TextView(context);
@@ -2248,7 +2269,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                     subtitleView[i] = new LinkSpanDrawable.LinksTextView(context);
                     subtitleView[i].setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
                     subtitleView[i].setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-                    subtitleView[i].setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider));
+                    ThemeBind.linkTextColor(subtitleView[i], Theme.key_chat_messageLinkIn, resourcesProvider);
                     subtitleView[i].setLineSpacing(dp(2), 1f);
                     subtitleView[i].setDisablePaddingsOffsetY(true);
                     subtitleView[i].setSingleLine();
@@ -2263,7 +2284,11 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                     continue;
                 } else {
                     titleView[i] = new LinkSpanDrawable.LinksTextView(context);
-                    titleView[i].setTextColor(i == PAGE_CRAFT ? 0xFFFFFFFF : Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                    if (i == PAGE_CRAFT) {
+                        titleView[i].setTextColor(0xFFFFFFFF);
+                    } else {
+                        titleView[i].setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                    }
                     titleView[i].setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
                     titleView[i].setTypeface(AndroidUtilities.bold());
                     titleView[i].setGravity(Gravity.CENTER);
@@ -2276,10 +2301,14 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
 
                     if (i == PAGE_INFO) {
                         subtitleView[i] = new LinkSpanDrawable.LinksTextView(context);
-                        subtitleView[i].setTextColor(i == PAGE_CRAFT ? Theme.multAlpha(0xFFFFFFFF, .75f) : Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                        if (i == PAGE_CRAFT) {
+                            subtitleView[i].setTextColor(Theme.multAlpha(0xFFFFFFFF, .75f));
+                        } else {
+                            subtitleView[i].setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                        }
                         subtitleView[i].setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
                         subtitleView[i].setGravity(Gravity.CENTER);
-                        subtitleView[i].setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider));
+                        ThemeBind.linkTextColor(subtitleView[i], Theme.key_chat_messageLinkIn, resourcesProvider);
                         subtitleView[i].setLineSpacing(dp(2), 1f);
                         subtitleView[i].setDisablePaddingsOffsetY(true);
 
@@ -2289,10 +2318,14 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                         layout[i].addView(subtitleContainer, subtitleViewLayoutParams[i] = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 24, 0, 24, i == PAGE_CRAFT ? 6 : 0));
                     } else {
                         subtitleView[i] = new LinkSpanDrawable.LinksTextView(context);
-                        subtitleView[i].setTextColor(i == PAGE_CRAFT ? Theme.multAlpha(0xFFFFFFFF, .75f) : Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                        if (i == PAGE_CRAFT) {
+                            subtitleView[i].setTextColor(Theme.multAlpha(0xFFFFFFFF, .75f));
+                        } else {
+                            subtitleView[i].setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                        }
                         subtitleView[i].setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
                         subtitleView[i].setGravity(Gravity.CENTER);
-                        subtitleView[i].setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider));
+                        ThemeBind.linkTextColor(subtitleView[i], Theme.key_chat_messageLinkIn, resourcesProvider);
                         subtitleView[i].setLineSpacing(dp(2), 1f);
                         subtitleView[i].setDisablePaddingsOffsetY(true);
                         layout[i].addView(subtitleView[i], subtitleViewLayoutParams[i] = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 24, 0, 24, i == PAGE_CRAFT ? 6 : 0));
@@ -2400,6 +2433,22 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         }
 
         private PageTransition currentPage = new PageTransition(PAGE_INFO, PAGE_INFO, 1.0f);
+
+        void updateTitleColors() {
+            if (titleView == null || subtitleView == null || backdrop == null) {
+                return;
+            }
+            final int black = Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider);
+            for (int i = 0; i < 2; ++i) {
+                if (titleView[i] == null || subtitleView[i] == null) continue;
+                titleView[i].setTextColor(backdrop[Math.min(1, i)] == null ? black : 0xFFFFFFFF);
+                subtitleView[i].setTextColor(i == 0 || i == 2 ? (backdrop[i] == null ? black : backdrop[i].text_color | 0xFF000000) : ColorUtils.blendARGB(backdrop[1] == null ? black : backdrop[1].text_color | 0xFF000000, backdrop[2] == null ? black : backdrop[2].text_color | 0xFF000000, toggleBackdrop));
+            }
+            if (subtitleView.length > PAGE_WEAR && subtitleView[PAGE_WEAR] != null) {
+                subtitleView[PAGE_WEAR].setTextColor(backdrop[0] == null ? black : backdrop[0].text_color | 0xFF000000);
+            }
+        }
+
         public void onSwitchPage(PageTransition p) {
             currentPage = p;
             for (int i = 0; i < layout.length; ++i) {
@@ -2419,8 +2468,8 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                     optionsView.clearColorFilter();
                     optionsView.setBackground(Theme.createSelectorDrawable(0x20ffffff, Theme.RIPPLE_MASK_CIRCLE_20DP));
                 } else {
-                    optionsView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_dialogIcon, resourcesProvider), PorterDuff.Mode.SRC_IN));
-                    optionsView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), Theme.RIPPLE_MASK_CIRCLE_20DP));
+                    ThemeBind.colorFilter(optionsView, Theme.key_dialogIcon, resourcesProvider, PorterDuff.Mode.SRC_IN);
+                    ThemeBind.selectorBackground(optionsView, Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), Theme.RIPPLE_MASK_CIRCLE_20DP), null, ThemeBind.of(Theme.key_listSelector), resourcesProvider);
                 }
             }
             if (!resellPriceViewInProgress) {
@@ -4021,7 +4070,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             public TextView(Context context, Theme.ResourcesProvider resourcesProvider) {
                 super(context);
                 this.resourcesProvider = resourcesProvider;
-                setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
+                ThemeBind.textColor(this, Theme.key_windowBackgroundWhiteBlackText, resourcesProvider);
                 setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
                 setPadding(0, dp(4), 0, dp(4));
             }
@@ -4141,7 +4190,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                 Browser.openUrlInSystemBrowser(getContext(), MessagesController.getInstance(currentAccount).tonBlockchainExplorerUrl + gift_address);
             }), true, dp(8f / 3f), dp(.66f)));
             beforeTableTextView.setVisibility(View.VISIBLE);
-            beforeTableTextView.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
+            ThemeBind.textColor(beforeTableTextView, Theme.key_dialogTextGray2, resourcesProvider);
         } else {
             beforeTableTextView.setVisibility(View.GONE);
         }
@@ -4421,8 +4470,8 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                 layout.setOrientation(LinearLayout.HORIZONTAL);
 
                 final SpoilersTextView textView = new SpoilersTextView(getContext());
-                textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
-                textView.setLinkTextColor(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider));
+                ThemeBind.textColor(textView, Theme.key_windowBackgroundWhiteBlackText, resourcesProvider);
+                ThemeBind.linkTextColor(textView, Theme.key_chat_messageLinkIn, resourcesProvider);
                 textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
                 textView.setGravity(Gravity.LEFT);
                 textView.setText(detailsText);
@@ -4430,9 +4479,9 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
 
                 final ImageView deleteView = new ImageView(getContext());
                 deleteView.setScaleType(ImageView.ScaleType.CENTER);
-                deleteView.setBackground(Theme.createRadSelectorDrawable(Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider), .10f), 6, 6));
+                ThemeBind.selectorBackground(deleteView, Theme.createRadSelectorDrawable(Theme.multAlpha(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider), .10f), 6, 6), null, ThemeBind.multAlpha(Theme.key_featuredStickers_addButton, .10f), resourcesProvider);
                 deleteView.setImageResource(R.drawable.menu_delete_old);
-                deleteView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider), PorterDuff.Mode.SRC_IN));
+                ThemeBind.colorFilter(deleteView, Theme.key_featuredStickers_addButton, resourcesProvider, PorterDuff.Mode.SRC_IN);
                 ScaleStateListAnimator.apply(deleteView);
                 deleteView.setOnClickListener(v -> {
                     showDeleteDescriptionAlert(detailsText);
@@ -4859,19 +4908,19 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         if (savedStarGift.refunded) {
             beforeTableTextView.setVisibility(View.VISIBLE);
             beforeTableTextView.setText(getString(R.string.Gift2Refunded));
-            beforeTableTextView.setTextColor(Theme.getColor(Theme.key_text_RedBold, resourcesProvider));
+            ThemeBind.textColor(beforeTableTextView, Theme.key_text_RedBold, resourcesProvider);
         } else if (hosted && !TextUtils.isEmpty(owner_address) && !TextUtils.isEmpty(gift_address)) {
             beforeTableTextView.setText(AndroidUtilities.replaceArrows(AndroidUtilities.replaceSingleTag(getString(R.string.Gift2InBlockchain), () -> {
                 Browser.openUrlInSystemBrowser(getContext(), MessagesController.getInstance(currentAccount).tonBlockchainExplorerUrl + gift_address);
             }), true, dp(8f / 3f), dp(.66f)));
             beforeTableTextView.setVisibility(View.VISIBLE);
-            beforeTableTextView.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
+            ThemeBind.textColor(beforeTableTextView, Theme.key_dialogTextGray2, resourcesProvider);
         } else if (TextUtils.isEmpty(owner_address) && TextUtils.isEmpty(gift_address) && myProfile && savedStarGift.gift instanceof TL_stars.TL_starGift && savedStarGift.name_hidden) {
             beforeTableTextView.setVisibility(View.VISIBLE);
             beforeTableTextView.setText(getString(
                 (message != null && !TextUtils.isEmpty(message.text)) ? R.string.Gift2InSenderMessageHidden2 : R.string.Gift2InSenderHidden2)
             );
-            beforeTableTextView.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
+            ThemeBind.textColor(beforeTableTextView, Theme.key_dialogTextGray2, resourcesProvider);
         } else {
             beforeTableTextView.setVisibility(View.GONE);
         }
@@ -5255,13 +5304,13 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         if (refunded) {
             beforeTableTextView.setVisibility(View.VISIBLE);
             beforeTableTextView.setText(getString(R.string.Gift2Refunded));
-            beforeTableTextView.setTextColor(Theme.getColor(Theme.key_text_RedBold, resourcesProvider));
+            ThemeBind.textColor(beforeTableTextView, Theme.key_text_RedBold, resourcesProvider);
         } else if (hosted && !TextUtils.isEmpty(owner_address) && !TextUtils.isEmpty(gift_address)) {
             beforeTableTextView.setVisibility(View.VISIBLE);
             beforeTableTextView.setText(AndroidUtilities.replaceArrows(AndroidUtilities.replaceSingleTag(getString(R.string.Gift2InBlockchain), () -> {
                 Browser.openUrlInSystemBrowser(getContext(), MessagesController.getInstance(currentAccount).tonBlockchainExplorerUrl + gift_address);
             }), true, dp(8f / 3f), dp(.66f)));
-            beforeTableTextView.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
+            ThemeBind.textColor(beforeTableTextView, Theme.key_dialogTextGray2, resourcesProvider);
         } else if (TextUtils.isEmpty(owner_address) && TextUtils.isEmpty(gift_address) && name_hidden && !self) {
             beforeTableTextView.setVisibility(View.VISIBLE);
             beforeTableTextView.setText(
@@ -5269,7 +5318,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                     formatString((message != null && !TextUtils.isEmpty(message.text)) ? R.string.Gift2OutSenderMessageHidden2 : R.string.Gift2OutSenderHidden2, DialogObject.getShortName(messageObject.getDialogId())) :
                     getString((message != null && !TextUtils.isEmpty(message.text)) ? R.string.Gift2InSenderMessageHidden2 : R.string.Gift2InSenderHidden2)
             );
-            beforeTableTextView.setTextColor(Theme.getColor(Theme.key_dialogTextGray2, resourcesProvider));
+            ThemeBind.textColor(beforeTableTextView, Theme.key_dialogTextGray2, resourcesProvider);
         } else {
             beforeTableTextView.setVisibility(View.GONE);
         }
@@ -6636,13 +6685,13 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                     topView.setOrientation(LinearLayout.VERTICAL);
                     topView.addView(new GiftTransferTopView(getContext(), gift), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 0, -4, 0, 0));
                     final TextView titleView = new TextView(getContext());
-                    titleView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                    ThemeBind.textColor(titleView, Theme.key_dialogTextBlack, resourcesProvider);
                     titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
                     titleView.setTypeface(AndroidUtilities.bold());
                     titleView.setText(getString(R.string.Gift2ExportTONFragmentTitle));
                     topView.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 24, 4, 24, 14));
                     final TextView textView = new TextView(getContext());
-                    textView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                    ThemeBind.textColor(textView, Theme.key_dialogTextBlack, resourcesProvider);
                     textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
                     textView.setText(AndroidUtilities.replaceTags(formatString(R.string.Gift2ExportTONFragmentText, getGiftName())));
                     topView.addView(textView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 24, 0, 24, 4));
@@ -6780,7 +6829,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         topView.setOrientation(LinearLayout.VERTICAL);
         topView.addView(new GiftTransferTopView(getContext(), gift, obj), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 0, -4, 0, 0));
         final TextView textView = new TextView(getContext());
-        textView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+        ThemeBind.textColor(textView, Theme.key_dialogTextBlack, resourcesProvider);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
         textView.setText(text != null ? text : AndroidUtilities.replaceTags(stars > 0 ?
             formatPluralStringComma("Gift2TransferPriceText", (int) stars, getGiftName(), DialogObject.getShortName(dialogId)) :
@@ -6923,7 +6972,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             builder.setView(linearLayout);
 
             TextView messageTextView = new TextView(getContext());
-            messageTextView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+            ThemeBind.textColor(messageTextView, Theme.key_dialogTextBlack);
             messageTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             messageTextView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP);
             messageTextView.setText(AndroidUtilities.replaceTags(LocaleController.getString(R.string.Gift2TransferToTONAlertText)));
@@ -6936,10 +6985,10 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             ImageView dotImageView = new ImageView(getContext());
             dotImageView.setImageResource(R.drawable.list_circle);
             dotImageView.setPadding(LocaleController.isRTL ? AndroidUtilities.dp(11) : 0, AndroidUtilities.dp(9), LocaleController.isRTL ? 0 : AndroidUtilities.dp(11), 0);
-            dotImageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_dialogTextBlack), PorterDuff.Mode.MULTIPLY));
+            ThemeBind.colorFilter(dotImageView, Theme.key_dialogTextBlack, PorterDuff.Mode.MULTIPLY);
 
             messageTextView = new TextView(getContext());
-            messageTextView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+            ThemeBind.textColor(messageTextView, Theme.key_dialogTextBlack);
             messageTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             messageTextView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP);
             messageTextView.setText(AndroidUtilities.replaceTags(LocaleController.getString(R.string.Gift2TransferToTONAlertText1)));
@@ -6958,10 +7007,10 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             dotImageView = new ImageView(getContext());
             dotImageView.setImageResource(R.drawable.list_circle);
             dotImageView.setPadding(LocaleController.isRTL ? AndroidUtilities.dp(11) : 0, AndroidUtilities.dp(9), LocaleController.isRTL ? 0 : AndroidUtilities.dp(11), 0);
-            dotImageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_dialogTextBlack), PorterDuff.Mode.MULTIPLY));
+            ThemeBind.colorFilter(dotImageView, Theme.key_dialogTextBlack, PorterDuff.Mode.MULTIPLY);
 
             messageTextView = new TextView(getContext());
-            messageTextView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+            ThemeBind.textColor(messageTextView, Theme.key_dialogTextBlack);
             messageTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             messageTextView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP);
             messageTextView.setText(AndroidUtilities.replaceTags(LocaleController.getString(R.string.Gift2TransferToTONAlertText2)));
@@ -6978,7 +7027,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                 builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
             } else {
                 messageTextView = new TextView(getContext());
-                messageTextView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+                ThemeBind.textColor(messageTextView, Theme.key_dialogTextBlack);
                 messageTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
                 messageTextView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP);
                 messageTextView.setText(LocaleController.getString(R.string.Gift2TransferToTONAlertText3));
@@ -7447,7 +7496,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         currentHintViewTextView = textView;
     }
 
-    public static class GiftTransferTopView extends View {
+    public static class GiftTransferTopView extends View implements Theme.Colorable {
 
         private final StarGiftDrawableIcon giftDrawable;
         private final ImageReceiver userImageReceiver;
@@ -7534,9 +7583,23 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             super.onDetachedFromWindow();
             userImageReceiver.onDetachedFromWindow();
         }
-    }
+    
+        private int colorsGeneration = ThemeBind.generation();
 
-    public static class UserToUserTransferTopView extends View {
+        @Override
+        public void updateColors() {
+            try {
+                arrowPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText7));
+                arrowPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText7));
+                invalidate();
+        
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+}
+
+    public static class UserToUserTransferTopView extends View implements Theme.Colorable {
 
         private final ImageReceiver fromUserImageReceiver;
         private final ImageReceiver toUserImageReceiver;
@@ -7608,7 +7671,20 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             fromUserImageReceiver.onDetachedFromWindow();
             toUserImageReceiver.onDetachedFromWindow();
         }
-    }
+    
+        private int colorsGeneration = ThemeBind.generation();
+
+        @Override
+        public void updateColors() {
+            try {
+                arrowPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText7));
+                invalidate();
+        
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        }
+}
 
     public static class GiftThemeReuseTopView extends View {
 
@@ -7628,7 +7704,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             userImageReceiver.setForUserOrChat(obj, avatarDrawable);
 
             drawable = context.getDrawable(R.drawable.chats_undo).mutate();
-            drawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText2), PorterDuff.Mode.MULTIPLY));
+            ThemeBind.drawableColorFilter(this, drawable, Theme.key_windowBackgroundWhiteGrayText2, PorterDuff.Mode.MULTIPLY);
             drawable.setBounds(dp(-12), dp(-12), dp(12), dp(12));
         }
 
@@ -7931,6 +8007,10 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
         private final Path arrow = new Path();
         private final long start = System.currentTimeMillis();
 
+        public void setStrokeColor(int color) {
+            strokePaint.setColor(color);
+        }
+
         public UpgradeIcon(View view, int color) {
             super(view);
             this.view = view;
@@ -8181,7 +8261,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
                 currencyTabsView = null;
 
                 TextView textTonOnlyView = new TextView(context);
-                textTonOnlyView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText, resourcesProvider));
+                ThemeBind.textColor(textTonOnlyView, Theme.key_windowBackgroundWhiteGrayText, resourcesProvider);
                 textTonOnlyView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
                 textTonOnlyView.setText(getString(R.string.Gift2BuyPriceOnlyTON));
                 textTonOnlyView.setGravity(Gravity.CENTER);
@@ -8190,7 +8270,7 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
             topView.addView(new GiftTransferTopView(context, gift, obj), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 0, -4, 0, 0));
 
             textInfoView = new TextView(context);
-            textInfoView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+            ThemeBind.textColor(textInfoView, Theme.key_dialogTextBlack, resourcesProvider);
             textInfoView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             topView.addView(textInfoView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 24, 4, 24, 4));
 
@@ -8357,17 +8437,17 @@ public class StarGiftSheet extends BottomSheetWithRecyclerListView implements No
 
                 final TextView priceTextView = new TextView(getContext());
                 priceTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
-                priceTextView.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText, resourcesProvider));
+                ThemeBind.textColor(priceTextView, Theme.key_featuredStickers_buttonText, resourcesProvider);
                 priceTextView.setTypeface(AndroidUtilities.bold());
                 priceTextView.setPadding(dp(20), 0, dp(20), 0);
-                priceTextView.setBackground(Theme.createRoundRectDrawable(dp(21), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
+                ThemeBind.fillBackground(priceTextView, Theme.createRoundRectDrawable(dp(21), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)), ThemeBind.of(Theme.key_featuredStickers_addButton), resourcesProvider);
                 priceTextView.setGravity(Gravity.CENTER);
                 linearLayout.addView(priceTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 42, Gravity.CENTER_HORIZONTAL, 0, 12, 0, 15));
                 priceTextView.setText(valuePrice);
 
                 final TextView textView = new TextView(getContext());
                 textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-                textView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+                ThemeBind.textColor(textView, Theme.key_dialogTextBlack, resourcesProvider);
                 textView.setGravity(Gravity.CENTER);
                 linearLayout.addView(textView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL, 16, 0, 16, 19));
                 if (info.value_is_average) {

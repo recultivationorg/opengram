@@ -11,7 +11,7 @@ configurations {
 }
 
 configurations.all {
-    exclude group: 'com.google.firebase', module: 'firebase-core'
+    exclude group: 'com.google.firebase'
     exclude group: 'androidx.recyclerview', module: 'recyclerview'
 }
 
@@ -162,5 +162,3 @@ android {
         checkReleaseBuilds false
     }
 }
-
-apply plugin: 'com.google.gms.google-services'
