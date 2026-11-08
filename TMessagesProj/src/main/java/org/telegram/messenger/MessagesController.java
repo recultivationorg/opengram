@@ -693,9 +693,6 @@ public class MessagesController extends BaseController implements NotificationCe
     public int uploadMaxFilePartsPremium;
     public String premiumBotUsername;
     public String premiumInvoiceSlug;
-    public String verifyAgeBotUsername;
-    public String verifyAgeCountry;
-    public int verifyAgeMin;
     public int chatlistInvitesLimitDefault;
     public int chatlistInvitesLimitPremium;
     public int chatlistJoinedLimitDefault;
@@ -1676,9 +1673,6 @@ public class MessagesController extends BaseController implements NotificationCe
         uploadMaxFileParts = mainPreferences.getInt("uploadMaxFileParts", (int) (FileLoader.DEFAULT_MAX_FILE_SIZE / 1024L / 512L));
         uploadMaxFilePartsPremium = mainPreferences.getInt("uploadMaxFilePartsPremium", uploadMaxFileParts * 2);
         premiumInvoiceSlug = mainPreferences.getString("premiumInvoiceSlug", null);
-        verifyAgeBotUsername = mainPreferences.getString("verifyAgeBotUsername", null);
-        verifyAgeCountry = mainPreferences.getString("verifyAgeCountry", "GB");
-        verifyAgeMin = mainPreferences.getInt("verifyAgeMin", 18);
         premiumBotUsername = mainPreferences.getString("premiumBotUsername", null);
         premiumLocked = mainPreferences.getBoolean("premiumLocked", false);
         starsLocked = mainPreferences.getBoolean("starsLocked", true);
@@ -2861,38 +2855,6 @@ public class MessagesController extends BaseController implements NotificationCe
                         if (!string.equals(premiumBotUsername)) {
                             premiumBotUsername = string;
                             editor.putString("premiumBotUsername", premiumBotUsername);
-                            changed = true;
-                        }
-                    }
-                    break;
-                }
-                case "verify_age_bot_username": {
-                    if (value.value instanceof TLRPC.TL_jsonString) {
-                        String string = ((TLRPC.TL_jsonString) value.value).value;
-                        if (!string.equals(verifyAgeBotUsername)) {
-                            verifyAgeBotUsername = string;
-                            editor.putString("verifyAgeBotUsername", verifyAgeBotUsername);
-                            changed = true;
-                        }
-                    }
-                    break;
-                }
-                case "verify_age_country": {
-                    if (value.value instanceof TLRPC.TL_jsonString) {
-                        String string = ((TLRPC.TL_jsonString) value.value).value;
-                        if (!string.equals(verifyAgeCountry)) {
-                            verifyAgeCountry = string;
-                            editor.putString("verifyAgeCountry", verifyAgeCountry);
-                            changed = true;
-                        }
-                    }
-                    break;
-                }
-                case "verify_age_min": {
-                    if (value.value instanceof TLRPC.TL_jsonNumber) {
-                        int num = (int) ((TLRPC.TL_jsonNumber) value.value).value;
-                        if (num != verifyAgeMin) {
-                            editor.putInt("verifyAgeMin", verifyAgeMin = num);
                             changed = true;
                         }
                     }
@@ -5566,8 +5528,6 @@ public class MessagesController extends BaseController implements NotificationCe
         freezeSinceDate = 0L;
         freezeUntilDate = 0L;
         freezeAppealUrl = "t.me/spambot";
-        verifyAgeBotUsername = null;
-        verifyAgeCountry = "GB";
         ignoreRestrictionReasons = new HashSet<String>();
         mainPreferences.edit()
             .remove("starsLocked")
@@ -5581,8 +5541,6 @@ public class MessagesController extends BaseController implements NotificationCe
             .remove("freezeSinceDate")
             .remove("freezeUntilDate")
             .remove("freezeAppealUrl")
-            .remove("verifyAgeBotUsername")
-            .remove("verifyAgeCountry")
             .remove("ignoreRestrictionReasons")
             .apply();
     }
@@ -23183,110 +23141,9 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public void checkSensitive(BaseFragment fragment, long did, Runnable done, Runnable canceled) {
-        ArrayList<TLRPC.RestrictionReason> reasons = null;
-        if (did < 0) {
-            TLRPC.Chat chat = getChat(-did);
-            reasons = chat != null ? chat.restriction_reason : null;
-        } else if (did >= 0) {
-            TLRPC.User user = getUser(did);
-            reasons = user != null ? user.restriction_reason : null;
+        if (done != null) {
+            done.run();
         }
-        if (!isSensitive(reasons) || sensitiveAgreed.contains(did)) {
-            if (done != null) {
-                done.run();
-            }
-            return;
-        }
-        Context _context0 = fragment.getContext();
-        if (_context0 == null) _context0 = AndroidUtilities.findActivity(LaunchActivity.instance);
-        if (_context0 == null) _context0 = LaunchActivity.instance;
-        if (_context0 == null) _context0 = ApplicationLoader.applicationContext;
-        final Context context0 = _context0;
-        final AlertDialog progressDialog = context0 == null ? null : new AlertDialog(context0, AlertDialog.ALERT_TYPE_SPINNER);
-        if (progressDialog != null) {
-            progressDialog.showDelayed(200);
-        }
-        getContentSettings(settings -> {
-            if (progressDialog != null) {
-                progressDialog.dismissUnless(200);
-            }
-            Context _context1 = fragment.getContext();
-            if (_context1 == null) _context1 = AndroidUtilities.findActivity(LaunchActivity.instance);
-            if (_context1 == null) _context1 = LaunchActivity.instance;
-            if (_context1 == null) _context1 = ApplicationLoader.applicationContext;
-            final Context context = _context1;
-            final BaseFragment lastFragment0 = LaunchActivity.getSafeLastFragment();
-            final Theme.ResourcesProvider resourcesProvider = lastFragment0 == null ? null : lastFragment0.getResourceProvider();
-
-            final boolean[] always = new boolean[1];
-            final FrameLayout frameLayout = new FrameLayout(context);
-            final boolean needsVerification = config.needAgeVideoVerification.get() && !TextUtils.isEmpty(verifyAgeBotUsername);
-            final boolean cannotView = !(settings != null && settings.sensitive_can_change) && needsVerification;
-            if (needsVerification) {
-                always[0] = true;
-            } else if (settings != null && settings.sensitive_can_change) {
-                CheckBoxCell checkbox = new CheckBoxCell(context, 1, resourcesProvider);
-                checkbox.setBackground(Theme.getSelectorDrawable(false));
-                checkbox.setText(getString(R.string.MessageShowSensitiveContentAlways), "", always[0], false);
-                checkbox.setPadding(LocaleController.isRTL ? dp(16) : dp(8), 0, LocaleController.isRTL ? dp(8) : dp(16), 0);
-                frameLayout.addView(checkbox, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.TOP | Gravity.LEFT, 0, 0, 0, 0));
-                checkbox.setOnClickListener(v -> {
-                    CheckBoxCell cell1 = (CheckBoxCell) v;
-                    always[0] = !always[0];
-                    cell1.setChecked(always[0], true);
-                });
-            }
-            final boolean[] doneSet = new boolean[1];
-            AlertDialog.Builder alert = new AlertDialog.Builder(context, resourcesProvider)
-                .setTitle(getString(R.string.MessageShowSensitiveContentChannelTitle))
-                .setMessage(getString(cannotView ? R.string.MessageShowSensitiveContentChannelTextClosed : R.string.MessageShowSensitiveContentChannelText))
-                .setView(frameLayout).setCustomViewOffset(9)
-                .setNegativeButton(getString(cannotView ? R.string.MessageShowSensitiveContentChannelTextClosedButton : R.string.Cancel), null)
-                .setOnDismissListener(di -> {
-                    if (!doneSet[0] && canceled != null) {
-                        canceled.run();
-                    }
-                });
-            if (!cannotView) {
-                alert.setPositiveButton(getString(R.string.MessageShowSensitiveContentButton), (di, w) -> {
-                    if (needsVerification || (always[0] && settings != null && settings.sensitive_can_change)) {
-                        ThemeActivity.verifyAge(context, currentAccount, passed -> {
-                            final BaseFragment lastFragment2 = LaunchActivity.getSafeLastFragment();
-                            if (passed) {
-                                sensitiveAgreed.add(did);
-                                setContentSettings(true);
-                                if (lastFragment2 != null) {
-                                    BulletinFactory.of(lastFragment2)
-                                        .createSimpleBulletinDetail(R.raw.chats_infotip, AndroidUtilities.replaceArrows(AndroidUtilities.premiumText(getString(R.string.SensitiveContentSettingsToast), () -> {
-                                            if (lastFragment2 != null) {
-                                                lastFragment2.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC).highlightSensitiveRow());
-                                            }
-                                        }), true))
-                                        .show(true);
-                                }
-                                doneSet[0] = true;
-                                if (done != null) {
-                                    done.run();
-                                }
-                            } else {
-                                if (lastFragment2 != null) {
-                                    BulletinFactory.of(lastFragment2)
-                                        .createSimpleBulletin(R.raw.error, getString(R.string.AgeVerificationFailedTitle), getString(R.string.AgeVerificationFailedText))
-                                        .show();
-                                }
-                            }
-                        }, resourcesProvider);
-                    } else {
-                        sensitiveAgreed.add(did);
-                        doneSet[0] = true;
-                        if (done != null) {
-                            done.run();
-                        }
-                    }
-                });
-            }
-            alert.show();
-        });
     }
 
     public static void showCantOpenAlert(BaseFragment fragment, String reason) {
@@ -23312,8 +23169,6 @@ public class MessagesController extends BaseController implements NotificationCe
     public boolean checkCanOpenChat(Bundle bundle, BaseFragment fragment, MessageObject originalMessage) {
         return checkCanOpenChat(bundle, fragment, originalMessage, null);
     }
-
-    private final HashSet<Long> sensitiveAgreed = new HashSet<>();
 
     public boolean checkCanOpenChat(Bundle bundle, BaseFragment fragment, MessageObject originalMessage, Browser.Progress progress) {
         if (bundle == null || fragment == null) {
@@ -25265,10 +25120,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean showSensitiveContent() {
-        if (contentSettings != null && System.currentTimeMillis() - contentSettingsLoadedTime < 1000 * 60 * 60) {
-            return contentSettings.sensitive_enabled;
-        }
-        return ignoreRestrictionReasons == null || ignoreRestrictionReasons.contains("sensitive");
+        return true;
     }
 
     private boolean loadingArePaidReactionsAnonymous;

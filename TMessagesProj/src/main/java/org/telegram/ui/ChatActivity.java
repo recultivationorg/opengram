@@ -43116,13 +43116,10 @@ public class ChatActivity extends BaseFragment implements
                 progressDialog.showDelayed(200);
                 getMessagesController().getContentSettings(settings -> {
                     progressDialog.dismissUnless(200);
-                    final boolean needsVerification = getMessagesController().config.needAgeVideoVerification.get() && !TextUtils.isEmpty(getMessagesController().verifyAgeBotUsername);
-                    final boolean cannotView = !(settings != null && settings.sensitive_can_change) && needsVerification;
+                    final boolean canChange = settings != null && settings.sensitive_can_change;
                     boolean[] always = new boolean[1];
                     FrameLayout frameLayout = new FrameLayout(getContext());
-                    if (needsVerification) {
-                        always[0] = true;
-                    } else if (settings != null && settings.sensitive_can_change) {
+                    if (canChange) {
                         CheckBoxCell checkbox = new CheckBoxCell(getContext(), 1, getResourceProvider());
                         checkbox.setBackground(Theme.getSelectorDrawable(false));
                         checkbox.setText(getString(R.string.MessageShowSensitiveContentAlways), "", always[0], false);
@@ -43136,53 +43133,41 @@ public class ChatActivity extends BaseFragment implements
                     }
                     final AlertDialog.Builder alert = new AlertDialog.Builder(getContext(), getResourceProvider())
                             .setTitle(getString(R.string.MessageShowSensitiveContentMediaTitle))
-                            .setMessage(getString(cannotView ? R.string.MessageShowSensitiveContentMediaTextClosed : R.string.MessageShowSensitiveContentMediaText))
+                            .setMessage(getString(R.string.MessageShowSensitiveContentMediaText))
                             .setView(frameLayout).setCustomViewOffset(9)
-                            .setNegativeButton(getString(cannotView ? R.string.MessageShowSensitiveContentMediaTextClosedButton : R.string.Cancel), null);
-                    if (!cannotView) {
-                        alert.setPositiveButton(getString(R.string.MessageShowSensitiveContentButton), (di, w) -> {
-                            final Utilities.Callback<Boolean> reveal = (all) -> {
-                                if (all) {
-                                    for (int i = 0; i < chatListView.getChildCount(); ++i) {
-                                        View child = chatListView.getChildAt(i);
-                                        if (!(child instanceof ChatMessageCell)) continue;
-                                        ChatMessageCell messageCell = (ChatMessageCell) child;
-                                        if (messageCell.getMessageObject() != null && messageCell.getMessageObject().isSensitive()) {
-                                            messageCell.startRevealMedia();
-                                        }
+                            .setNegativeButton(getString(R.string.Cancel), null);
+                    alert.setPositiveButton(getString(R.string.MessageShowSensitiveContentButton), (di, w) -> {
+                        final Utilities.Callback<Boolean> reveal = (all) -> {
+                            if (all) {
+                                for (int i = 0; i < chatListView.getChildCount(); ++i) {
+                                    View child = chatListView.getChildAt(i);
+                                    if (!(child instanceof ChatMessageCell)) continue;
+                                    ChatMessageCell messageCell = (ChatMessageCell) child;
+                                    if (messageCell.getMessageObject() != null && messageCell.getMessageObject().isSensitive()) {
+                                        messageCell.startRevealMedia();
                                     }
-                                } else {
-                                    if (cell.getMessageObject() != null) {
-                                        cell.getMessageObject().isSensitiveCached = false;
-                                    }
-                                    cell.startRevealMedia();
-                                }
-                            };
-                            if (always[0]) {
-                                if (needsVerification || settings != null && settings.sensitive_can_change) {
-                                    ThemeActivity.verifyAge(getContext(), currentAccount, passed -> {
-                                        if (!passed) {
-                                            BulletinFactory.of(ChatActivity.this)
-                                                .createSimpleBulletin(R.raw.error, getString(R.string.AgeVerificationFailedTitle), getString(R.string.AgeVerificationFailedText))
-                                                .show();
-                                            return;
-                                        }
-                                        getMessagesController().setContentSettings(true);
-                                        BulletinFactory.of(ChatActivity.this)
-                                            .createSimpleBulletinDetail(R.raw.chats_infotip, AndroidUtilities.replaceArrows(AndroidUtilities.premiumText(getString(R.string.SensitiveContentSettingsToast), () -> {
-                                                presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC).highlightSensitiveRow());
-                                            }), true))
-                                            .show(true);
-                                        reveal.run(true);
-                                    }, getResourceProvider());
-                                } else {
-                                    reveal.run(true);
                                 }
                             } else {
-                                reveal.run(false);
+                                if (cell.getMessageObject() != null) {
+                                    cell.getMessageObject().isSensitiveCached = false;
+                                }
+                                cell.startRevealMedia();
                             }
-                        });
-                    }
+                        };
+                        if (always[0] && canChange) {
+                            getMessagesController().setContentSettings(true);
+                            BulletinFactory.of(ChatActivity.this)
+                                .createSimpleBulletinDetail(R.raw.chats_infotip, AndroidUtilities.replaceArrows(AndroidUtilities.premiumText(getString(R.string.SensitiveContentSettingsToast), () -> {
+                                    presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC).highlightSensitiveRow());
+                                }), true))
+                                .show(true);
+                            reveal.run(true);
+                        } else if (always[0]) {
+                            reveal.run(true);
+                        } else {
+                            reveal.run(false);
+                        }
+                    });
                     showDialog(alert.create());
                 });
                 return;

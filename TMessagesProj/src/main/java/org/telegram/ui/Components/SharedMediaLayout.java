@@ -3001,7 +3001,7 @@ public class SharedMediaLayout extends FrameLayout implements Theme.Colorable, N
                 } else if (mediaPage.selectedType == TAB_PHOTOVIDEO && view instanceof SharedPhotoVideoCell2) {
                     final SharedPhotoVideoCell2 cell = (SharedPhotoVideoCell2) view;
                     final MessageObject messageObject = cell.getMessageObject();
-                    if (messageObject != null && messageObject.isSensitive()) {
+                    if (messageObject != null && messageObject.isHiddenSensitive()) {
                         if (profileActivity == null) return;
                         final int currentAccount = profileActivity.getCurrentAccount();
                         final MessagesController messagesController = MessagesController.getInstance(currentAccount);
@@ -3009,13 +3009,10 @@ public class SharedMediaLayout extends FrameLayout implements Theme.Colorable, N
                         progressDialog.showDelayed(200);
                         messagesController.getContentSettings(settings -> {
                             progressDialog.dismissUnless(200);
-                            final boolean needsVerification = messagesController.config.needAgeVideoVerification.get() && !TextUtils.isEmpty(messagesController.verifyAgeBotUsername);
-                            final boolean cannotView = !(settings != null && settings.sensitive_can_change) && needsVerification;
+                            final boolean canChange = settings != null && settings.sensitive_can_change;
                             boolean[] always = new boolean[1];
                             FrameLayout frameLayout = new FrameLayout(context);
-                            if (needsVerification) {
-                                always[0] = true;
-                            } else if (settings != null && settings.sensitive_can_change) {
+                            if (canChange) {
                                 CheckBoxCell checkbox = new CheckBoxCell(context, 1, profileActivity == null ? null : profileActivity.getResourceProvider());
                                 checkbox.setBackground(Theme.getSelectorDrawable(false));
                                 checkbox.setText(getString(R.string.MessageShowSensitiveContentAlways), "", always[0], false);
@@ -3029,43 +3026,28 @@ public class SharedMediaLayout extends FrameLayout implements Theme.Colorable, N
                             }
                             final AlertDialog.Builder alert = new AlertDialog.Builder(context, profileActivity == null ? null : profileActivity.getResourceProvider())
                                 .setTitle(getString(R.string.MessageShowSensitiveContentMediaTitle))
-                                .setMessage(getString(cannotView ? R.string.MessageShowSensitiveContentMediaTextClosed : R.string.MessageShowSensitiveContentMediaText))
+                                .setMessage(getString(R.string.MessageShowSensitiveContentMediaText))
                                 .setView(frameLayout).setCustomViewOffset(9)
-                                .setNegativeButton(getString(cannotView ? R.string.MessageShowSensitiveContentMediaTextClosedButton : R.string.Cancel), null);
-                            if (!cannotView) {
-                                alert.setPositiveButton(getString(R.string.MessageShowSensitiveContentButton), (di, w) -> {
-                                    final Utilities.Callback<Boolean> reveal = (all) -> {
-                                        cell.startRevealMedia(x, y);
-                                    };
-                                    if (always[0]) {
-                                        if (needsVerification || settings != null && settings.sensitive_can_change) {
-                                            final BaseFragment lastFragment1 = LaunchActivity.getSafeLastFragment();
-                                            ThemeActivity.verifyAge(context, currentAccount, passed -> {
-                                                final BaseFragment lastFragment2 = LaunchActivity.getSafeLastFragment();
-                                                if (passed) {
-                                                    messagesController.setContentSettings(true);
-                                                    if (lastFragment2 != null) {
-                                                        BulletinFactory.of(lastFragment2)
-                                                            .createSimpleBulletinDetail(R.raw.chats_infotip, AndroidUtilities.replaceArrows(AndroidUtilities.premiumText(getString(R.string.SensitiveContentSettingsToast), () -> {
-                                                                lastFragment2.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC).highlightSensitiveRow());
-                                                            }), true))
-                                                            .show(true);
-                                                    }
-                                                    reveal.run(true);
-                                                } else if (lastFragment2 != null) {
-                                                    BulletinFactory.of(lastFragment2)
-                                                        .createSimpleBulletin(R.raw.error, getString(R.string.AgeVerificationFailedTitle), getString(R.string.AgeVerificationFailedText))
-                                                        .show();
-                                                }
-                                            }, lastFragment1 == null ? null : lastFragment1.getResourceProvider());
-                                        } else {
-                                            reveal.run(true);
-                                        }
-                                    } else {
-                                        reveal.run(false);
+                                .setNegativeButton(getString(R.string.Cancel), null);
+                            alert.setPositiveButton(getString(R.string.MessageShowSensitiveContentButton), (di, w) -> {
+                                final Utilities.Callback<Boolean> reveal = (all) -> {
+                                    cell.startRevealMedia(x, y);
+                                };
+                                if (always[0] && canChange) {
+                                    messagesController.setContentSettings(true);
+                                    final BaseFragment lastFragment2 = LaunchActivity.getSafeLastFragment();
+                                    if (lastFragment2 != null) {
+                                        BulletinFactory.of(lastFragment2)
+                                            .createSimpleBulletinDetail(R.raw.chats_infotip, AndroidUtilities.replaceArrows(AndroidUtilities.premiumText(getString(R.string.SensitiveContentSettingsToast), () -> {
+                                                lastFragment2.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC).highlightSensitiveRow());
+                                            }), true))
+                                            .show(true);
                                     }
-                                });
-                            }
+                                    reveal.run(true);
+                                } else {
+                                    reveal.run(always[0]);
+                                }
+                            });
                             if (profileActivity != null && profileActivity.getContext() != null) {
                                 profileActivity.showDialog(alert.create());
                             } else {

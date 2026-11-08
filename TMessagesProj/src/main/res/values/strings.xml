@@ -10202,13 +10202,6 @@
     <string name="PollItemQuote">Reply to Option</string>
     <string name="Gift2CollectionAll">All Gifts</string>
     <string name="ProfileGiftsAdd">Add Gifts</string>
-    <string name="AgeVerificationTitle">Age Verification</string>
-    <string name="AgeVerificationTextGB">To access such content, you must confirm that you are at least **18** years old as required by UK law.\n\nThis is a one-time process using your phone\'s camera. Your selfie will not be stored by Telegram.</string>
-    <string name="AgeVerificationButton">Verify My Age</string>
-    <string name="AgeVerificationFailedTitle">Age Check Failed</string>
-    <string name="AgeVerificationFailedText">Sorry, you can\'t view 18+ content.</string>
-    <string name="AgeVerificationPassedTitle">Age Check Passed</string>
-    <string name="AgeVerificationNeedCameraPermission">Telegram needs access to your camera so that you can confirm your age.</string>
     <string name="StoriesForwardTitle">Your Stories</string>
     <string name="StoriesForwardText">Forward to stories</string>
     <string name="Gift2CollectionEmptyTitle">Organize Your Gifts</string>

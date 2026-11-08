@@ -5447,7 +5447,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     void didClickedImage() {
         if (currentMessageObject.hasMediaSpoilers() && !currentMessageObject.needDrawBluredPreview() && !currentMessageObject.isMediaSpoilersRevealed) {
-            if (delegate != null && currentMessageObject.isSensitive()) {
+            if (delegate != null && currentMessageObject.isHiddenSensitive()) {
                 delegate.didPressRevealSensitiveContent(this);
                 return;
             }
@@ -14975,7 +14975,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     void didPressButton(boolean animated, boolean video) {
-        if (delegate != null && currentMessageObject.isSensitive() && currentMessageObject.hasMediaSpoilers() && !currentMessageObject.needDrawBluredPreview() && !currentMessageObject.isMediaSpoilersRevealed) {
+        if (delegate != null && currentMessageObject.isHiddenSensitive() && currentMessageObject.hasMediaSpoilers() && !currentMessageObject.needDrawBluredPreview() && !currentMessageObject.isMediaSpoilersRevealed) {
             delegate.didPressRevealSensitiveContent(this);
             return;
         }

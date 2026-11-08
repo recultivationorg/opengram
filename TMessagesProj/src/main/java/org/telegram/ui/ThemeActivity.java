@@ -805,10 +805,6 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
 
             otherHeaderRow = rowCount++;
             directShareRow = rowCount++;
-            TL_account.contentSettings contentSettings = getMessagesController().getContentSettings();
-            if (contentSettings != null && contentSettings.sensitive_can_change) {
-                sensitiveContentRow = rowCount++;
-            }
             sendByEnterRow = rowCount++;
             distanceRow = rowCount++;
             otherSectionRow = rowCount++;
@@ -1438,17 +1434,7 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
                         new AlertDialog.Builder(context, resourceProvider)
                             .setTitle(getString(R.string.ConfirmSensitiveContentTitle))
                             .setMessage(getString(R.string.ConfirmSensitiveContentText))
-                            .setPositiveButton(getString(R.string.Confirm), (di, w) -> {
-                                verifyAge(getContext(), currentAccount, passed -> {
-                                    if (passed) {
-                                        set.run();
-                                    } else {
-                                        BulletinFactory.of(this)
-                                            .createSimpleBulletin(R.raw.error, getString(R.string.AgeVerificationFailedTitle), getString(R.string.AgeVerificationFailedText))
-                                            .show();
-                                    }
-                                }, getResourceProvider());
-                            })
+                            .setPositiveButton(getString(R.string.Confirm), (di, w) -> set.run())
                             .setNegativeButton(getString(R.string.Cancel), null)
                             .create()
                     );
@@ -1664,110 +1650,6 @@ public class ThemeActivity extends BaseFragment implements NotificationCenter.No
             AndroidUtilities.requestAdjustResize(getParentActivity(), classGuid);
             AndroidUtilities.setAdjustResizeToNothing(getParentActivity(), classGuid);
         }
-    }
-
-    public static void verifyAge(Context context, int currentAccount, Utilities.Callback<Boolean> done, Theme.ResourcesProvider resourcesProvider) {
-        final MessagesController messagesController = MessagesController.getInstance(currentAccount);
-        final String username = messagesController.verifyAgeBotUsername;
-        final String country = messagesController.verifyAgeCountry;
-        final int minAge = messagesController.verifyAgeMin;
-        if (TextUtils.isEmpty(username) || !messagesController.config.needAgeVideoVerification.get()) {
-            done.run(true);
-            return;
-        }
-
-        final BottomSheet.Builder b = new BottomSheet.Builder(context, false, resourcesProvider);
-        final BottomSheet[] sheet = new BottomSheet[1];
-
-        LinearLayout layout = new LinearLayout(context);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(dp(12), 0, dp(12), 0);
-        layout.setClipChildren(false);
-        layout.setClipToPadding(false);
-        b.setCustomView(layout);
-
-        FrameLayout topView = new FrameLayout(context);
-        ThemeBind.fillBackground(topView, Theme.createCircleDrawable(dp(80), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)), ThemeBind.of(Theme.key_featuredStickers_addButton), resourcesProvider);
-        ImageView imageView = new ImageView(context);
-        imageView.setScaleType(ImageView.ScaleType.CENTER);
-        imageView.setImageResource(R.drawable.filled_verify_age);
-        topView.addView(imageView, LayoutHelper.createFrame(50, 50, Gravity.CENTER));
-        layout.addView(topView, LayoutHelper.createLinear(80, 80, Gravity.CENTER_HORIZONTAL, 0, 20, 0, 8));
-
-        TextView textView = TextHelper.makeTextView(context, 20, Theme.key_dialogTextBlack, true, resourcesProvider);
-        textView.setText(getString(R.string.AgeVerificationTitle));
-        textView.setGravity(Gravity.CENTER);
-        layout.addView(textView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.FILL_HORIZONTAL, 24, 8, 24, 8));
-
-        textView = TextHelper.makeTextView(context, 14, Theme.key_dialogTextBlack, false, resourcesProvider);
-        textView.setText(AndroidUtilities.replaceTags(getString("AgeVerificationText" + country)));
-        textView.setGravity(Gravity.CENTER);
-        layout.addView(textView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.FILL_HORIZONTAL, 24, 0, 24, 0));
-
-        ButtonWithCounterView button = new ButtonWithCounterView(context, resourcesProvider);
-        button.setText(getString(R.string.AgeVerificationButton), false);
-        button.setOnClickListener(v -> {
-            if (button.isLoading()) return;
-            button.setLoading(true);
-
-            PermissionRequest.ensurePermission(
-                R.raw.permission_request_camera,
-                R.string.AgeVerificationNeedCameraPermission,
-                Manifest.permission.CAMERA,
-                granted -> {
-                    if (!granted) {
-                        button.setLoading(false);
-                        return;
-                    }
-
-                    messagesController.getUserNameResolver().resolve(username, userId -> {
-                        if (userId == null) {
-                            button.setLoading(false);
-                            return;
-                        }
-                        final TLRPC.User bot = messagesController.getUser(userId);
-                        if (bot == null) {
-                            button.setLoading(false);
-                            return;
-                        }
-
-                        BaseFragment lastFragment = LaunchActivity.getSafeLastFragment();
-                        if (lastFragment == null) {
-                            button.setLoading(false);
-                            return;
-                        }
-
-                        final WebViewRequestProps props = WebViewRequestProps.of(currentAccount, userId, userId, null, null, BotWebViewAttachedSheet.TYPE_WEB_VIEW_BOT_MAIN, 0, 0L, false, null, false, null, bot, 0, false, false);
-                        final BotWebViewSheet webViewSheet = new BotWebViewSheet(context, resourcesProvider);
-                        webViewSheet.setOnVerifiedAge((localPassed, age, gender, genderProbability) -> {
-                            final boolean passed = age != null ? age >= minAge : localPassed;
-
-                            webViewSheet.dismiss();
-                            done.run(passed);
-
-                            final BaseFragment lastFragment2 = LaunchActivity.getSafeLastFragment();
-                            if (passed && lastFragment2 != null) {
-                                BulletinFactory.of(lastFragment2)
-                                    .createSimpleBulletin(R.raw.contact_check, getString(R.string.AgeVerificationPassedTitle))
-                                    .show();
-                            }
-                        });
-                        webViewSheet.setDefaultFullsize(true);
-                        webViewSheet.setNeedsContext(false);
-                        webViewSheet.setParentActivity(lastFragment.getParentActivity());
-                        webViewSheet.requestWebView(lastFragment, props);
-                        webViewSheet.show();
-
-                        button.setLoading(false);
-                        sheet[0].dismiss();
-                    });
-                }
-            );
-        });
-        layout.addView(button, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, Gravity.FILL_HORIZONTAL, 2, 29, 2, 14));
-
-        sheet[0] = b.show();
-        sheet[0].fixNavigationBar();
     }
 
     private void updateMenuItem() {

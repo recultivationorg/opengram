@@ -33,7 +33,6 @@ public class AppGlobalConfig {
     public final ConfigDouble tonUsdRate = ofDouble("ton_usd_rate", 3);
 
     public final ConfigString starsRatingLearnMoreUrl = ofString("stars_rating_learnmore_url", "https://telegram.org/blog/telegram-stars");
-    public final ConfigBoolean needAgeVideoVerification = ofBoolean("need_age_video_verification", false);
 
     public final ConfigInt starsStarGiftResaleCommissionPermille = ofInt("stars_stargift_resale_commission_permille", 800);
     public final ConfigInt tonStarGiftResaleCommissionPermille = ofInt("ton_stargift_resale_commission_permille", 800);
