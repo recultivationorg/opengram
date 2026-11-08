@@ -13,7 +13,15 @@ configurations {
 }
 
 configurations.all {
-    exclude group: 'com.google.firebase'
+    exclude group: 'com.google.firebase', module: 'firebase-analytics'
+    exclude group: 'com.google.firebase', module: 'firebase-analytics-ktx'
+    exclude group: 'com.google.firebase', module: 'firebase-crashlytics'
+    exclude group: 'com.google.firebase', module: 'firebase-crashlytics-ktx'
+    exclude group: 'com.google.firebase', module: 'firebase-crashlytics-ndk'
+    exclude group: 'com.google.firebase', module: 'firebase-messaging'
+    exclude group: 'com.google.firebase', module: 'firebase-installations'
+    exclude group: 'com.google.firebase', module: 'firebase-common'
+    exclude group: 'com.google.firebase', module: 'firebase-core'
     exclude group: 'androidx.recyclerview', module: 'recyclerview'
 }
 
