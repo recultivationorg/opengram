@@ -20,8 +20,8 @@ import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
 import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
-import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
+import org.telegram.utils.glass.source.GlassSourceColor;
+import org.telegram.utils.glass.source.GlassSourceRenderNode;
 import org.telegram.ui.Components.chat.ViewPositionWatcher;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
@@ -104,16 +104,16 @@ final class OpengramReloadChrome {
     static final class GlassPage extends FrameLayout {
 
         final BlurredBackgroundDrawableViewFactory factory;
-        private final BlurredBackgroundSourceColor colorSource;
-        private final BlurredBackgroundSourceRenderNode glassSource;
+        private final GlassSourceColor colorSource;
+        private final GlassSourceRenderNode glassSource;
 
         GlassPage(Context context) {
             super(context);
             setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
-            colorSource = new BlurredBackgroundSourceColor();
+            colorSource = new GlassSourceColor();
             colorSource.setColor(Theme.getColor(Theme.key_windowBackgroundGray));
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                glassSource = new BlurredBackgroundSourceRenderNode(colorSource);
+                glassSource = new GlassSourceRenderNode(colorSource);
                 factory = new BlurredBackgroundDrawableViewFactory(glassSource);
                 factory.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
             } else {

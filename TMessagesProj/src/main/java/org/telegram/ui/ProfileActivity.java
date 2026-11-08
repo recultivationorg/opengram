@@ -3806,9 +3806,6 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
 //        sharedMediaLayout.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
         if (userId == 0 || imageUpdater == null || myProfile) {
             musicView = new ProfileMusicView(context, resourcesProvider);
-            if (avatarsBlurView != null) {
-                avatarsBlurView.setMusicView(musicView);
-            }
             musicView.setColor(peerColor);
             if (userInfo != null && userInfo.saved_music != null) {
                 musicView.setMusicDocument(userInfo.saved_music);

@@ -511,7 +511,7 @@ public final class OpengramGhostReads {
         if (clientUserId == 0 || !UserConfig.isGhostMode(account)) {
             return;
         }
-        Handler handler = Utilities.globalQueue.getHandler();
+        Handler handler = Utilities.globalQueue.getHandlerSync();
         if (handler != null && Thread.currentThread() == handler.getLooper().getThread()) {
             saveNow(clientUserId);
             return;

@@ -11511,7 +11511,7 @@ public class MessagesStorage extends BaseController {
         if (userId == 0) {
             return null;
         }
-        Handler handler = storageQueue.getHandler();
+        Handler handler = storageQueue.getHandlerSync();
         if (handler != null && Thread.currentThread() == handler.getLooper().getThread()) {
             return queryEncryptedChatForUser(userId);
         }

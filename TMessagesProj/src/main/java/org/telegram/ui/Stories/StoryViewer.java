@@ -1456,7 +1456,7 @@ public class StoryViewer implements NotificationCenter.NotificationCenterDelegat
                             liveView.setScope(0, null);
                             liveView.reset();
                         }
-                        if (livePlayer != null && !livePlayer.outgoing && !LiveStoryPipOverlay.isVisible(livePlayer)) {
+                        if (livePlayer != null && !livePlayer.outgoing && !LiveStoryPipContent.isInPip(livePlayer)) {
                             livePlayer.destroy();
                             livePlayer = null;
                         }
