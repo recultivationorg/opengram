@@ -28,6 +28,7 @@ import org.telegram.messenger.ChatThemeController;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
+import org.telegram.messenger.OpengramClientFingerprint;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
@@ -105,6 +106,7 @@ public class DebugSettingsActivity extends UniversalFragment {
     private static final int ID_WIDGET_STATIC_LAYERS = 44;
     private static final int ID_FORGET_HINTS = 45;
     private static final int ID_COMPACT_MODE = 46;
+    private static final int ID_RANDOMIZE_FINGERPRINT = 47;
 
     @Override
     protected boolean useSimpleActionBar() {
@@ -176,6 +178,7 @@ public class DebugSettingsActivity extends UniversalFragment {
             items.add(UItem.asButton(ID_PERFORMANCE_CLASS, "Force performance class"));
         }
         items.add(UItem.asButton(ID_MEMORY_DUMP, "Make Memory Dump"));
+        items.add(UItem.asButton(ID_RANDOMIZE_FINGERPRINT, getString(R.string.DebugMenuRandomizeFingerprint)));
         if (BuildVars.DEBUG_PRIVATE_VERSION) {
             items.add(UItem.asCheck(ID_FLOATING_DEBUG, getString(R.string.FloatingDebugEnable)).setChecked(SharedConfig.isFloatingDebugActive));
         }
@@ -421,6 +424,9 @@ public class DebugSettingsActivity extends UniversalFragment {
             case ID_MEMORY_DUMP:
                 FileLog.getInstance().dumpMemory(true);
                 break;
+            case ID_RANDOMIZE_FINGERPRINT:
+                confirmRandomizeFingerprint();
+                break;
             case ID_WALLPAPER_SHADER:
                 SharedConfig.toggleFastWallpaperDisabled();
                 break;
@@ -460,6 +466,22 @@ public class DebugSettingsActivity extends UniversalFragment {
     @Override
     protected boolean onLongClick(UItem item, View view, int position, float x, float y) {
         return false;
+    }
+
+    private void confirmRandomizeFingerprint() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity(), getResourceProvider());
+        builder.setTitle(getString(R.string.DebugMenuRandomizeFingerprint));
+        builder.setMessage(getString(R.string.DebugMenuRandomizeFingerprintWarning));
+        builder.setPositiveButton(getString(R.string.OK), (dialog, which) -> {
+            if (getParentActivity() != null) {
+                OpengramClientFingerprint.rerollAndRestart(getParentActivity(), currentAccount);
+            }
+        });
+        builder.setNegativeButton(getString(R.string.Cancel), null);
+        showDialog(builder.create());
     }
 
     private void clearSentMediaCache() {
