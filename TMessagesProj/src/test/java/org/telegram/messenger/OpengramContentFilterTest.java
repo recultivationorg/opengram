@@ -317,6 +317,49 @@ public class OpengramContentFilterTest {
     }
 
     @Test
+    public void exclusionsRoundTripAndStayWhenChannelsChange() throws Exception {
+        File file = temp();
+        ArrayList<Long> channels = new ArrayList<>();
+        channels.add(-4L);
+        ArrayList<Long> excluded = new ArrayList<>();
+        excluded.add(-20L);
+        excluded.add(33L);
+        assertTrue(OpengramContentFilter.writeFilter(file, OpengramSnapshotFile.MODE_PLAINTEXT, 7L, Arrays.asList("stay"), channels, excluded, null));
+        OpengramContentFilter.Snapshot read = OpengramContentFilter.readKeywords(file, OpengramSnapshotFile.MODE_PLAINTEXT, 7L, null);
+        assertEquals(Arrays.asList("stay"), read.keywords);
+        assertEquals(channels, read.channels);
+        assertEquals(excluded, read.exclusions);
+
+        ArrayList<Long> nextChannels = new ArrayList<>();
+        nextChannels.add(-8L);
+        assertTrue(OpengramContentFilter.writeFilter(file, OpengramSnapshotFile.MODE_PLAINTEXT, 7L, Arrays.asList("stay"), nextChannels, excluded, null));
+        read = OpengramContentFilter.readKeywords(file, OpengramSnapshotFile.MODE_PLAINTEXT, 7L, null);
+        assertEquals(nextChannels, read.channels);
+        assertEquals(excluded, read.exclusions);
+    }
+
+    @Test
+    public void oldFilesHaveNoExclusions() throws Exception {
+        File file = temp();
+        assertTrue(OpengramContentFilter.writeKeywords(file, OpengramSnapshotFile.MODE_PLAINTEXT, 7L, Arrays.asList("metro"), null));
+        OpengramContentFilter.Snapshot read = OpengramContentFilter.readKeywords(file, OpengramSnapshotFile.MODE_PLAINTEXT, 7L, null);
+        assertTrue(read.exclusions.isEmpty());
+    }
+
+    @Test
+    public void corruptExclusionLineStopsFiltering() throws Exception {
+        File file = temp();
+        java.util.LinkedHashSet<String> peers = new java.util.LinkedHashSet<>();
+        peers.add("ok");
+        peers.add(OpengramContentFilter.EXCLUDE_PREFIX + "0");
+        assertTrue(OpengramSnapshotFile.write(file, new OpengramSnapshotFile.Record(OpengramSnapshotFile.MODE_PLAINTEXT, 0L, new long[] {7L}, peers), null));
+        OpengramContentFilter.Snapshot read = OpengramContentFilter.readKeywords(file, OpengramSnapshotFile.MODE_PLAINTEXT, 7L, null);
+        assertEquals(OpengramSnapshotFile.Status.CORRUPT, read.status);
+        assertTrue(read.keywords.isEmpty());
+        assertTrue(read.exclusions.isEmpty());
+    }
+
+    @Test
     public void hiddenChannelDoesNotAdvancePts() {
         assertFalse(OpengramContentFilter.applyChannelPts(true));
         assertTrue(OpengramContentFilter.applyChannelPts(false));

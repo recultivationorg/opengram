@@ -12,6 +12,7 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.FrameLayout;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.OpengramContentFilter;
 import org.telegram.messenger.OpengramSnapshotFile;
@@ -35,6 +36,9 @@ public class OpengramContentFilterActivity extends BaseFragment {
     private static final int ROW_ENABLE = 1;
     private static final int ROW_ADD_KEYWORD = 2;
     private static final int ROW_ADD_CHANNEL = 3;
+    private static final int ROW_ADD_EXCLUSION = 4;
+    private static final int ROW_CHANNEL = 5;
+    private static final int ROW_EXCLUSION = 6;
     private static final int ROW_KEYWORD = 100;
 
     private UniversalRecyclerView listView;
@@ -88,10 +92,20 @@ public class OpengramContentFilterActivity extends BaseFragment {
             ArrayList<Long> channels = OpengramContentFilter.hiddenChannels(currentAccount);
             for (int a = 0; a < channels.size(); a++) {
                 long dialogId = channels.get(a);
-                items.add(UItem.asFilterChat(false, dialogId).setCloseIcon(v -> removeChannel(dialogId)));
+                items.add(UItem.asFilterChat(false, dialogId).setId(ROW_CHANNEL).setCloseIcon(v -> removeChannel(dialogId)));
             }
         }
         items.add(UItem.asShadow(getString(R.string.MessageFilterChannelsInfo)));
+        items.add(UItem.asHeader(getString(R.string.MessageFilterExcludedChats)));
+        items.add(UItem.asButton(ROW_ADD_EXCLUSION, getString(R.string.MessageFilterAddExcludedChat)).setEnabled(ready));
+        if (ready) {
+            ArrayList<Long> excluded = OpengramContentFilter.excludedChats(currentAccount);
+            for (int a = 0; a < excluded.size(); a++) {
+                long dialogId = excluded.get(a);
+                items.add(UItem.asFilterChat(false, dialogId).setId(ROW_EXCLUSION).setCloseIcon(v -> removeExclusion(dialogId)));
+            }
+        }
+        items.add(UItem.asShadow(getString(R.string.MessageFilterExcludedChatsInfo)));
     }
 
     private void onClick(UItem item, View view, int position, float x, float y) {
@@ -133,8 +147,12 @@ public class OpengramContentFilterActivity extends BaseFragment {
             removeKeyword(item.text.toString());
         } else if (item.id == ROW_ADD_CHANNEL) {
             openChannelPicker();
-        } else if (item.viewType == UniversalAdapter.VIEW_TYPE_FILTER_CHAT && item.dialogId < 0) {
+        } else if (item.id == ROW_ADD_EXCLUSION) {
+            openExclusionPicker();
+        } else if (item.id == ROW_CHANNEL) {
             removeChannel(item.dialogId);
+        } else if (item.id == ROW_EXCLUSION) {
+            removeExclusion(item.dialogId);
         }
     }
 
@@ -149,6 +167,15 @@ public class OpengramContentFilterActivity extends BaseFragment {
 
     private void removeChannel(long dialogId) {
         if (!OpengramContentFilter.removeChannel(currentAccount, dialogId)) {
+            showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
+        }
+        if (listView != null) {
+            listView.adapter.update(true);
+        }
+    }
+
+    private void removeExclusion(long dialogId) {
+        if (!OpengramContentFilter.removeExclusion(currentAccount, dialogId)) {
             showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
         }
         if (listView != null) {
@@ -176,6 +203,35 @@ public class OpengramContentFilterActivity extends BaseFragment {
                 ArrayList<Long> hidden = OpengramContentFilter.hiddenChannels(currentAccount);
                 boolean full = !hidden.contains(dialogId) && hidden.size() >= OpengramContentFilter.MAX_CHANNELS;
                 if (!full && !OpengramContentFilter.addChannel(currentAccount, dialogId)) {
+                    showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
+                }
+            }
+            if (listView != null) {
+                listView.adapter.update(true);
+            }
+            return true;
+        });
+        presentFragment(picker);
+    }
+
+    private void openExclusionPicker() {
+        if (getParentActivity() == null || OpengramContentFilter.phase(currentAccount) != OpengramContentFilter.Phase.READY) {
+            return;
+        }
+        Bundle args = new Bundle();
+        args.putBoolean("onlySelect", true);
+        args.putBoolean("checkCanWrite", false);
+        DialogsActivity picker = new DialogsActivity(args);
+        picker.setDelegate((fragment, dids, message, param, notify, scheduleDate, scheduleRepeatPeriod, topicsFragment) -> {
+            if (dids == null || dids.isEmpty()) {
+                return false;
+            }
+            fragment.finishFragment();
+            long dialogId = dids.get(0).dialogId;
+            if (dialogId != 0 && !DialogObject.isEncryptedDialog(dialogId)) {
+                ArrayList<Long> excluded = OpengramContentFilter.excludedChats(currentAccount);
+                boolean full = !excluded.contains(dialogId) && excluded.size() >= OpengramContentFilter.MAX_EXCLUSIONS;
+                if (!full && !OpengramContentFilter.addExclusion(currentAccount, dialogId)) {
                     showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
                 }
             }

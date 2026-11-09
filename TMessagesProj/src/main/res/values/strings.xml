@@ -3358,6 +3358,9 @@
     <string name="MessageFilterHiddenChannelsCount_one">%1$d hidden channel</string>
     <string name="MessageFilterHiddenChannelsCount_other">%1$d hidden channels</string>
     <string name="MessageFilterAddChannel">Add a channel</string>
+    <string name="MessageFilterExcludedChats">Excluded chats</string>
+    <string name="MessageFilterAddExcludedChat">Add a chat</string>
+    <string name="MessageFilterExcludedChatsInfo">Keyword filtering is skipped in these chats. A channel that is also hidden stays hidden.</string>
     <string name="MessageFilterHiddenLink">You have %1$s in your hidden list. While it remains there, the corresponding links to it are also disabled. To re-enable them, just remove the channel from the list</string>
     <string name="MessageFilterOpenSettings">Open settings</string>
     <string name="MessageFilterError">The keyword list could not be read. Filtering is stopped. Turn this off and on again.</string>

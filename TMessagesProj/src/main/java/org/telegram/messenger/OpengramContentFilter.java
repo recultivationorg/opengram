@@ -18,7 +18,9 @@ public final class OpengramContentFilter {
     public static final int MAX_KEYWORDS = 32;
     public static final int MAX_KEYWORD_LENGTH = 48;
     public static final int MAX_CHANNELS = 256;
+    public static final int MAX_EXCLUSIONS = 256;
     static final String CHANNEL_PREFIX = "\u007F";
+    static final String EXCLUDE_PREFIX = "\u0001";
 
     private static final int ACCOUNT_SLOTS = 4;
     private static final String FILE_PREFIX = "opengram-filter-";
@@ -36,15 +38,21 @@ public final class OpengramContentFilter {
         public final OpengramSnapshotFile.Status status;
         public final List<String> keywords;
         public final List<Long> channels;
+        public final List<Long> exclusions;
 
         Snapshot(OpengramSnapshotFile.Status status, List<String> keywords) {
-            this(status, keywords, Collections.<Long>emptyList());
+            this(status, keywords, Collections.<Long>emptyList(), Collections.<Long>emptyList());
         }
 
         Snapshot(OpengramSnapshotFile.Status status, List<String> keywords, List<Long> channels) {
+            this(status, keywords, channels, Collections.<Long>emptyList());
+        }
+
+        Snapshot(OpengramSnapshotFile.Status status, List<String> keywords, List<Long> channels, List<Long> exclusions) {
             this.status = status;
             this.keywords = keywords == null ? Collections.<String>emptyList() : keywords;
             this.channels = channels == null ? Collections.<Long>emptyList() : channels;
+            this.exclusions = exclusions == null ? Collections.<Long>emptyList() : exclusions;
         }
     }
 
@@ -56,6 +64,7 @@ public final class OpengramContentFilter {
         final ArrayList<String> keywords = new ArrayList<>();
         final ArrayList<String> folded = new ArrayList<>();
         final ArrayList<Long> channels = new ArrayList<>();
+        final ArrayList<Long> exclusions = new ArrayList<>();
 
         void clear() {
             loaded = false;
@@ -65,6 +74,7 @@ public final class OpengramContentFilter {
             keywords.clear();
             folded.clear();
             channels.clear();
+            exclusions.clear();
         }
 
         void fail(long clientUserId, int mode) {
@@ -75,6 +85,7 @@ public final class OpengramContentFilter {
             keywords.clear();
             folded.clear();
             channels.clear();
+            exclusions.clear();
         }
 
         void replaceKeywords(Collection<String> next) {
@@ -105,6 +116,18 @@ public final class OpengramContentFilter {
                 }
             }
         }
+
+        void replaceExclusions(Collection<Long> next) {
+            exclusions.clear();
+            if (next == null) {
+                return;
+            }
+            for (Long dialogId : next) {
+                if (dialogId != null && dialogId != 0 && !DialogObject.isEncryptedDialog(dialogId) && !exclusions.contains(dialogId)) {
+                    exclusions.add(dialogId);
+                }
+            }
+        }
     }
 
     private OpengramContentFilter() {
@@ -123,7 +146,7 @@ public final class OpengramContentFilter {
             }
             String token = raw.substring(start, i).replace('\n', ' ').replace('\r', ' ').trim();
             start = i + 1;
-            if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH || token.charAt(0) == CHANNEL_PREFIX.charAt(0)) {
+            if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH || token.charAt(0) == CHANNEL_PREFIX.charAt(0) || token.charAt(0) == EXCLUDE_PREFIX.charAt(0)) {
                 continue;
             }
             if (!seen.add(token.toLowerCase(Locale.ROOT))) {
@@ -627,6 +650,10 @@ public final class OpengramContentFilter {
     }
 
     public static boolean writeFilter(File file, int mode, long clientUserId, Collection<String> keywords, Collection<Long> channels, OpengramSnapshotFile.Sealer sealer) {
+        return writeFilter(file, mode, clientUserId, keywords, channels, Collections.<Long>emptyList(), sealer);
+    }
+
+    public static boolean writeFilter(File file, int mode, long clientUserId, Collection<String> keywords, Collection<Long> channels, Collection<Long> exclusions, OpengramSnapshotFile.Sealer sealer) {
         LinkedHashSet<String> peers = new LinkedHashSet<>();
         if (keywords != null) {
             for (String keyword : keywords) {
@@ -634,7 +661,7 @@ public final class OpengramContentFilter {
                     continue;
                 }
                 String token = keyword.replace('\n', ' ').replace('\r', ' ').trim();
-                if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH || token.charAt(0) == CHANNEL_PREFIX.charAt(0)) {
+                if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH || token.charAt(0) == CHANNEL_PREFIX.charAt(0) || token.charAt(0) == EXCLUDE_PREFIX.charAt(0)) {
                     continue;
                 }
                 if (!peers.add(token)) {
@@ -660,6 +687,21 @@ public final class OpengramContentFilter {
                 }
             }
         }
+        int exclusionCount = 0;
+        if (exclusions != null) {
+            for (Long dialogId : exclusions) {
+                if (dialogId == null || dialogId == 0 || DialogObject.isEncryptedDialog(dialogId)) {
+                    continue;
+                }
+                if (!peers.add(EXCLUDE_PREFIX + dialogId)) {
+                    continue;
+                }
+                exclusionCount++;
+                if (exclusionCount == MAX_EXCLUSIONS) {
+                    break;
+                }
+            }
+        }
         return OpengramSnapshotFile.write(file, new OpengramSnapshotFile.Record(mode, 0L, new long[]{clientUserId}, peers), sealer);
     }
 
@@ -673,6 +715,7 @@ public final class OpengramContentFilter {
         }
         ArrayList<String> keywords = new ArrayList<>();
         ArrayList<Long> channels = new ArrayList<>();
+        ArrayList<Long> exclusions = new ArrayList<>();
         for (String peer : read.record.peers) {
             if (peer == null || peer.indexOf('\n') >= 0 || peer.indexOf('\r') >= 0) {
                 return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
@@ -690,6 +733,19 @@ public final class OpengramContentFilter {
                 }
                 continue;
             }
+            if (peer.startsWith(EXCLUDE_PREFIX)) {
+                Long dialogId = parseExcludedDialogId(peer);
+                if (dialogId == null) {
+                    return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
+                }
+                if (!exclusions.contains(dialogId)) {
+                    exclusions.add(dialogId);
+                }
+                if (exclusions.size() > MAX_EXCLUSIONS) {
+                    return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
+                }
+                continue;
+            }
             String token = peer.trim();
             if (token.isEmpty() || token.length() > MAX_KEYWORD_LENGTH) {
                 return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
@@ -699,7 +755,22 @@ public final class OpengramContentFilter {
                 return new Snapshot(OpengramSnapshotFile.Status.CORRUPT, Collections.<String>emptyList());
             }
         }
-        return new Snapshot(OpengramSnapshotFile.Status.OK, keywords, channels);
+        return new Snapshot(OpengramSnapshotFile.Status.OK, keywords, channels, exclusions);
+    }
+
+    private static Long parseExcludedDialogId(String peer) {
+        if (peer.length() <= EXCLUDE_PREFIX.length()) {
+            return null;
+        }
+        try {
+            long id = Long.parseLong(peer.substring(EXCLUDE_PREFIX.length()));
+            if (id == 0 || DialogObject.isEncryptedDialog(id)) {
+                return null;
+            }
+            return id;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static Long parseChannelId(String peer) {
@@ -799,7 +870,7 @@ public final class OpengramContentFilter {
     private static boolean replaceKeywords(int account, List<String> keywords) {
         boolean wrote;
         synchronized (lock) {
-            wrote = writeStateLocked(account, keywords, new ArrayList<>(stateLocked(account).channels));
+            wrote = writeStateLocked(account, keywords, new ArrayList<>(stateLocked(account).channels), new ArrayList<>(stateLocked(account).exclusions));
         }
         if (wrote) {
             notifyDialogs(account);
@@ -863,6 +934,7 @@ public final class OpengramContentFilter {
             state.mode = mode;
             state.replaceKeywords(Collections.<String>emptyList());
             state.replaceChannels(Collections.<Long>emptyList());
+            state.replaceExclusions(Collections.<Long>emptyList());
         }
         notifyDialogs(account);
         return true;
@@ -898,7 +970,7 @@ public final class OpengramContentFilter {
         List<String> keywords = parseKeywords(raw);
         boolean wrote;
         synchronized (lock) {
-            wrote = writeStateLocked(account, keywords, new ArrayList<>(stateLocked(account).channels));
+            wrote = writeStateLocked(account, keywords, new ArrayList<>(stateLocked(account).channels), new ArrayList<>(stateLocked(account).exclusions));
         }
         if (wrote) {
             notifyDialogs(account);
@@ -915,7 +987,7 @@ public final class OpengramContentFilter {
     }
 
     public static ArrayList<MessageObject> withoutHidden(int account, long dialogId, ArrayList<MessageObject> messages) {
-        if (messages == null || messages.isEmpty()) {
+        if (messages == null || messages.isEmpty() || isExcluded(account, dialogId)) {
             return messages;
         }
         List<String> keywords = keywordsForHide(account);
@@ -967,7 +1039,7 @@ public final class OpengramContentFilter {
 
     public static HashSet<Long> hiddenGroups(int account, long dialogId, List<MessageObject> messages) {
         List<String> keywords = keywordsForHide(account);
-        if (keywords.isEmpty() || messages == null || !appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId, null), isBotChat(account, dialogId))) {
+        if (isExcluded(account, dialogId) || keywords.isEmpty() || messages == null || !appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId, null), isBotChat(account, dialogId))) {
             return new HashSet<>();
         }
         return hiddenGroups(messages, keywords);
@@ -1008,16 +1080,19 @@ public final class OpengramContentFilter {
         if (message == null) {
             return false;
         }
+        long id = dialogId;
+        if (id == 0 && message.messageOwner != null) {
+            id = message.getDialogId();
+        }
+        if (isExcluded(account, id)) {
+            return false;
+        }
         if (isHiddenRepost(account, message)) {
             return true;
         }
         List<String> keywords = keywordsForHide(account);
         if (keywords.isEmpty()) {
             return false;
-        }
-        long id = dialogId;
-        if (id == 0 && message.messageOwner != null) {
-            id = message.getDialogId();
         }
         boolean encrypted = DialogObject.isEncryptedDialog(id);
         boolean userDialog = !encrypted && DialogObject.isUserDialog(id);
@@ -1119,7 +1194,7 @@ public final class OpengramContentFilter {
             }
             ArrayList<Long> channels = new ArrayList<>(state.channels);
             channels.add(dialogId);
-            wrote = writeStateLocked(account, new ArrayList<>(state.keywords), channels);
+            wrote = writeStateLocked(account, new ArrayList<>(state.keywords), channels, new ArrayList<>(state.exclusions));
         }
         if (!wrote) {
             return false;
@@ -1142,7 +1217,7 @@ public final class OpengramContentFilter {
             }
             ArrayList<Long> channels = new ArrayList<>(state.channels);
             channels.remove(dialogId);
-            wrote = writeStateLocked(account, new ArrayList<>(state.keywords), channels);
+            wrote = writeStateLocked(account, new ArrayList<>(state.keywords), channels, new ArrayList<>(state.exclusions));
         }
         if (wrote) {
             notifyDialogs(account);
@@ -1150,7 +1225,70 @@ public final class OpengramContentFilter {
         return wrote;
     }
 
-    private static boolean writeStateLocked(int account, List<String> keywords, List<Long> channels) {
+    public static boolean isExcluded(int account, long dialogId) {
+        if (dialogId == 0 || DialogObject.isEncryptedDialog(dialogId) || phase(account) != Phase.READY) {
+            return false;
+        }
+        synchronized (lock) {
+            return stateLocked(account).exclusions.contains(dialogId);
+        }
+    }
+
+    public static ArrayList<Long> excludedChats(int account) {
+        ArrayList<Long> copy = new ArrayList<>();
+        if (phase(account) != Phase.READY) {
+            return copy;
+        }
+        synchronized (lock) {
+            copy.addAll(stateLocked(account).exclusions);
+        }
+        return copy;
+    }
+
+    public static boolean addExclusion(int account, long dialogId) {
+        if (phase(account) != Phase.READY || dialogId == 0 || DialogObject.isEncryptedDialog(dialogId)) {
+            return false;
+        }
+        boolean wrote;
+        synchronized (lock) {
+            State state = stateLocked(account);
+            if (state.exclusions.contains(dialogId)) {
+                return true;
+            }
+            if (state.exclusions.size() >= MAX_EXCLUSIONS) {
+                return false;
+            }
+            ArrayList<Long> exclusions = new ArrayList<>(state.exclusions);
+            exclusions.add(dialogId);
+            wrote = writeStateLocked(account, new ArrayList<>(state.keywords), new ArrayList<>(state.channels), exclusions);
+        }
+        if (wrote) {
+            notifyDialogs(account);
+        }
+        return wrote;
+    }
+
+    public static boolean removeExclusion(int account, long dialogId) {
+        if (phase(account) != Phase.READY) {
+            return false;
+        }
+        boolean wrote;
+        synchronized (lock) {
+            State state = stateLocked(account);
+            if (!state.exclusions.contains(dialogId)) {
+                return true;
+            }
+            ArrayList<Long> exclusions = new ArrayList<>(state.exclusions);
+            exclusions.remove(dialogId);
+            wrote = writeStateLocked(account, new ArrayList<>(state.keywords), new ArrayList<>(state.channels), exclusions);
+        }
+        if (wrote) {
+            notifyDialogs(account);
+        }
+        return wrote;
+    }
+
+    private static boolean writeStateLocked(int account, List<String> keywords, List<Long> channels, List<Long> exclusions) {
         UserConfig config = UserConfig.getInstance(account);
         long clientUserId = config.getClientUserId();
         int mode = config.messageFilterMode;
@@ -1158,7 +1296,7 @@ public final class OpengramContentFilter {
             return false;
         }
         OpengramSnapshotFile.Sealer sealer = mode == OpengramSnapshotFile.MODE_STRONGBOX ? OpengramStrongBox.forFilter(clientUserId) : null;
-        if (!writeFilter(file(clientUserId), mode, clientUserId, keywords, channels, sealer)) {
+        if (!writeFilter(file(clientUserId), mode, clientUserId, keywords, channels, exclusions, sealer)) {
             return false;
         }
         State state = stateLocked(account);
@@ -1168,6 +1306,7 @@ public final class OpengramContentFilter {
         state.mode = mode;
         state.replaceKeywords(keywords);
         state.replaceChannels(channels);
+        state.replaceExclusions(exclusions);
         return true;
     }
 
@@ -1237,6 +1376,7 @@ public final class OpengramContentFilter {
         state.mode = mode;
         state.replaceKeywords(snapshot.keywords);
         state.replaceChannels(snapshot.channels);
+        state.replaceExclusions(snapshot.exclusions);
     }
 
     private static boolean validAccount(int account) {
