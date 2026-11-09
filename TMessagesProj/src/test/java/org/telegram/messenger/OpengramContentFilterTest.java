@@ -360,6 +360,14 @@ public class OpengramContentFilterTest {
     }
 
     @Test
+    public void excludedDialogSkipsKeywordsAndStillHidesHiddenForwards() {
+        assertFalse(OpengramContentFilter.shouldHideContent(false, true, true, true));
+        assertTrue(OpengramContentFilter.shouldHideContent(true, true, true, false));
+        assertTrue(OpengramContentFilter.shouldHideContent(true, false, false, false));
+        assertFalse(OpengramContentFilter.shouldHideContent(false, false, false, true));
+    }
+
+    @Test
     public void hiddenChannelDoesNotAdvancePts() {
         assertFalse(OpengramContentFilter.applyChannelPts(true));
         assertTrue(OpengramContentFilter.applyChannelPts(false));

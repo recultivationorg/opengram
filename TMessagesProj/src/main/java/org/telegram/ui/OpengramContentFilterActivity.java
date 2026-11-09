@@ -228,10 +228,14 @@ public class OpengramContentFilterActivity extends BaseFragment {
             }
             fragment.finishFragment();
             long dialogId = dids.get(0).dialogId;
-            if (dialogId != 0 && !DialogObject.isEncryptedDialog(dialogId)) {
+            if (!exclusionApplies(dialogId)) {
+                showNotice(getString(R.string.MessageFilter), getString(R.string.MessageFilterExcludeOnlyFiltered));
+            } else {
                 ArrayList<Long> excluded = OpengramContentFilter.excludedChats(currentAccount);
                 boolean full = !excluded.contains(dialogId) && excluded.size() >= OpengramContentFilter.MAX_EXCLUSIONS;
-                if (!full && !OpengramContentFilter.addExclusion(currentAccount, dialogId)) {
+                if (full) {
+                    showNotice(getString(R.string.MessageFilter), getString(R.string.MessageFilterExcludeFull));
+                } else if (!OpengramContentFilter.addExclusion(currentAccount, dialogId)) {
                     showNotice(getString(R.string.ForceEndToEndStrongBoxTitle), getString(R.string.MessageFilterStorageError));
                 }
             }
@@ -241,6 +245,21 @@ public class OpengramContentFilterActivity extends BaseFragment {
             return true;
         });
         presentFragment(picker);
+    }
+
+    private boolean exclusionApplies(long dialogId) {
+        if (dialogId == 0 || DialogObject.isEncryptedDialog(dialogId)) {
+            return false;
+        }
+        if (DialogObject.isChatDialog(dialogId)) {
+            TLRPC.Chat chat = getMessagesController().getChat(-dialogId);
+            return chat != null && chat.broadcast;
+        }
+        if (DialogObject.isUserDialog(dialogId)) {
+            TLRPC.User user = getMessagesController().getUser(dialogId);
+            return user != null && user.bot;
+        }
+        return false;
     }
 
     private void enableFilter(int mode) {

@@ -20,7 +20,7 @@ public final class OpengramContentFilter {
     public static final int MAX_CHANNELS = 256;
     public static final int MAX_EXCLUSIONS = 256;
     static final String CHANNEL_PREFIX = "\u007F";
-    static final String EXCLUDE_PREFIX = "\u0001";
+    static final String EXCLUDE_PREFIX = "\u007E";
 
     private static final int ACCOUNT_SLOTS = 4;
     private static final String FILE_PREFIX = "opengram-filter-";
@@ -987,11 +987,12 @@ public final class OpengramContentFilter {
     }
 
     public static ArrayList<MessageObject> withoutHidden(int account, long dialogId, ArrayList<MessageObject> messages) {
-        if (messages == null || messages.isEmpty() || isExcluded(account, dialogId)) {
+        if (messages == null || messages.isEmpty()) {
             return messages;
         }
-        List<String> keywords = keywordsForHide(account);
-        boolean keywordsApply = !keywords.isEmpty() && appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId, null), isBotChat(account, dialogId));
+        boolean excluded = isExcluded(account, dialogId);
+        List<String> keywords = excluded ? Collections.<String>emptyList() : keywordsForHide(account);
+        boolean keywordsApply = !excluded && !keywords.isEmpty() && appliesToDialog(DialogObject.isEncryptedDialog(dialogId), isBroadcastChannel(account, dialogId, null), isBotChat(account, dialogId));
         HashSet<Long> hiddenGroups = keywordsApply ? hiddenGroups(messages, keywords) : new HashSet<Long>();
         for (int i = 0; i < messages.size(); i++) {
             MessageObject message = messages.get(i);
@@ -1076,6 +1077,16 @@ public final class OpengramContentFilter {
         return -peer.channel_id;
     }
 
+    static boolean shouldHideContent(boolean hiddenRepost, boolean excluded, boolean keywordsApply, boolean keywordMatch) {
+        if (hiddenRepost) {
+            return true;
+        }
+        if (excluded || !keywordsApply) {
+            return false;
+        }
+        return keywordMatch;
+    }
+
     public static boolean shouldHide(int account, long dialogId, MessageObject message) {
         if (message == null) {
             return false;
@@ -1084,11 +1095,10 @@ public final class OpengramContentFilter {
         if (id == 0 && message.messageOwner != null) {
             id = message.getDialogId();
         }
-        if (isExcluded(account, id)) {
-            return false;
-        }
-        if (isHiddenRepost(account, message)) {
-            return true;
+        boolean hiddenRepost = isHiddenRepost(account, message);
+        boolean excluded = isExcluded(account, id);
+        if (hiddenRepost || excluded) {
+            return shouldHideContent(hiddenRepost, excluded, false, false);
         }
         List<String> keywords = keywordsForHide(account);
         if (keywords.isEmpty()) {
@@ -1100,10 +1110,8 @@ public final class OpengramContentFilter {
         if (holdUntilUserLoaded(true, userDialog, user)) {
             return true;
         }
-        if (!appliesToDialog(encrypted, isBroadcastChannel(account, id, message), user != null && user.bot)) {
-            return false;
-        }
-        return messageMatchesPrepared(message, keywords);
+        boolean keywordsApply = appliesToDialog(encrypted, isBroadcastChannel(account, id, message), user != null && user.bot);
+        return shouldHideContent(false, false, keywordsApply, keywordsApply && messageMatchesPrepared(message, keywords));
     }
 
     private static HashSet<Long> hiddenGroups(List<MessageObject> messages, List<String> keywords) {

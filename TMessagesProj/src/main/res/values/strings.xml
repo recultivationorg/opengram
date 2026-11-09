@@ -3360,7 +3360,9 @@
     <string name="MessageFilterAddChannel">Add a channel</string>
     <string name="MessageFilterExcludedChats">Excluded chats</string>
     <string name="MessageFilterAddExcludedChat">Add a chat</string>
-    <string name="MessageFilterExcludedChatsInfo">Keyword filtering is skipped in these chats. A channel that is also hidden stays hidden.</string>
+    <string name="MessageFilterExcludedChatsInfo">Keyword filtering is skipped in these chats. Forwards from hidden channels stay hidden, and a channel that is also hidden stays hidden.</string>
+    <string name="MessageFilterExcludeOnlyFiltered">Only channels and bot chats can be excluded. Keyword filtering does not apply to other chats.</string>
+    <string name="MessageFilterExcludeFull">You can exclude up to 256 chats.</string>
     <string name="MessageFilterHiddenLink">You have %1$s in your hidden list. While it remains there, the corresponding links to it are also disabled. To re-enable them, just remove the channel from the list</string>
     <string name="MessageFilterOpenSettings">Open settings</string>
     <string name="MessageFilterError">The keyword list could not be read. Filtering is stopped. Turn this off and on again.</string>
