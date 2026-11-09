@@ -46,7 +46,7 @@ import java.util.function.Consumer;
 /**
  * The emoji keyboard of the QR screen's sheet: a glass strip of pack tabs over a grid of custom emoji (the presets, the
  * recent ones and the installed packs). Only animated (Lottie) custom emoji: the theme on the server keeps custom emoji
- * only and the backdrop pattern animates them. Without Premium only the presets are free; the packs show "Unlock".
+ * only and the backdrop pattern animates them.
  * <p>
  * The screen styles it from outside: the strip draws the glass under and the rim over itself
  * ({@link Tabs#underDraw} / {@link Tabs#overDraw}), the grid lets the screen draw under its cells and mask them
@@ -120,12 +120,10 @@ public class QrEmojiPanel extends FrameLayout implements NotificationCenter.Noti
     private int spanCount = 7;
     private int itemCount;
     private boolean smoothScrolling;
-    private boolean premium;
     private int headerColor = 0x99FFFFFF;
     private @Nullable TLRPC.TL_messages_stickerSet presetSet;
     private boolean presetsRequested, presetsFailed;
     private final java.util.HashSet<Long> presetsFetched = new java.util.HashSet<>();
-    private final java.util.HashSet<Long> presetIds = new java.util.HashSet<>();
     /** The emoji applied to the QR (presets included), newest first: the start of Recent. */
     private @Nullable ArrayList<Long> applied;
     private boolean recentDirty;
@@ -134,7 +132,6 @@ public class QrEmojiPanel extends FrameLayout implements NotificationCenter.Noti
         super(context);
         this.account = account;
         this.delegate = delegate;
-        premium = org.telegram.messenger.UserConfig.getInstance(account).isPremium();
 
         grid = new Grid(context);
         layoutManager = new GridLayoutManager(context, spanCount);
@@ -258,11 +255,6 @@ public class QrEmojiPanel extends FrameLayout implements NotificationCenter.Noti
         return document != null && "application/x-tgsticker".equals(document.mime_type);
     }
 
-    /** Whether a custom emoji is one of the free presets (applies without Premium). */
-    public boolean isPreset(long documentId) {
-        return presetIds.contains(documentId);
-    }
-
     /** An emoji has been applied to the QR: it goes to the start of Recent, shown from the next time the panel shows. */
     public void addRecent(long documentId) {
         final ArrayList<Long> l = applied();
@@ -329,7 +321,6 @@ public class QrEmojiPanel extends FrameLayout implements NotificationCenter.Noti
             if (cached != null && cached.documents != null && !cached.documents.isEmpty()) presetSet = cached;
         }
         final ArrayList<TLRPC.Document> docs = new ArrayList<>(PRESETS.length);
-        presetIds.clear();
         if (presetSet == null && !presetsFailed) {
             for (int i = 0; i < PRESETS.length; i++) docs.add(new TLRPC.TL_documentEmpty());
             return docs;
@@ -355,7 +346,6 @@ public class QrEmojiPanel extends FrameLayout implements NotificationCenter.Noti
             if (d == null) d = AnimatedEmojiDrawable.findDocument(account, id);
             if (d != null) {
                 docs.add(d);
-                presetIds.add(d.id);
             } else if (presetsFetched.add(id)) {
                 // one fetch per id; the section is rebuilt with it
                 AnimatedEmojiDrawable.getDocumentFetcher(account).fetchDocument(id, doc -> AndroidUtilities.runOnUIThread(() -> {
@@ -706,7 +696,7 @@ public class QrEmojiPanel extends FrameLayout implements NotificationCenter.Noti
         private void bind(@NonNull RecyclerView.ViewHolder holder, int position) {
             final Section s = sections.get(sectionAt(position));
             if (holder.getItemViewType() == TYPE_HEADER) {
-                ((Header) holder.itemView).set(s.title, !premium && s.kind == KIND_PACK);
+                ((Header) holder.itemView).set(s.title, false);
                 return;
             }
             final TLRPC.Document document = s.documents.get(position - s.start - (s.title != null ? 1 : 0));

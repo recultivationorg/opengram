@@ -393,12 +393,6 @@ public class QrShareView extends View {
         showToast(R.drawable.msg_download, org.telegram.messenger.LocaleController.getString(R.string.QrSavedToGallery));
     }
 
-    /** Without Premium a custom emoji other than the presets was tapped: nothing is applied, the star toast explains it. */
-    public void showPremiumEmojiToast() {
-        showToast(0, org.telegram.messenger.LocaleController.getString(R.string.QrPremiumEmojiToast), org.telegram.messenger.LocaleController.getString(R.string.QrPremiumSubscribe));
-        haptic();
-    }
-
     private float toast;                // 0..1
     private long toastUntil;
     private final ArrayList<TL_stars.TL_starGiftUnique> gifts = new ArrayList<>();
@@ -1612,12 +1606,6 @@ public class QrShareView extends View {
 
     private void openLayer(int t) {
         if (!themeEditable) return;
-        // gifts as a theme are for Premium only; the colours and the emoji presets are for everyone
-        if (t == SCENE_GIFT && !org.telegram.messenger.UserConfig.getInstance(currentAccount).isPremium()) {
-            showToast(0, org.telegram.messenger.LocaleController.getString(R.string.QrPremiumGiftsToast), org.telegram.messenger.LocaleController.getString(R.string.QrPremiumSubscribe));
-            haptic();
-            return;
-        }
         if (t == SCENE_GIFT && (tab != t || sheet < 0.5f)) giftOpenAt = AnimationUtils.currentAnimationTimeMillis();
         tab = t;
         tabX = tab;

@@ -695,11 +695,6 @@ public class QrShareActivity extends BaseFragment {
                 @Override
                 public void onEmojiPicked(long documentId, @Nullable TLRPC.Document document) {
                     if (view == null) return;
-                    // without Premium only the presets apply; any other custom emoji: the Premium toast, nothing applied
-                    if (!getUserConfig().isPremium() && (emojiView == null || !emojiView.isPreset(documentId))) {
-                        view.showPremiumEmojiToast();
-                        return;
-                    }
                     view.pickCustomEmoji(documentId, document);
                     if (emojiView != null) emojiView.addRecent(documentId); // whatever styles the QR goes to Recent
                 }
