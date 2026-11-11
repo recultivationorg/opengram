@@ -54,10 +54,6 @@
 # https://developers.google.com/ml-kit/known-issues#android_issues
 -keep class com.google.mlkit.nl.languageid.internal.LanguageIdentificationJni { *; }
 
-# WidgetSandbox: JNI_OnLoad uses RegisterNatives; backend methods are called by native workers.
--keep class org.telegram.utils.twidget.WidgetSandboxNative { *; }
--keep class org.telegram.utils.twidget.WidgetSandboxBackend { *; }
-
 # Huawei Services
 -keep class com.huawei.hianalytics.**{ *; }
 -keep class com.huawei.updatesdk.**{ *; }

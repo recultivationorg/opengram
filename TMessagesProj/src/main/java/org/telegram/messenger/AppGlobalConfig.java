@@ -4,7 +4,6 @@ import android.content.SharedPreferences;
 import android.text.TextUtils;
 
 import org.telegram.tgnet.TLRPC;
-import org.telegram.utils.twidget.WidgetMedia;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -112,10 +111,6 @@ public class AppGlobalConfig {
     public final ConfigBoolean roundVideoRecorder2Allowed = ofBoolean("round_video_recorder_2_allowed", true);
     public final ConfigStringSet botAllowedSuffixes = ofStringSet("bot_allowed_suffixes", Collections.singleton("bot"));
 
-    // Kill switch for message widgets (messageMediaWidget): true and the client runs no widget code at all
-    // (WidgetSandboxSession#disabledByConfig). Kept across restarts; turned back on only by an explicit false.
-    public final ConfigBoolean widgetsDisabled = ofBoolean("widgets_disabled", false);
-
     /* * */
 
     public boolean apply(SharedPreferences.Editor editor, TLRPC.TL_jsonObject object) {
@@ -129,11 +124,6 @@ public class AppGlobalConfig {
             }
 
             changed |= configHandler.apply(editor, value.value);
-        }
-
-        if (widgetsDisabled.get()) {
-            // The widgets running now stop at once; new ones never start.
-            WidgetMedia.onKillSwitch();
         }
 
         return changed;

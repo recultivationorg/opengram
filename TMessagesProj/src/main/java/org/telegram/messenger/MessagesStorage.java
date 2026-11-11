@@ -51,7 +51,6 @@ import org.telegram.tgnet.tl.TL_update;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Adapters.DialogsSearchAdapter;
 import org.telegram.ui.ChatActivity;
-import org.telegram.utils.twidget.WidgetMedia;
 import org.telegram.ui.Components.Forum.ForumUtilities;
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble;
 import org.telegram.ui.Components.Reactions.ReactionsUtils;
@@ -1524,7 +1523,6 @@ public class MessagesStorage extends BaseController {
             } catch (Exception e) {
                 checkSQLException(e);
             }
-            WidgetMedia.onHeightsCleared(currentAccount);
         });
     }
 
@@ -1539,7 +1537,6 @@ public class MessagesStorage extends BaseController {
                 database.executeFast("DELETE FROM ephemeral_messages").stepThis().dispose();
                 database.executeFast("DELETE FROM widget_state").stepThis().dispose();
                 database.executeFast("DELETE FROM widget_heights").stepThis().dispose();
-                WidgetMedia.onStateCleared(currentAccount);
                 database.executeFast("DELETE FROM poll_votes_mentions").stepThis().dispose();
                 database.executeFast("DELETE FROM poll_votes_mentions_topics").stepThis().dispose();
                 database.executeFast("DELETE FROM reaction_mentions").stepThis().dispose();

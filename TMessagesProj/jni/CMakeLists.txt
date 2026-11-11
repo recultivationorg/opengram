@@ -209,9 +209,6 @@ add_library(${NATIVE_LIB} SHARED
         tests.cpp
 )
 
-include(twidget/twidget.cmake)
-twidget_target_sources(${NATIVE_LIB})
-
 # Compile JNI directly into the shared library so archive extraction cannot drop its exports.
 set(PRISMA_BRIDGE_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/prisma/bridge/PrismaEngine.cpp"

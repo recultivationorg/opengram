@@ -87,7 +87,6 @@ import org.telegram.ui.Components.TextStyleSpan;
 import org.telegram.ui.Components.TranscribeButton;
 import org.telegram.ui.Components.TypefaceSpan;
 import org.telegram.ui.Components.URLSpanBotCommand;
-import org.telegram.utils.twidget.WidgetMedia;
 import org.telegram.ui.Components.URLSpanBrowser;
 import org.telegram.ui.Components.URLSpanMono;
 import org.telegram.ui.Components.URLSpanNoUnderline;
@@ -1986,8 +1985,6 @@ public class MessageObject {
     public boolean hasRtl;
     public float textXOffset;
     public RichMessageLayout richLayout;
-    /** A widget message laid out as a rich one (WidgetMedia#richMessage); messageOwner.rich_message stays null. */
-    private TL_iv.RichMessage widgetRichMessage;
     public boolean richCheckboxEcho; // next edit-echo for this message is our own checkbox toggle -> reuse layout, skip relayout
     public ArrayList<TextLayoutBlock> textLayoutBlocks;
     public boolean hasCode;
@@ -6870,12 +6867,12 @@ public class MessageObject {
             type = TYPE_JOINED_CHANNEL;
             channelJoinedExpanded = MessagesController.getInstance(currentAccount).getMainSettings().getBoolean("c" + getDialogId() + "_rec", true);
         } else if (messageOwner instanceof TLRPC.TL_message || messageOwner instanceof TLRPC.TL_messageForwarded_old2) {
-            if (getMedia(messageOwner) instanceof TLRPC.TL_messageMediaUnsupported) {
+            if (getMedia(messageOwner) instanceof TLRPC.TL_messageMediaUnsupported || getMedia(messageOwner) instanceof TLRPC.TL_messageMediaWidget) {
                 contentType = 10;
                 type = TYPE_UNSUPPORTED;
             } else if (isRestrictedMessage) {
                 type = TYPE_TEXT;
-            } else if (messageOwner.rich_message != null || getMedia(messageOwner) instanceof TLRPC.TL_messageMediaWidget) {
+            } else if (messageOwner.rich_message != null) {
                 type = TYPE_ARTICLE;
 //                contentType = 9;
             } else if (emojiAnimatedSticker != null || emojiAnimatedStickerId != null) {
@@ -8948,27 +8945,7 @@ public class MessageObject {
         if (translated && messageOwner.translatedRichMessage != null) {
             return messageOwner.translatedRichMessage;
         }
-        if (messageOwner.rich_message == null && getMedia(messageOwner) instanceof TLRPC.TL_messageMediaWidget) {
-            if (widgetRichMessage == null) {
-                widgetRichMessage = WidgetMedia.richMessage(this, (TLRPC.TL_messageMediaWidget) getMedia(messageOwner));
-            }
-            return widgetRichMessage;
-        }
         return messageOwner.rich_message;
-    }
-
-    /**
-     * UI: the message was sent, it has its id and the server's media: the widget made for the temporary message (its
-     * id, no flags) is made anew, what it kept moves to the new id.
-     */
-    public void onWidgetMessageSent(int oldId) {
-        if (widgetRichMessage == null || !(getMedia(messageOwner) instanceof TLRPC.TL_messageMediaWidget)) {
-            return;
-        }
-        WidgetMedia.onMessageSent(currentAccount, getDialogId(), oldId, messageOwner.id);
-        widgetRichMessage = null;
-        generateLayout(null);
-        forceUpdate = true;
     }
 
     public void generateLayout(TLRPC.User fromUser) {

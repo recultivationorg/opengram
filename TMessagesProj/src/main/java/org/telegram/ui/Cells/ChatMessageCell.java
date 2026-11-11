@@ -80,7 +80,6 @@ import android.util.SparseArray;
 import android.util.StateSet;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
-import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.SoundEffectConstants;
 import android.view.View;
@@ -202,7 +201,6 @@ import org.telegram.ui.Components.RadialProgress2;
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.ReplyMessageLine;
-import org.telegram.ui.Components.RichWidgetBlock;
 import org.telegram.ui.Components.RoundVideoPlayingDrawable;
 import org.telegram.ui.Components.SeekBar;
 import org.telegram.ui.Components.SeekBarAccessibilityDelegate;
@@ -2298,62 +2296,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         return handled;
     }
 
-    // MotionEvent#getDownTime of the last press on the cell (isWidgetPress).
-    private long lastTouchDownTime;
-
-    /** The widget of a widget message, or null. */
-    private RichWidgetBlock widgetBlock() {
-        return currentMessageObject != null && isWidgetMessage() ? (RichWidgetBlock) currentMessageObject.richLayout.blocks.get(0) : null;
-    }
-
-    /**
-     * The current press is the widget's and a horizontal drag of it may still be the bubble's swipe-to-reply
-     * (docs/sdk-v1.md §5.5): the chat list keeps tracking the swipe while the widget holds its parents.
-     */
-    public boolean widgetMayGiveSwipe() {
-        RichWidgetBlock widget = widgetBlock();
-        return widget != null && widget.mayGiveSwipe();
-    }
-
-    /**
-     * A hold over the widget is the bubble's (touch-action: auto, docs/sdk-v1.md §5.5): the message menu, as a long
-     * press elsewhere on the bubble; the widget already got its pointercancel.
-     */
-    public void onWidgetHold() {
-        if (delegate == null) return;
-        try {
-            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-        } catch (Exception ignore) {}
-        delegate.didLongPress(this, lastTouchX, lastTouchY);
-    }
-
-    /** The last press on this cell landed on its widget: a double tap there is the widget's, not a reaction. */
-    public boolean isWidgetPress() {
-        RichWidgetBlock widget = widgetBlock();
-        return widget != null && lastTouchDownTime != 0 && widget.lastDownTime() == lastTouchDownTime;
-    }
-
-    /**
-     * A widget message draws its time over the widget's bottom corner, as a photo does (docs/sdk-v1.md §5.12): no
-     * caption below the widget (none, or shown above it), a bubble, no reactions row under it. The widget gets the
-     * band and the corner as its content safe area (RichWidgetBlock#setSafeArea).
-     */
-    private boolean widgetTimeOver() {
-        return currentMessageObject != null && isWidgetMessage() && !isCompactIn()
-            && (TextUtils.isEmpty(currentMessageObject.caption) || captionAbove)
-            && (reactionsLayoutInBubble.isEmpty || reactionsLayoutInBubble.isSmall);
-    }
-
-    // The widget's frame as last drawn, in the cell's px, while its time is over it (getPhotoBottom, the time's x).
-    private float widgetRight, widgetBottom;
-
-    /** A widget message (messageMediaWidget) laid out as a rich message: the widget is its only block. */
-    private boolean isWidgetMessage() {
-        final RichMessageLayout layout = currentMessageObject.richLayout;
-        return currentMessageObject.type == MessageObject.TYPE_ARTICLE && layout != null
-            && layout.blocks.size() == 1 && layout.blocks.get(0) instanceof RichWidgetBlock;
-    }
-
     private boolean checkTextBlockMotionEvent(MotionEvent event) {
         if (!(currentMessageObject.type == MessageObject.TYPE_TEXT || currentMessageObject.type == MessageObject.TYPE_EMOJIS || currentMessageObject.type == MessageObject.TYPE_STORY_MENTION) || currentMessageObject.textLayoutBlocks == null || currentMessageObject.textLayoutBlocks.isEmpty() || !(currentMessageObject.messageText instanceof Spannable)) {
             return false;
@@ -4330,7 +4272,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) lastTouchDownTime = event.getDownTime();
         if (currentMessageObject == null || delegate != null && !delegate.canPerformActions() || animationRunning) {
             if (currentMessageObject != null && currentMessageObject.richLayout != null
                     && (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL)) {
@@ -4914,12 +4855,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 x -= dp(1.33f);
                 y = this.factCheckY;
                 textSelectionHelper.setMaybeTextCord(x + dp(10) - factCheck.textLayoutLeft, y + dp(22));
-            } else if (hasRichLayout && isWidgetMessage() && getEventY(event) < textY + currentMessageObject.richLayout.getHeight()) {
-                // A widget's selectable text (sdk-v1 §5.10) is over its caption: a touch on the widget selects there.
-                textSelectionHelper.setIsDescription(false);
-                textSelectionHelper.setIsFactCheck(false);
-                textSelectionHelper.setIsRich(true);
-                textSelectionHelper.setMaybeTextCord(textX, textY);
             } else if (hasCaptionLayout()) {
                 textSelectionHelper.setIsDescription(false);
                 textSelectionHelper.setIsFactCheck(false);
@@ -7244,10 +7179,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 }
                 if (messageObject.isSponsored()) {
                     totalHeight = dp(22.5f);
-                } else if (messageObject.type == MessageObject.TYPE_ARTICLE && widgetTimeOver()) {
-                    // No time line: the widget ends the bubble 2 dp inside its edge, as on the sides and the top
-                    // (textY is 5 dp from the bubble's top without a name), and the time goes over its corner.
-                    totalHeight = messageObject.richLayout.getHeight() + dp(8 + (namesOffset <= 0 ? -3 : 2) + 5) + namesOffset;
                 } else if (messageObject.type == MessageObject.TYPE_ARTICLE) {
                     totalHeight = messageObject.richLayout.getHeight() + dp(19.5f) + namesOffset;
                 } else {
@@ -9953,21 +9884,11 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                                 captionHeight = captionLayout.textHeight();
                             }
                             totalHeight += captionHeight + (currentMessageObject.type != MessageObject.TYPE_POLL ? dp(9) : 0);
-                            final boolean widgetCaptionAbove = captionLayout != null && isWidgetMessage() && captionAbove;
-                            if (widgetCaptionAbove) {
-                                // The caption above the widget (invert_media), the time over its corner: the caption
-                                // from 9 dp, the widget 6 dp under it (layoutTextXY) and 5 dp above the bubble's bottom.
-                                totalHeight -= dp(9) + dp(8 + (namesOffset <= 0 ? -3 : 2) + 5) - dp(8 + 7 + 5);
-                            } else if (captionLayout != null && isWidgetMessage()) {
-                                // The caption sits 6 dp under the widget, like a photo's: the rich layout's
-                                // own 19.5 dp below it are for a time line the caption already carries.
-                                totalHeight -= dp(19.5f + 9) - dp(namesOffset <= 0 ? 5 : 10) - dp(6 + 10);
-                            }
-                            if (!widgetCaptionAbove && captionLayout != null && (captionLayout.hasCodeAtBottom || captionLayout.hasQuoteAtBottom)) {
+                            if (captionLayout != null && (captionLayout.hasCodeAtBottom || captionLayout.hasQuoteAtBottom)) {
                                 captionHeight += dp(10);
                                 totalHeight += dp(10);
                             }
-                            if (!widgetCaptionAbove && currentMessageObject.type != MessageObject.TYPE_POLL && (reactionsLayoutInBubble.isEmpty || reactionsLayoutInBubble.isSmall) && (currentPosition == null || (currentPosition.flags & captionFlag()) != 0)) {
+                            if (currentMessageObject.type != MessageObject.TYPE_POLL && (reactionsLayoutInBubble.isEmpty || reactionsLayoutInBubble.isSmall) && (currentPosition == null || (currentPosition.flags & captionFlag()) != 0)) {
                                 int timeWidthTotal = timeWidth + (messageObject.isOutOwner() ? dp(20) : 0) + getExtraTimeX();
                                 if (width2 - dp(8) - lastCaptionLineWidth < timeWidthTotal || hasFactCheck()) {
                                     totalHeight += dp(14);
@@ -10574,12 +10495,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     @Override
     protected boolean onLongPress() {
         if (currentMessageObject != null && currentMessageObject.richLayout != null && currentMessageObject.richLayout.isHorizontallyDragging()) {
-            // The widget claimed holds (touch-action: none) or has a drag of this press: no message menu (sdk-v1 §5.5).
-            return false;
-        }
-        if (isWidgetPress()) {
-            // A hold over the widget is timed by the gesture policy (500 ms, sdk-v1 §5.5), not by the system's long
-            // press: the widget's arbiter opens the menu (onWidgetHold) together with the widget's pointercancel.
             return false;
         }
         if (isRoundVideo && isPlayingRound && MediaController.getInstance().isPlayingMessage(currentMessageObject)) {
@@ -11389,11 +11304,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     private void calcBackgroundWidth(int maxWidth, int timeMore, int maxChildWidth) {
         if (currentMessageObject.isSponsored()) {
-            backgroundWidth = maxChildWidth + dp(31);
-            return;
-        }
-        if (widgetTimeOver()) {
-            // The time goes over the widget's corner (docs/sdk-v1.md §5.12): no line of its own, nothing to widen.
             backgroundWidth = maxChildWidth + dp(31);
             return;
         }
@@ -12232,8 +12142,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             } else {
                 timeLayout = null;
             }
-            // An outgoing widget's time over its corner sits as a photo's: the ticks over media keep to layoutWidth.
-            if (mediaBackground || widgetTimeOver() && currentMessageObject.isOutOwner()) {
+            // An outgoing photo's time over its corner sits as a photo's: the ticks over media keep to layoutWidth.
+            if (mediaBackground) {
                 if (currentMessageObject.isOutOwner()) {
                     timeX = layoutWidth - timeWidth - dp(42.0f);
                 } else if (isCompactIn()) {
@@ -12284,7 +12194,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             if (effectId != 0) {
                 timeX += dp(14 + 4);
             }
-            updateWidgetSafeArea();
 
             final boolean isInWelcomeMessages = delegate != null && delegate.getChatMode() == ChatActivity.MODE_WELCOME_MESSAGES;
             if ((currentMessageObject.messageOwner.flags & TLRPC.MESSAGE_FLAG_HAS_VIEWS) != 0 && !isInWelcomeMessages) {
@@ -12766,16 +12675,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 }
                 canvas.translate(textX, textY);
                 layout.draw(canvas, padLeft, padRight, transitionParams);
-                final RichWidgetBlock widget = widgetBlock();
-                if (widget != null && widgetTimeOver()) {
-                    // The time over the widget's corner: its backing 6 dp inside the widget's bottom edge and, for an
-                    // incoming message, its right one (an outgoing one's sits as a photo's, onLayout).
-                    widgetRight = textX + widget.drawnRight();
-                    widgetBottom = textY + widget.drawnBottom();
-                    if (!currentMessageObject.isOutOwner()) {
-                        timeX = (int) (widgetRight - dp(6) - timeWidth - RichWidgetBlock.timePadding() + (effectId != 0 ? dp(14 + 4) : 0) - transitionParams.deltaRight);
-                    }
-                }
                 // drawn on top, so block backgrounds (table headers, code) don't cover them
                 if (delegate != null && delegate.getTextSelectionHelper() != null) {
                     delegate.getTextSelectionHelper().drawRich(currentMessageObject, layout, canvas);
@@ -13542,24 +13441,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         }
     }
 
-    /** The widget hears of its time's band and corner (docs/sdk-v1.md §5.12) when the bubble's layout changes them. */
-    private void updateWidgetSafeArea() {
-        final RichWidgetBlock widget = widgetBlock();
-        // Taken again from the next draw.
-        widgetRight = widgetBottom = 0;
-        if (widget == null) return;
-        if (widgetTimeOver()) {
-            widget.setSafeArea(RichWidgetBlock.timeBand(), RichWidgetBlock.timeCorner(timeWidth, currentMessageObject.isOutOwner()));
-        } else {
-            widget.setSafeArea(0, 0);
-        }
-    }
-
     public float getPhotoBottom() {
-        if (widgetTimeOver()) {
-            // Not drawn yet: where layoutHeight puts it (the bubble's path ends 3 dp above, the widget 2 dp above that).
-            return widgetBottom > 0 ? widgetBottom : layoutHeight - dp(5);
-        }
         if (groupMedia != null) {
             return groupMedia.y + groupMedia.height;
         } else {
@@ -13743,10 +13625,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
         } else {
             textY = dp(8) + namesOffset;
             if (currentMessageObject.type == MessageObject.TYPE_ARTICLE) {
-                if (captionAbove && captionLayout != null && isWidgetMessage()) {
-                    // The caption from 9 dp (updateCaptionLayout), the widget 6 dp under it.
-                    textY += captionLayout.textHeight() + dp(7);
-                } else if (currentMessageObject.richLayout != null && currentMessageObject.richLayout.startsWithMedia()) {
+                if (currentMessageObject.richLayout != null && currentMessageObject.richLayout.startsWithMedia()) {
                     textY += dp(namesOffset <= 0 ? -3 : 2);
                 }
             } else {
@@ -15517,8 +15396,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     /**
      * The text of a message's time (measureTime): `current` is the message the cell shows, `message` the one whose
-     * time it is (an album's), `editDate` the latest edit. Also a widget's estimate of the corner its time takes
-     * before a cell lays it out (RichWidgetBlock#estimateSafeArea).
+     * time it is (an album's), `editDate` the latest edit.
      */
     public static String timeString(MessageObject current, MessageObject message, boolean edited, int editDate) {
         if (current.notime || current.isSponsored() || current.isQuickReply() || current.isWelcomeMessage()) {
@@ -21239,7 +21117,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
     }
 
     private boolean shouldDrawTimeOnMediaIgnoringCompact() {
-        if (widgetTimeOver()) return true;
         return mediaBackground && (captionLayout == null || captionAbove) && (reactionsLayoutInBubble.isEmpty || reactionsLayoutInBubble.isSmall || currentMessageObject != null && (currentMessageObject.isAnyKindOfSticker() || currentMessageObject.isRoundVideo())) || currentMessageObject != null && currentMessageObject.type == MessageObject.TYPE_PAID_MEDIA/* || isMedia && drawCommentButton && !isRepliesChat*/;
     }
 
@@ -21480,11 +21357,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             paint.setAlpha((int) (oldAlpha * timeAlpha * alpha * .6f));
 
             int r;
-            if (widgetTimeOver()) {
-                // The widget's bottom corner under the time follows the bubble's (RichWidgetBlock#cornerRadii).
-                r = Math.min(dp(8), SharedConfig.bubbleRadius > 2 ? dp(SharedConfig.bubbleRadius - 2) : dp(SharedConfig.bubbleRadius));
-                bigRadius = SharedConfig.bubbleRadius >= 10;
-            } else if (documentAttachType != DOCUMENT_ATTACH_TYPE_ROUND && documentAttachType != DOCUMENT_ATTACH_TYPE_STICKER && currentMessageObject.type != MessageObject.TYPE_EMOJIS) {
+            if (documentAttachType != DOCUMENT_ATTACH_TYPE_ROUND && documentAttachType != DOCUMENT_ATTACH_TYPE_STICKER && currentMessageObject.type != MessageObject.TYPE_EMOJIS) {
                 int[] rad = photoImage.getRoundRadius();
                 r = Math.min(dp(8), Math.max(rad[2], rad[3]));
                 bigRadius = SharedConfig.bubbleRadius >= 10;
@@ -23236,14 +23109,6 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
 
     @Override
     public boolean onHoverEvent(MotionEvent event) {
-        RichWidgetBlock widget = widgetBlock();
-        if (widget != null && event.isFromSource(InputDevice.SOURCE_MOUSE)) {
-            // A mouse over the widget: its :hover and cursor (the touch path's coordinates, checkRichLayoutMotionEvent).
-            final float textY = getStarsPriceTopPadding() + suggestionOfferTopPadding + getTopicSeparatorTopPadding() + this.textY;
-            event.offsetLocation(-textX, -textY);
-            widget.onHoverEvent(event);
-            event.offsetLocation(textX, textY);
-        }
         int x = (int) getEventX(event);
         int y = (int) getEventY(event);
         if (event.getAction() == MotionEvent.ACTION_HOVER_ENTER || event.getAction() == MotionEvent.ACTION_HOVER_MOVE) {

@@ -84,7 +84,6 @@ import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.Cells.ChatMessageTransitionParams;
 import org.telegram.ui.Cells.TextSelectionHelper;
-import org.telegram.ui.Components.RichWidgetBlock;
 import org.telegram.ui.Components.AnimatedArrowDrawable;
 import org.telegram.ui.Components.AnimatedFileDrawable;
 import org.telegram.ui.Components.AnimatedFloat;
@@ -348,7 +347,7 @@ public class RichMessageLayout {
     public boolean startsWithMedia() {
         if (blocks.isEmpty()) return false;
         final RichBlock first = blocks.get(0);
-        return first instanceof RichPhotoBlock || first instanceof RichVideoBlock || first instanceof RichCollageBlock || first instanceof RichSlideshowBlock || first instanceof RichWidgetBlock;
+        return first instanceof RichPhotoBlock || first instanceof RichVideoBlock || first instanceof RichCollageBlock || first instanceof RichSlideshowBlock;
     }
 
     private RichMessageLayout prev;
@@ -1179,12 +1178,6 @@ public class RichMessageLayout {
                 anchors.put(anchor.name.toLowerCase(), blocks.size());
             }
             return null;
-        } else if (pageBlock instanceof TL_iv.pageBlockEmbed && RichWidgetBlock.supports((TL_iv.pageBlockEmbed) pageBlock)) {
-            final TL_iv.pageBlockEmbed embed = (TL_iv.pageBlockEmbed) pageBlock;
-            final RichBlock block = new RichWidgetBlock(this, padding, RichWidgetBlock.contentWidth(embed, maxWidth), embed, blocks.isEmpty());
-            blocks.add(block);
-            emitCaption(embed.caption, padding, textFlags);
-            return block;
         } else if (pageBlock instanceof TL_iv.pageBlockUnsupported) {
             final int o = BitwiseUtils.hasFlag(textFlags, TEXT_FLAG_BLOCK_QUOTE) ? dp(6) : level > 0 ? dp(4) : 0;
             final RichUnsupportedBlock block = new RichUnsupportedBlock(this, new Rect(
@@ -1873,8 +1866,7 @@ public class RichMessageLayout {
     public boolean onTouchEvent(MotionEvent event) {
         final int act = event.getActionMasked();
 
-        // A widget spans the bubble, its text paddings included; compact mode's paddings are the page's edges.
-        final float minX = startsWithMedia() && blocks.get(0) instanceof RichWidgetBlock ? -padLeft : isCompactIn() ? 0 : padLeft;
+        final float minX = isCompactIn() ? 0 : padLeft;
         if (act == MotionEvent.ACTION_DOWN && (event.getX() < minX || event.getX() > getMinWidth() + padRight)) {
             return false;
         }

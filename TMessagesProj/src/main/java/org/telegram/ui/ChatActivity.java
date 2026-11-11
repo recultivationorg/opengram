@@ -282,10 +282,9 @@ import org.telegram.ui.Components.blur3.DownscaleScrollableNoiseSuppressor;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProviderThemed;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProvider;
 import org.telegram.ui.Components.blur3.drawable.color.impl.BlurredBackgroundProviderImpl;
-import org.telegram.utils.glass.source.GlassSourceWrapped;
-import org.telegram.utils.glass.source.GlassSourceCrossfade;
-import org.telegram.utils.twidget.WidgetMedia;
 import org.telegram.ui.Components.blur3.utils.Blur3Utils;
+import org.telegram.utils.glass.source.GlassSourceCrossfade;
+import org.telegram.utils.glass.source.GlassSourceWrapped;
 import org.telegram.ui.Components.chat.ChatActivityBottomViewsVisibilityController;
 import org.telegram.ui.Components.chat.ChatActivityDraftMessageMeasureController;
 import org.telegram.ui.Components.chat.ChatActivityMessageMetricsView;
@@ -1205,8 +1204,6 @@ public class ChatActivity extends BaseFragment implements
     private float pullingDownAnimateProgress;
     private AnimatorSet fragmentTransition;
     private ChatActivity backToPreviousFragment;
-    /** How long the first messages wait for the heights of the widgets they show (WidgetMedia). */
-    private static final long WIDGET_HEIGHTS_WAIT_MS = 150;
     private Runnable fragmentTransitionRunnable = new Runnable() {
         @Override
         public void run() {
@@ -1920,8 +1917,6 @@ public class ChatActivity extends BaseFragment implements
         @Override
         public boolean hasDoubleTap(View view, int position) {
             if (isQuickRepliesOrWelcomeMessagesMode()) return false;
-            // A double tap over a widget is the widget's (dblclick, docs/sdk-v1.md §5.5): the reaction is outside it.
-            if (view instanceof ChatMessageCell && ((ChatMessageCell) view).isWidgetPress()) return false;
             String reactionStringSetting = getMediaDataController().getDoubleTapReaction();
             TLRPC.TL_availableReaction reaction = getMediaDataController().getReactionsMap().get(reactionStringSetting);
             if (reaction == null && (reactionStringSetting == null || !reactionStringSetting.startsWith("animated_"))) {
@@ -5243,8 +5238,7 @@ public class ChatActivity extends BaseFragment implements
             @Override
             public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
                 super.requestDisallowInterceptTouchEvent(disallowIntercept);
-                // A widget holds its parents until it knows whether a swipe is its own: the swipe stays tracked.
-                if (slidingView != null && !(slidingView instanceof ChatMessageCell && ((ChatMessageCell) slidingView).widgetMayGiveSwipe())) {
+                if (slidingView != null) {
                     processTouchEvent(null);
                 }
             }
@@ -9989,17 +9983,13 @@ public class ChatActivity extends BaseFragment implements
         return topicsTabs != null ? topicsTabs.areTabsEnabled() : ChatObject.isForum(currentChat) && areTopicsTabsEnabled();
     }
     /**
-     * Widget messages take the side menu's width as they arrive, not when a cell binds them: their widgets
-     * run off screen at the width of their layout for their heights (WidgetMedia#measure). The first
-     * messages may come before the topics: the side menu the user chose is the one they will be shown with.
+     * Compact albums take the side menu's width as they arrive, not when a cell binds them.
      */
-    private void layOutWidgetsForSideMenu(ArrayList<MessageObject> arr) {
+    private void layOutCompactAlbumsForSideMenu(ArrayList<MessageObject> arr) {
         if (arr == null || topicsTabs == null || !topicsTabs.isSideMenuChosen()) return;
         for (int i = 0; i < arr.size(); i++) {
             MessageObject object = arr.get(i);
-            if (object != null && object.type == MessageObject.TYPE_ARTICLE && WidgetMedia.isWidget(MessageObject.getMedia(object.messageOwner))) {
-                object.updateSideMenuEnabled(true);
-            } else if (object != null && object.isCompactMode() && !object.isOutOwner() && object.getGroupId() != 0) {
+            if (object != null && object.isCompactMode() && !object.isOutOwner() && object.getGroupId() != 0) {
                 // compact albums are laid out past the side menu (GroupedMessages#applyCompactSpans)
                 object.updateSideMenuEnabled(true);
             }
@@ -21343,7 +21333,7 @@ public class ChatActivity extends BaseFragment implements
             postponedScrollToLastMessageQueryIndex = 0;
         }
         ArrayList<MessageObject> messArr = (ArrayList<MessageObject>) args[2];
-        layOutWidgetsForSideMenu(messArr);
+        layOutCompactAlbumsForSideMenu(messArr);
 
         boolean universalNotify = false;
         HashMap<Integer, MessageObject> oldMessages = null;
@@ -22574,14 +22564,10 @@ public class ChatActivity extends BaseFragment implements
         chatWasReset = false;
 
         if (isFirstLoading) {
-            // Widgets on screen with no height yet are given the open animation's wait to get theirs.
-            AndroidUtilities.runOnUIThread(() -> WidgetMedia.whenShownHeightsKnown(() -> {
-                resumeDelayedFragmentAnimation();
-
-                AndroidUtilities.cancelRunOnUIThread(fragmentTransitionRunnable);
-                fragmentTransitionRunnable.run();
-                getNotificationCenter().runDelayedNotifications();
-            }, WIDGET_HEIGHTS_WAIT_MS));
+            resumeDelayedFragmentAnimation();
+            AndroidUtilities.cancelRunOnUIThread(fragmentTransitionRunnable);
+            fragmentTransitionRunnable.run();
+            getNotificationCenter().runDelayedNotifications();
         }
 
         if (did == dialog_id && !messages.isEmpty() && currentUser != null && (bottomOverlayStartButton != null && bottomOverlayStartButton.getVisibility() == View.VISIBLE)) {
@@ -23295,7 +23281,6 @@ public class ChatActivity extends BaseFragment implements
                 obj.messageOwner.id = newMsgId;
                 obj.messageOwner.send_state = MessageObject.MESSAGE_SEND_STATE_SENT;
                 obj.forceUpdate = mediaUpdated;
-                obj.onWidgetMessageSent(msgId);
                 addReplyMessageOwner(obj, msgId);
                 if (args.length >= 6) {
                     obj.applyMediaExistanceFlags((Integer) args[5]);
@@ -26189,7 +26174,7 @@ public class ChatActivity extends BaseFragment implements
     private void processNewMessages(ArrayList<MessageObject> arr, final boolean animatedFromBottom) {
         arr = OpengramContentFilter.withoutHidden(currentAccount, dialog_id, arr);
         FileLog.d("processNewMessages " + arr.size() + " messages");
-        layOutWidgetsForSideMenu(arr);
+        layOutCompactAlbumsForSideMenu(arr);
 
         final boolean isBot = UserObject.isBot(currentUser);
         final boolean isStreamingTopic = isBot && BotForumHelper.getInstance(currentAccount).isStreamingTopic(getDialogId(), getTopicId());
